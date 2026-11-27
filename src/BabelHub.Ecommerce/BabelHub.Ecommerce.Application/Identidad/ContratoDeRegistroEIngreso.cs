@@ -1,6 +1,15 @@
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Domain.Identidad;
 
 namespace BabelHub.Ecommerce.Application.Identidad;
+
+/// <summary>Lo que la política de contraseñas exige (IDE-15), para que la interfaz lo diga sin repetir las cifras. La política completa (normalización y lista de contraseñas comunes) la aplica el servidor al guardar.</summary>
+public static class ReglasDeContrasena
+{
+    public const int LongitudMinima = PoliticaDeContrasenas.LongitudMinima;
+
+    public const int LongitudMaxima = PoliticaDeContrasenas.LongitudMaxima;
+}
 
 /// <summary>
 /// Registro y verificación del correo (IDE-01, IDE-13, IDE-16, IDE-34, IDE-39, IDE-56, IDE-84, IDE-88). Las respuestas no revelan si el correo ya existe ni nada de la cuenta existente; los fallos son categorías

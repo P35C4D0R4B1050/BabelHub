@@ -253,7 +253,7 @@ public sealed class RegistroController(
         if (!resultado.EsExito)
         {
             var mensaje = resultado.Error!.Categoria is CategoriaDeError.Limite or CategoriaDeError.NoDisponible ? TextoDelError(resultado.Error) : resultado.Error.Categoria == CategoriaDeError.Validacion && resultado.Error.Errores.Count > 0 && resultado.Error.Errores[0].Campo.Contains("contrasena", StringComparison.OrdinalIgnoreCase)
-                ? "La contraseña no cumple las reglas: usa al menos 12 caracteres y evita las muy comunes."
+                ? $"La contraseña no cumple las reglas: usa de {ReglasDeContrasena.LongitudMinima} a {ReglasDeContrasena.LongitudMaxima} caracteres y evita las muy comunes."
                 : TextoCodigoInvalido;
             return await Pintar(PantallaDelRegistro.ConfirmarRecuperacion, correo, mensaje, CodigoHttp(resultado.Error), "Recupera tu acceso", cancelacion);
         }
@@ -282,7 +282,8 @@ public sealed class RegistroController(
         CategoriaDeError.Conflicto => "No pudimos crear la cuenta con esos datos. Si ya tienes una, ingresa o recupera tu acceso.",
         CategoriaDeError.Validacion => error.Errores.FirstOrDefault()?.Clave switch
         {
-            "demasiado-corta" => "La contraseña es demasiado corta: usa al menos 12 caracteres.",
+            "demasiado-corta" => $"La contraseña es demasiado corta: usa al menos {ReglasDeContrasena.LongitudMinima} caracteres.",
+            "demasiado-larga" => $"La contraseña es demasiado larga: usa como máximo {ReglasDeContrasena.LongitudMaxima} caracteres.",
             "demasiado-comun" => "Esa contraseña es muy común. Elige otra.",
             "correo-invalido" => "El correo no es válido.",
             "version-de-textos-cambio" => "Los textos legales cambiaron mientras leías. Revisa y acepta la versión nueva.",

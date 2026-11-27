@@ -57,7 +57,7 @@
 
         case PantallaDelIngreso.ContrasenaTemporal:
             <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Cambia tu contraseña temporal</h1>
-            <p class="mt-2">Ingresaste con una contraseña temporal. Elige una nueva de al menos 12 caracteres; puedes pegarla desde tu gestor de contraseñas.</p>
+            <p class="mt-2">Ingresaste con una contraseña temporal. Elige una nueva de al menos @BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima caracteres; puedes pegarla desde tu gestor de contraseñas.</p>
             <partial name="_MensajeDelIngreso" model="Model" />
             <form method="post" action="/ingreso/contrasena" class="mt-6 flex flex-col gap-4">
                 <partial name="_TokenAntifalsificacion" />

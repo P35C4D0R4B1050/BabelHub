@@ -383,6 +383,46 @@ public sealed class PantallasDeAccesoTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-13")]
+    public async Task Las_pantallas_de_contrasena_nueva_piden_las_diez_de_la_politica_y_el_navegador_no_rechaza_lo_que_el_servidor_acepta()
+    {
+        using var registro = await _host.Cliente.SendAsync(_host.Pedir("/registro"));
+        using var recuperacion = await _host.Enviar("/recuperacion", [new("correo", "nadie@correo.example")]);
+        _host.Ingreso.Paso = PasoPendienteDelIngreso.CambiarContrasenaTemporal;
+        using var temporal = await _host.Cliente.SendAsync(_host.Pedir("/ingreso", CookieDelDesafio));
+
+        foreach (var (respuesta, texto) in new[] { (registro, "mínimo 10 caracteres"), (recuperacion, "mínimo 10 caracteres"), (temporal, "al menos 10 caracteres") })
+        {
+            var html = System.Net.WebUtility.HtmlDecode(Cuerpo(respuesta));
+            Assert.Contains(texto, html, StringComparison.Ordinal);
+            Assert.DoesNotContain("12 caracteres", html, StringComparison.Ordinal);
+            // El «minlength» del navegador cuenta unidades UTF-16 y el servidor caracteres Unicode tras normalizar: la longitud la decide solo el servidor.
+            Assert.DoesNotContain("minlength", html, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Una contraseña de 10 caracteres llega a Identidad, que es quien decide.
+        using var diez = await _host.Enviar("/recuperacion/confirmar", [new("correo", "ana@correo.example"), new("codigo", "123456"), new("contrasenaNueva", "diez letra"), new("confirmacion", "diez letra")]);
+        Assert.Equal(HttpStatusCode.OK, diez.StatusCode);
+        Assert.Contains("confirmar", _host.Recuperacion.Llamadas);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-13")]
+    [InlineData("demasiado-corta", "usa al menos 10 caracteres")]
+    [InlineData("demasiado-larga", "usa como máximo 128 caracteres")]
+    [InlineData("demasiado-comun", "Esa contraseña es muy común")]
+    public async Task El_rechazo_de_una_contrasena_nueva_dice_el_motivo_con_las_cifras_de_la_politica(string clave, string texto)
+    {
+        _host.Registro.Alta = Resultado<RespuestaUniforme>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Validacion, "datos-invalidos", [new ErrorDeCampo("contrasena", clave)]));
+        var campos = new KeyValuePair<string, string>[] { new("nombre", "Ana Pérez"), new("correo", "ana@correo.example"), new("contrasena", "corta"), new("versionDeTerminos", "T-2026-11"), new("versionDePrivacidad", "P-2026-11"), new("acepto", "si"), new("mayorDeEdad", "si") };
+
+        using var respuesta = await _host.Enviar("/registro", campos);
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Contains(texto, System.Net.WebUtility.HtmlDecode(Cuerpo(respuesta)), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-20")]
     public async Task El_registro_sin_aceptar_o_sin_declarar_la_mayoria_de_edad_no_llega_a_Identidad()
     {

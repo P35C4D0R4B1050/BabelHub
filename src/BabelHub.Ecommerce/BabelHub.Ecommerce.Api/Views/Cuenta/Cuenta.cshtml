@@ -105,7 +105,7 @@
                 <form method="post" action="/cuenta/contrasena" class="mt-3 flex max-w-md flex-col gap-4">
                     <partial name="_TokenAntifalsificacion" />
                     <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
-                    <label class="form-control"><span class="label-text">Contraseña nueva (mínimo 12 caracteres)</span><input type="password" name="nueva" class="input input-bordered w-full" required minlength="12" maxlength="1024" autocomplete="new-password" /></label>
+                    <label class="form-control"><span class="label-text">Contraseña nueva (mínimo @ReglasDeContrasena.LongitudMinima caracteres)</span><input type="password" name="nueva" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
                     <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
                     @if (acciones)
                     {

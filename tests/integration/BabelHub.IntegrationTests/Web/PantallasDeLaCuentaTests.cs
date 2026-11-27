@@ -158,6 +158,18 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
 [Fact]    [Trait("Criterio", "AC-WEB-33")]    public async Task Cambiar_la_contrasena_o_desactivar_el_segundo_factor_entrega_a_Identidad_la_renovacion_de_la_sesion_actual_para_conservarla()    {        using var contrasena = await Enviar("/cuenta/contrasena", ("actual", "la contraseña actual"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _argumentos.Remove("renovacion");        using var desactivado = await Enviar("/cuenta/segundo-factor/desactivar", ("actual", "la contraseña actual"), ("codigo", "123456"));        Assert.Equal(HttpStatusCode.SeeOther, contrasena.StatusCode);        Assert.Equal(HttpStatusCode.SeeOther, desactivado.StatusCode);        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _sesiones.Renovacion = null;        _argumentos.Remove("renovacion");        using var sinSesionLegible = await Enviar("/cuenta/contrasena", ("actual", "x"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Null(_argumentos["renovacion"]);    }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-13")]
+    public async Task El_cambio_de_contrasena_de_la_cuenta_pide_las_diez_de_la_politica_sin_minlength_del_navegador()
+    {
+        using var respuesta = await Pedir("/cuenta/datos");
+
+        var html = System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("mínimo 10 caracteres", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("12 caracteres", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("minlength", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-29")]
     public async Task Un_campo_de_mas_o_una_confirmacion_distinta_se_rechazan_sin_llamar_a_Identidad_ni_repetir_la_contrasena()
     {

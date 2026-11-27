@@ -338,7 +338,8 @@ public sealed class IngresoController(
     /// <summary>Las razones de una contraseña nueva rechazada, en palabras de la persona y sin repetir lo que escribió.</summary>
     private static string TextoDeLaContrasena(ErrorDeAplicacion error) => error.Errores.FirstOrDefault()?.Clave switch
     {
-        "demasiado-corta" => "La contraseña es demasiado corta: usa al menos 12 caracteres.",
+        "demasiado-corta" => $"La contraseña es demasiado corta: usa al menos {ReglasDeContrasena.LongitudMinima} caracteres.",
+        "demasiado-larga" => $"La contraseña es demasiado larga: usa como máximo {ReglasDeContrasena.LongitudMaxima} caracteres.",
         "demasiado-comun" => "Esa contraseña es muy común. Elige otra.",
         "igual-a-la-actual" => "La contraseña nueva debe ser distinta de la anterior.",
         _ => "La contraseña no cumple las reglas. Elige otra más larga y poco común.",
