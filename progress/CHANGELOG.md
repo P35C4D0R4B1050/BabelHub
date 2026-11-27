@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — Primera versión publicada y colaboración en la interfaz (coordinación)
+
+### Cubierto
+- `v0.1.1` publicada en GHCR y guía 08 §5 con las dos aprobaciones del lanzamiento (`37ced2df`).
+- Reglas, tablero y control de rutas para que Codex trabaje solo la interfaz (`docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`, `progress/coordinacion-ui.md`, `scripts/guardia-ui.sh`).
+- Registrada la operación manual sobre el segundo factor de la administración (`log/2026-11-27-despliegue-observaciones-y-colaboracion.md`).
+
+### Pendiente
+- Publicar la compra desde la ficha y las mejoras de acceso, actualizar las VMs y enviar la tienda a Culqi (B14).
+
 ## 2026-11-26 — La tienda sin pasarela para la revisión de Culqi (carril `sin-pasarela`)
 
 ### Cubierto

@@ -32,6 +32,20 @@ No hay un canal directo entre agentes: se coordinan con [`progress/coordinacion-
 
 **Todo lo demás está prohibido**, en particular: Dominio, Aplicación, Infraestructura, controladores y cualquier `.cs`; base de datos; `specs/`; `tests/`; `infra/`, `scripts/`, `.github/`; archivos de proyecto y dependencias; `AGENTS.md` y `CLAUDE.md`; textos legales; secretos; `bh.js`, `admin-catalogo.js` e `indice-infinito.js`.
 
+## 2 bis. Qué referencia vale
+
+Ambos agentes parten de la misma información. Si dos fuentes se contradicen, gana la de arriba y se anota en «Peticiones».
+
+1. `AGENTS.md`.
+2. La spec de la función (`specs/<feature>/spec.md`) y `docs/`, en particular `docs/06-experiencia-de-usuario/`.
+3. La aplicación actual de `main`: lo que el sistema hace hoy.
+4. `prototype/ui-v2/`: referencia visual y de recorrido. Puede ofrecer cosas que la aplicación o la spec no tienen; no se copian sin pedirlo.
+5. `progress/coordinacion-ui.md`: tareas y observaciones vigentes de la persona.
+
+**La primera versión de la interfaz (`prototype/ui/`, v1) está retirada** (`docs/06-experiencia-de-usuario/03-estados-accesibilidad-y-criterios.md`). Si se comparte con un agente, es solo historia: no define diseño, textos, recorridos ni funciones. Lo que se rescate de ella se pide como cambio y se decide antes de hacerlo.
+
+El trabajo de ramas sin integrar todavía no está en `main`: se consulta en «Reservado».
+
 ## 3. Reglas de la interfaz
 
 1. **Solo apariencia.** No se cambia lo que el sistema hace. Mover una función, agregar o quitar un dato o cambiar un recorrido es un cambio de comportamiento: necesita spec (`AGENTS.md` §2) y se pide en «Peticiones».
@@ -70,4 +84,4 @@ El control detecta rutas y patrones conocidos; **no sustituye la revisión**.
 
 ## 6. Mensaje para iniciar a Codex
 
-> Lee `AGENTS.md` y `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`. Trabajas solo la interfaz, dentro de las rutas permitidas. Lee `git show main:progress/coordinacion-ui.md`, toma la tarea asignada y sigue el flujo del §4. Responde en español. Si algo requiere salir de tus rutas o cambiar el comportamiento, no lo hagas: anótalo en «Peticiones» y avísame.
+> Lee `AGENTS.md` y `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`. Trabajas solo la interfaz, dentro de las rutas permitidas. La primera versión de la interfaz que se te haya compartido está retirada: la referencia es la del §2 bis. Lee `git show main:progress/coordinacion-ui.md`, toma la tarea asignada y sigue el flujo del §4. Responde en español. Si algo requiere salir de tus rutas o cambiar el comportamiento, no lo hagas: anótalo en «Peticiones» y avísame.
