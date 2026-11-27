@@ -24,6 +24,24 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
     private const string SinContacto = "NULL::text, NULL::text, NULL::text";
 
+    /// <summary>Las líneas impresas que atiende la sucursal <c>@sucursal</c> en el pedido de la consulta: la regla de <c>Pedido.SucursalDeLaLinea</c> (la sucursal de recojo común si la tiene y, si no, la fuente de la línea).</summary>
+    private const string LineasDeLaSucursal =
+        "FROM pedidos.lineas_de_pedido l WHERE l.pedido_id = pedidos.pedidos.id AND NOT l.es_digital AND COALESCE(pedidos.pedidos.codigo_de_sucursal_de_recojo, l.codigo_de_fuente) = @sucursal";
+
+    /// <summary>
+    /// La derivación de <c>DerivacionDelEstadoDelPedido</c> (PED-20, PED-30) en la consulta, sobre líneas impresas: anulado si todas lo están; entregado si las demás lo están; no recogido si alguna lo está y las demás están entregadas o no recogidas y, si no, la menos avanzada (entre iguales, la que no es un no recogido). Una prueba la compara con el Dominio.
+    /// </summary>
+    private const string EstadoDerivado =
+        """
+        CASE
+            WHEN bool_and(l.estado = 'anulado') THEN 'anulado'
+            WHEN bool_and(l.estado IN ('anulado', 'entregado')) THEN 'entregado'
+            WHEN bool_or(l.estado = 'no_recogido') AND bool_and(l.estado IN ('anulado', 'entregado', 'no_recogido')) THEN 'no_recogido'
+            ELSE (array_agg(l.estado ORDER BY CASE l.estado WHEN 'confirmado' THEN 1 WHEN 'en_transito' THEN 2 WHEN 'recibido' THEN 3 WHEN 'en_preparacion' THEN 4 ELSE 5 END, l.estado = 'no_recogido')
+                FILTER (WHERE l.estado NOT IN ('anulado', 'entregado')))[1]
+        END
+        """;
+
     // ---------- Pedidos ----------
 
     public Task<PaginaDeDominio> Listar(CriterioDeListado criterio, CancellationToken cancelacion = default)
@@ -42,7 +60,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
                 if (criterio.CodigoDeSucursalDelEncargado is { } sucursal)
                 {
-                    filtros.Add("tipo_de_entrega = 'recojo' AND codigo_de_sucursal_de_recojo = @sucursal");
+                    filtros.Add($"tipo_de_entrega = 'recojo' AND EXISTS (SELECT 1 {LineasDeLaSucursal})");
                     parametros.Add(new NpgsqlParameter("sucursal", sucursal));
                 }
 
@@ -53,7 +71,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
                 if (criterio.Estado is { } estado)
                 {
-                    filtros.Add("estado = @estado");
+                    // El encargado filtra por el estado de sus líneas, que es el que ve, calculado antes de paginar (PED-08).
+                    filtros.Add(criterio.CodigoDeSucursalDelEncargado is null ? "estado = @estado" : $"(SELECT {EstadoDerivado} {LineasDeLaSucursal}) = @estado");
                     parametros.Add(new NpgsqlParameter("estado", CodigosDePedidos.De(estado)));
                 }
 

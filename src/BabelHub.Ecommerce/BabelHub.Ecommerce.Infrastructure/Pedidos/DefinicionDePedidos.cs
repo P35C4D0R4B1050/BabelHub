@@ -39,7 +39,7 @@ public static class DefinicionDePedidos
             CONSTRAINT pedidos_contacto_solo_a_domicilio CHECK (contacto_nombre IS NULL OR tipo_de_entrega = 'domicilio'),
             CONSTRAINT pedidos_contacto_anonimizado_sin_datos CHECK (contacto_anonimizado_en IS NULL OR contacto_nombre IS NULL),
             CONSTRAINT pedidos_domicilio_con_contacto CHECK (tipo_de_entrega <> 'domicilio' OR contacto_anonimizado_en IS NOT NULL OR contacto_nombre IS NOT NULL),
-            CONSTRAINT pedidos_recojo_con_sucursal CHECK ((tipo_de_entrega = 'recojo') = (codigo_de_sucursal_de_recojo IS NOT NULL)),
+            CONSTRAINT pedidos_recojo_con_sucursal CHECK (tipo_de_entrega = 'recojo' OR codigo_de_sucursal_de_recojo IS NULL),
             CONSTRAINT pedidos_domicilio_con_region CHECK ((tipo_de_entrega = 'domicilio') = (region_de_entrega IS NOT NULL)),
             CONSTRAINT pedidos_reembolso_digital_junto CHECK ((reembolso_digital_version IS NULL) = (reembolso_digital_aceptado_en IS NULL)),
             CONSTRAINT pedidos_fecha_final_con_estado_final CHECK ((estado IN ('entregado', 'anulado')) = (fecha_estado_final IS NOT NULL))
@@ -48,6 +48,9 @@ public static class DefinicionDePedidos
         CREATE INDEX IF NOT EXISTS pedidos_por_sucursal ON pedidos.pedidos (codigo_de_sucursal_de_recojo, estado);
         CREATE INDEX IF NOT EXISTS pedidos_por_tipo_y_estado ON pedidos.pedidos (tipo_de_entrega, estado);
         CREATE INDEX IF NOT EXISTS pedidos_por_estado ON pedidos.pedidos (estado, creado_en);
+        -- Venta por sucursal: un recojo puede no tener sucursal común (cada línea es de la sucursal de su fuente). Repetible sobre una base anterior, que exigía la sucursal en todo recojo.
+        ALTER TABLE pedidos.pedidos DROP CONSTRAINT IF EXISTS pedidos_recojo_con_sucursal;
+        ALTER TABLE pedidos.pedidos ADD CONSTRAINT pedidos_recojo_con_sucursal CHECK (tipo_de_entrega = 'recojo' OR codigo_de_sucursal_de_recojo IS NULL);
 
         -- El contacto se escribe una sola vez, al crear el pedido: después solo puede pasar a nulo (anonimizarse), nunca cambiar a otro valor.
         CREATE OR REPLACE FUNCTION pedidos.proteger_el_contacto() RETURNS trigger
@@ -87,7 +90,6 @@ public static class DefinicionDePedidos
             anulada_en timestamptz,
             envio_id uuid,
             version integer NOT NULL CHECK (version >= 1),
-            CONSTRAINT lineas_una_por_edicion UNIQUE (pedido_id, edicion_id),
             CONSTRAINT lineas_digital_sin_fuente CHECK (NOT es_digital OR (codigo_de_fuente IS NULL AND NOT requiere_traslado AND traslado_id IS NULL AND envio_id IS NULL)),
             CONSTRAINT lineas_impresa_con_fuente CHECK (es_digital OR codigo_de_fuente IS NOT NULL),
             CONSTRAINT lineas_estado_segun_tipo CHECK ((es_digital AND estado IN ('disponible', 'anulado')) OR (NOT es_digital AND estado <> 'disponible')),
@@ -99,6 +101,9 @@ public static class DefinicionDePedidos
         CREATE INDEX IF NOT EXISTS lineas_por_envio ON pedidos.lineas_de_pedido (envio_id) WHERE envio_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS lineas_por_traslado ON pedidos.lineas_de_pedido (traslado_id) WHERE traslado_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS lineas_por_estado ON pedidos.lineas_de_pedido (estado, no_recogida_en);
+        -- Venta por sucursal: una edición impresa puede tener varias líneas (una por sucursal o lote); una digital, solo una.
+        ALTER TABLE pedidos.lineas_de_pedido DROP CONSTRAINT IF EXISTS lineas_una_por_edicion;
+        CREATE UNIQUE INDEX IF NOT EXISTS lineas_una_digital_por_edicion ON pedidos.lineas_de_pedido (pedido_id, edicion_id) WHERE es_digital;
 
         -- Las operaciones en curso: la fila durable de cada anulación o entrega (D03). Guardan el iniciador (dato personal del personal) que se anonimiza a los dos años (PED-34).
         CREATE TABLE IF NOT EXISTS pedidos.anulaciones (
