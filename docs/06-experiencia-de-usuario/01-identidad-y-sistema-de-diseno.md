@@ -65,6 +65,7 @@ Se respeta la preferencia de tema del sistema operativo y se recuerda la elecci�
 | :--- | :--- |
 | **CSS** | Tailwind CSS 4 con daisyUI 5, compilado con la CLI independiente de Tailwind (sin Node) en el `Dockerfile` de `BabelHub.Ecommerce.Api`. El CSS generado no se versiona. |
 | **Tokens** | Los colores viven como tokens semánticos de daisyUI (`primary`, `secondary`, `accent`, `base-100/200/300`, `base-content`, `info`, `success`, `warning`, `error`) en dos temas con los mismos nombres. Ningún componente tiene colores propios. |
+| **Tokens propios** | Además de los de daisyUI, cada tema declara `--bh-coral-texto`, `--bh-foco`, los cuatro niveles de la barra de contraseñas (`--bh-nivel-debil`, `--bh-nivel-aceptable`, `--bh-nivel-buena`, `--bh-nivel-fuerte`: rojo, ámbar, verde intermedio y verde, con al menos 3 a 1 sobre el fondo) y `--bh-qr-fondo` y `--bh-qr-tinta` (blanco y negro en los dos temas: lo necesita la cámara que lee el código). |
 | **Componentes** | Clases de daisyUI para botones, tarjetas, formularios, insignias y modales; Tailwind para layout, espaciado y responsive. |
 | **Interactividad** | htmx para fragmentos (carrito, disponibilidad, estado de pedido y filtros); JavaScript propio mínimo. |
 | **Tipografía** | **DM Serif Display** para títulos y precios destacados; **Inter** para interfaz y texto. En producción se autoalojan las fuentes (sin depender de servidores externos). |

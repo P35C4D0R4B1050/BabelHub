@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — Acceso para la versión 0.1.2 (carril `acceso-v012`)
+
+### Cubierto
+- La réplica de gestión y n8n arrancan con lo que genera el repositorio; la guía de despliegue corrige los comandos que fallaron en las VMs; las pantallas piden las 10 letras de IDE-15.
+- `web-acceso` nueva (aprobación delegada de spec y plan): ayudas de contraseña sin reglas de composición, ver u ocultar en todos los campos, enlace «Acceso del personal» y código QR del segundo factor (DD-116 a DD-121; guía 08 §15.5).
+
+### Pendiente
+- Persona: publicar `v0.1.2`, seguir la guía 08 §15.5 y ratificar DD-116 a DD-121.
+- Menores de la puerta y de la revisión en `hallazgos.md`; sin corrida contra el entorno completo ni en las VMs.
+
 ## 2026-11-26 — La tienda sin pasarela para la revisión de Culqi (carril `sin-pasarela`)
 
 ### Cubierto
