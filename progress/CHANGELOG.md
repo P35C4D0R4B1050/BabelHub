@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — Accesos pendientes para la versión 0.1.3 (carril `accesos-pendientes`)
+
+### Cubierto
+- La raíz de la gestión lleva al ingreso o al destino del rol, y el ingreso pedido desde la compra devuelve al carrito (DD-143, DD-144).
+- Enlaces a «Mis devoluciones», «Mis hojas de reclamación» y los reportes de devoluciones (DD-145).
+- `identidad-recuperacion-del-segundo-factor` nueva e implementada: orden `restablecer-segundo-factor` para la única administración (DD-140 a DD-142; guía 08 §15.1).
+
+### Pendiente
+- Persona: ratificar DD-140 a DD-145 y publicar `v0.1.3`. Sin migraciones ni secretos nuevos por estos cambios.
+- Sin enlazar: la biblioteca de un cliente y `POST /checkout/reiniciar` (`hallazgos.md`).
+
 ## 2026-11-27 — Acceso para la versión 0.1.3 (carril `acceso-v012`)
 
 ### Cubierto
