@@ -4,7 +4,7 @@
 set -euo pipefail
 CARGA_CARPETA="${CARGA_CARPETA:-$(cygpath -m "$(cd "$(git rev-parse --git-common-dir)/../.." && pwd)")/babelhub-carga}"
 set -a; source "$CARGA_CARPETA/env"; set +a
-psql_() { MSYS_NO_PATHCONV=1 docker exec -i bhcarga-postgres-1 psql -U "$POSTGRES_ADMIN_USER" -d inventario "$@"; }
+psql_() { MSYS_NO_PATHCONV=1 docker exec -i "${CARGA_PROYECTO:-bhcarga}-postgres-1" psql -U "$POSTGRES_ADMIN_USER" -d inventario "$@"; }
 case "${1:?reiniciar|volcar}" in
   reiniciar) psql_ -qAt -c "SELECT pg_stat_statements_reset(); SELECT pg_stat_reset();" >/dev/null ;;
   volcar)

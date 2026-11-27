@@ -44,7 +44,7 @@ if [ ! -f "$CARGA_CARPETA/certificado/carga.pfx" ]; then
   rm -f "$CARGA_CARPETA/certificado/k.pem"
 fi
 export CARGA_ENV_CONTENEDOR="$env_cont"
-compose() { docker compose -p bhcarga -f tests/load/entorno/docker-compose.carga.yml --env-file "$env_host" "$@"; }
+compose() { docker compose -p "${CARGA_PROYECTO:-bhcarga}" -f tests/load/entorno/docker-compose.carga.yml --env-file "$env_host" "$@"; }
 compose build inventario
 compose up -d postgres
 for i in $(seq 1 30); do compose exec -T postgres pg_isready -U "$POSTGRES_ADMIN_USER" >/dev/null 2>&1 && break; sleep 2; done
@@ -54,4 +54,4 @@ mkdir -p "$CARGA_CARPETA/claves"
 node tests/load/entorno/servidor-de-claves.mjs emitir "$CARGA_CARPETA/claves" 1 >/dev/null
 compose up -d inventario claves
 for i in $(seq 1 40); do curl -fsk "https://localhost:$CARGA_PUERTO/health/live" >/dev/null 2>&1 && { echo "entorno de carga listo en https://localhost:$CARGA_PUERTO"; exit 0; }; sleep 2; done
-echo "el Inventario no respondió: docker compose -p bhcarga logs inventario" >&2; exit 1
+echo "el Inventario no respondió: docker compose -p ${CARGA_PROYECTO:-bhcarga} logs inventario" >&2; exit 1

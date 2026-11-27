@@ -51,7 +51,7 @@ fi
 estadisticas() { bash tests/load/entorno/estadisticas-de-base.sh "$@" || true; }
 # Un solo cliente k6 a la vez: se elimina cualquier residuo del anterior, el contenedor lleva nombre fijo (un duplicado falla en vez de competir por la máquina) y un tope de tiempo
 # (TOPE_K6_S, 1800 s por omisión) evita una corrida colgada; al salir se retira el contenedor.
-nombre_k6=bhcarga-k6
+nombre_k6="${CARGA_PROYECTO:-bhcarga}-k6"
 docker rm -f "$nombre_k6" >/dev/null 2>&1 || true
 trap 'docker rm -f "$nombre_k6" >/dev/null 2>&1 || true' EXIT
 correr() {
@@ -69,8 +69,8 @@ if [ "$escenario" = "resiliencia" ]; then
   correr > "$registro" 2>&1 &
   k6pid=$!
   for i in $(seq 1 120); do grep -q "running (0" "$registro" 2>/dev/null && break; sleep 1; done
-  sleep 20; docker pause bhcarga-postgres-1 >/dev/null; echo "PostgreSQL pausado"
-  sleep 25; docker unpause bhcarga-postgres-1 >/dev/null; echo "PostgreSQL reanudado"
+  sleep 20; docker pause "${CARGA_PROYECTO:-bhcarga}-postgres-1" >/dev/null; echo "PostgreSQL pausado"
+  sleep 25; docker unpause "${CARGA_PROYECTO:-bhcarga}-postgres-1" >/dev/null; echo "PostgreSQL reanudado"
   wait $k6pid && estado=0 || estado=$?
   estadisticas volcar "$resultados/$escenario-base.txt"
   cat "$registro" | tail -40

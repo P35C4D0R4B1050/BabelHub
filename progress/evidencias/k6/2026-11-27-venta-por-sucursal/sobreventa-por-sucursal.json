@@ -1,0 +1,433 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+      {
+        "passes": 13,
+        "fails": 0,
+        "name": "cada línea queda en la sucursal pedida",
+        "path": "::cada línea queda en la sucursal pedida",
+        "id": "d3203b8c253ff4bc5eda9f4629ed88e6"
+      },
+      {
+        "path": "::solo 201, 409 por falta de stock o 503 uniforme",
+        "id": "a441ef6cf19a46ee781cb1bf13f23f96",
+        "passes": 100,
+        "fails": 0,
+        "name": "solo 201, 409 por falta de stock o 503 uniforme"
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdErrTTY": false,
+    "testRunDurationMs": 7340.086168,
+    "isStdOutTTY": false
+  },
+  "metrics": {
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "passes": 87,
+        "fails": 21,
+        "rate": 0.8055555555555556
+      }
+    },
+    "estados": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 100,
+        "rate": 13.623818264690431
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 100,
+        "rate": 13.623818264690431
+      }
+    },
+    "respuestas_inesperadas": {
+      "thresholds": {
+        "count==0": {
+          "ok": true
+        }
+      },
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      }
+    },
+    "vus": {
+      "contains": "default",
+      "values": {
+        "value": 18,
+        "min": 18,
+        "max": 100
+      },
+      "type": "gauge"
+    },
+    "vus_max": {
+      "contains": "default",
+      "values": {
+        "value": 100,
+        "min": 100,
+        "max": 100
+      },
+      "type": "gauge"
+    },
+    "reservas_sin_stock": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 87,
+        "rate": 11.852721890280675
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "estados{estado:429}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 4002.81848163889,
+        "min": 27.33745,
+        "med": 4090.0730704999996,
+        "max": 5997.344824,
+        "p(90)": 5872.006614,
+        "p(95)": 5951.6828006999995
+      }
+    },
+    "data_sent": {
+      "contains": "data",
+      "values": {
+        "count": 282754,
+        "rate": 38521.89109614278
+      },
+      "type": "counter"
+    },
+    "unidades_apartadas": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 20,
+        "rate": 2.7247636529380865
+      },
+      "thresholds": {
+        "count<=20": {
+          "ok": true
+        }
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 108,
+        "rate": 14.713723725865666
+      }
+    },
+    "estados{estado:0}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 2993.489736,
+        "p(90)": 2866.423576,
+        "p(95)": 2985.695184,
+        "avg": 1635.8716785238098,
+        "min": 27.613884,
+        "med": 2111.501381
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 4664.956324,
+        "min": 2132.110304,
+        "med": 4775.7826775,
+        "max": 6532.461947,
+        "p(90)": 6325.9839214,
+        "p(95)": 6434.425789
+      }
+    },
+    "estados{estado:409}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 87,
+        "rate": 11.852721890280675
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.11339732407407402,
+        "min": 0.021752,
+        "med": 0.099955,
+        "max": 0.341408,
+        "p(90)": 0.20065629999999998,
+        "p(95)": 0.22725999999999988
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 106.10432011111112,
+        "min": 0,
+        "med": 104.5995685,
+        "max": 220.171454,
+        "p(90)": 205.11662669999998,
+        "p(95)": 213.2272054
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 113,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate==1": {
+          "ok": true
+        }
+      }
+    },
+    "estados{estado:200}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "vendible_final_de_la_sucursal": {
+      "type": "trend",
+      "contains": "default",
+      "values": {
+        "p(95)": 0,
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0
+      },
+      "thresholds": {
+        "max<=20": {
+          "ok": true
+        },
+        "min>=0": {
+          "ok": true
+        }
+      }
+    },
+    "vendible_final_de_la_otra": {
+      "type": "trend",
+      "contains": "default",
+      "values": {
+        "max": 20,
+        "p(90)": 20,
+        "p(95)": 20,
+        "avg": 20,
+        "min": 20,
+        "med": 20
+      },
+      "thresholds": {
+        "min>=20": {
+          "ok": true
+        },
+        "max<=20": {
+          "ok": true
+        }
+      }
+    },
+    "reservas_exitosas": {
+      "contains": "default",
+      "values": {
+        "count": 13,
+        "rate": 1.771096374409756
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      },
+      "type": "counter"
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.11805494444444449,
+        "min": 0.03739,
+        "med": 0.09870699999999999,
+        "max": 0.51885,
+        "p(90)": 0.20490549999999996,
+        "p(95)": 0.2270018
+      }
+    },
+    "estados{estado:503}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "estados{estado:201}": {
+      "values": {
+        "rate": 1.771096374409756,
+        "count": 13
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "data_received": {
+      "contains": "data",
+      "values": {
+        "count": 284100,
+        "rate": 38705.267689985514
+      },
+      "type": "counter"
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 5997.68367,
+        "p(90)": 5872.3047378,
+        "p(95)": 5951.94954095,
+        "avg": 4003.0499339074076,
+        "min": 27.613884,
+        "med": 4090.3754965
+      }
+    },
+    "rechazos_por_capacidad": {
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "estados{estado:500}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count>=0": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.000424,
+        "med": 426.169037,
+        "max": 637.031084,
+        "p(90)": 444.9451409,
+        "p(95)": 450.5325628,
+        "avg": 320.5214298425925
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0,
+        "med": 227.13557,
+        "max": 529.239909,
+        "p(90)": 338.5532531,
+        "p(95)": 354.15995519999984,
+        "avg": 214.24661931481475
+      }
+    }
+  },
+  "setup_data": {
+    "codigo": "carga-616cc6fa",
+    "edicion": "320765ee-3903-4b4f-bcb6-d3dbba83f8dd",
+    "otra": "otra-b9a31352"
+  }
+}

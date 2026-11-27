@@ -95,6 +95,31 @@ La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, ratificadas el 
 - **Lo que no cambia:** ningún nivel de la rampa cumple RNF02 con 0,6 + 0,4 CPU, y a 1 000 y 2 000 usuarios la saturación iguala las dos configuraciones. Se descartó mover los límites generales a memoria (sin efecto medible: la consulta de servicio no los evalúa).
 - **Honestidad de la medición:** el perfil realista de 2 000 sesiones cumplió al empezar la tarde (p95 70 ms) y falló horas después con el mismo build (15 s); el entorno derivó (otros carriles en la misma máquina o la base de la carga muy usada; no se aisló la causa), por eso solo se acepta la comparación alternada. Las dos corridas con el modelo de la caché del E-commerce (`FALLOS_DE_CACHE`) cumplen los umbrales (183 y 130 ms), pero son un **modelo del tráfico**, no una medición de VM-VENTAS. AC01 intacto: `sobreventa` dio 10 reservas y 90 rechazos.
 
+### 2.5 Mediciones con la venta por sucursal (2026-11-27, posteriores a la entrega del Sprint 2)
+
+**No forman parte de la entrega del Sprint 2 ni sustituyen sus cifras** (secciones anteriores): repiten sus escenarios tras la venta por sucursal (v0.1.3, `inventario-seleccion-fuente` T43), en la rama de ese cambio y antes de integrarlo. `checkout-confirmacion`, `sobreventa`, `tope-por-origen` y `perfil-realista` reservan ahora declarando la sucursal en cada línea, y se agrega `sobreventa-por-sucursal` (AC-SEL-47). Mismo dimensionamiento declarado (DD-17, comprobado en los contenedores: Inventario 0,6 CPU y 512 MB, PostgreSQL 0,4 CPU; memoria de referencias de 5 s encendida), mismos umbrales, solo en el entorno local y con una base nueva, en un proyecto propio (`CARGA_PROYECTO`). Resultados en [`k6/2026-11-27-venta-por-sucursal/`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/).
+
+| Escenario | Sprint 2 (dimensionamiento declarado) | Venta por sucursal | ¿Cumple hoy? |
+| :--- | :--- | :--- | :--- |
+| [`sobreventa-por-sucursal`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/sobreventa-por-sucursal.md) (nuevo) | no existía | 100 clientes por 20 unidades de una sucursal, 1 a 3 líneas cada uno: 13 reservas apartan exactamente 20, 87 rechazos por falta de stock, vendible final 0 y las 20 de la otra sucursal intactas; ningún 500 ni 503 | **Sí** (sin sobreventa) |
+| [`sobreventa`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/sobreventa.md) | 10 reservas y 90 rechazos | 10 reservas, 90 rechazos, vendible final 0 | **Sí** |
+| [`checkout-confirmacion`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/checkout-confirmacion.md) | p95 108 ms | p95 171 ms, 300 de 300 reservas confirmadas | **Sí** (< 3 s) |
+| [`tope-por-origen`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/tope-por-origen.md) | cumple (2026-11-21) | 10 aceptadas por origen, el resto 429 con `Retry-After` | **Sí** |
+| [`limites`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/limites-de-uso.md) | cumple | usuario abusivo: 100 permitidas y 40 con 429; el vecino sin limitar | **Sí** |
+| [`resiliencia`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/resiliencia.md) | cumple | 503 uniforme (14), ningún 500, proceso vivo y recuperación sola | **Sí** |
+| `disponibilidad` ([1](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/disponibilidad.md), [2](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal-disponibilidad-1/disponibilidad.md), [3](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal-disponibilidad-2/disponibilidad.md)) | p95 908, 897 y 802 ms: **no cumple** | p95 195, 235 y 211 ms, 0 % de errores | **Sí** en las tres corridas (ver la lectura) |
+| [`rampa`](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal/rampa-de-usuarios.md) (perfil de estrés) | p95 1,4 s a 50 usuarios; 16,9 s y 51 % de errores a 2 000 | p95 por nivel de 50 / 100 / 250 / 500 / 1 000 / 2 000: 277 ms / 900 ms / 2,1 s / 3,2 s / 8,7 s / 13,2 s (45,9 % de errores) | **Solo 50 usuarios**; la rampa **no cumple** |
+| `perfil-realista`, [100 a 1 000](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal-perfil-realista/perfil-realista.md) | sostiene ≈ 1 000 sesiones | disponibilidad p95 123 / 101 / 90 / 283 ms; reservar + confirmar 206 / 246 / 347 / 940 ms; errores ≤ 0,12 % | **Sí** hasta 1 000 |
+| `perfil-realista`, [1 500 y 2 000](../../progress/evidencias/k6/2026-11-27-venta-por-sucursal-perfil-realista-altos/perfil-realista.md) | 1 500 en el límite; 2 000 no | 1 500: 358 ms y 2,6 s, 0 % de errores; 2 000: **1 158 ms y 3,4 s**, 0,04 % | 1 500 **sí** (una corrida); 2 000 **no** |
+
+**Lectura honesta.**
+
+- **La venta por sucursal no introduce sobreventa** (AC01 y AC-SEL-47) y la reserva sigue muy por debajo de su umbral.
+- **`disponibilidad` cumple hoy y no cumplía en el Sprint 2, pero no se atribuye a este cambio:** la consulta de disponibilidad no se modificó. La causa **no se aisló** (entre las dos series cambian el código, la memoria de referencias de 5 s, la base nueva y el estado de la máquina; en esta documentación ya se vieron diferencias de hasta 3 veces entre corridas). **No se cambia la declaración de RNF02 ni DD-18**: decidirlo corresponde a la persona responsable, con una medición dedicada.
+- **Máquina compartida:** el procesador estaba entre el 1 % y el 68 % antes de cada escenario y al **99 %** antes de la corrida de 1 500 y 2 000 sesiones (otros trabajos en la misma máquina), así que esa corrida es la menos fiable; hubo una sola de cada escenario salvo `disponibilidad`.
+- **No repetido:** las series de capacidad con otros límites de CPU (incluido 2 + 1 para 2 000 sesiones, sección 2.3), los paneles HTML y el modelo de la caché del E-commerce. Como en el Sprint 2, solo se mide el Inventario.
+- **Reproducir:** `CARGA_PROYECTO=<nombre> CARGA_CARPETA=<carpeta> bash tests/load/entorno/preparar-carga.sh` y `bash tests/load/ejecutar.sh <escenario>` con las mismas variables (en `perfil-realista`, `NIVELES=100,250,500,1000 SEGUNDOS_FINAL=100` y `NIVELES=1500,2000 SEGUNDOS_FINAL=180`, porque las credenciales duran 14 minutos).
+
 ## 3. Rúbrica punto por punto
 
 ### 3.1 Estilo arquitectónico

@@ -10,7 +10,7 @@ export CARGA_CARPETA="${CARGA_CARPETA:-$(cygpath -m "$(cd "$(git rev-parse --git
 export CARGA_FECHA="${CARGA_FECHA:-$(date +%Y-%m-%d)-final}"
 bloqueo="$CARGA_CARPETA/serie.bloqueo"
 mkdir "$bloqueo" 2>/dev/null || { echo "ya hay una serie en curso ($bloqueo); si no es así, bórralo" >&2; exit 2; }
-trap 'rmdir "$bloqueo" 2>/dev/null; docker rm -f bhcarga-k6 >/dev/null 2>&1 || true' EXIT
+trap 'rmdir "$bloqueo" 2>/dev/null; docker rm -f "${CARGA_PROYECTO:-bhcarga}-k6" >/dev/null 2>&1 || true' EXIT
 registro="$CARGA_CARPETA/serie.log"
 exec > >(tee -a "$registro") 2>&1
 
@@ -21,10 +21,10 @@ tope="${TOPE_PASO_S:-1500}"
 for cfg in "${configuraciones[@]}"; do
   read -r cinv cpg mem <<<"$cfg"; mem="${mem:-512m}"
   echo "=== Inventario $cinv CPU / PostgreSQL $cpg CPU / $mem — $(date +%T)"
-  docker rm -f bhcarga-k6 >/dev/null 2>&1 || true
+  docker rm -f "${CARGA_PROYECTO:-bhcarga}-k6" >/dev/null 2>&1 || true
   timeout 300 bash tests/load/entorno/ajustar-limites.sh "$cinv" "$cpg" "$mem" || { echo "no se pudo ajustar los límites: se omite"; continue; }
   timeout "$tope" bash tests/load/ejecutar.sh rampa || echo "la rampa terminó con umbral incumplido, error o tope de tiempo (código $?)"
-  docker rm -f bhcarga-k6 >/dev/null 2>&1 || true
+  docker rm -f "${CARGA_PROYECTO:-bhcarga}-k6" >/dev/null 2>&1 || true
   destino="progress/evidencias/k6/$CARGA_FECHA/inventario-${cinv}cpu_postgres-${cpg}cpu_pool-16"
   mkdir -p "$destino"
   for a in progress/evidencias/k6/"$CARGA_FECHA"/rampa-*; do [ -e "$a" ] && mv -f "$a" "$destino/"; done
