@@ -95,7 +95,7 @@ public sealed class AnfitrionDelEcommerceTests
         ["Almacen:Biblioteca:ClaveSecreta"] = Secreto(),
     };
 
-    private static WebApplicationBuilder Constructor(Dictionary<string, string?> configuracion, string entorno)
+    internal static WebApplicationBuilder Constructor(Dictionary<string, string?> configuracion, string entorno)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = entorno });
         builder.Logging.ClearProviders();

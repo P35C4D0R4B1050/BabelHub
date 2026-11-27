@@ -189,7 +189,8 @@ linea "$f" BABELHUB__Identidad__Pimienta "$(valor pimienta 0 versionada)"
 entorno_y_pagos "$f"
 linea "$f" BABELHUB__Pagos__ClaveDeIntentos "$(valor intentos 40)"
 linea "$f" BABELHUB__Notificaciones__Envio n8n
-linea "$f" BABELHUB__Notificaciones__N8n__Webhook "http://$IP_VENTAS:5678/webhook/babelhub-avisos"
+# La réplica de gestión nunca envía avisos (el trabajo corre solo en la tienda), pero valida la misma configuración al arrancar: el webhook es el nombre interno «n8n» (la aplicación rechaza http hacia una dirección IP).
+linea "$f" BABELHUB__Notificaciones__N8n__Webhook "http://n8n:5678/webhook/babelhub-avisos"
 linea "$f" BABELHUB__Notificaciones__N8n__ClaveSaliente "$(valor firma-avisos 40)"
 linea "$f" BABELHUB__Notificaciones__ClaveDeHuellaDeNumero "$(valor huella-numero 0 numerada)"
 linea "$f" BABELHUB__Integraciones__n8n__Secreto "$(valor firma-estados 40)"
