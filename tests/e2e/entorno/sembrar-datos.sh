@@ -23,7 +23,7 @@ CREATE OR REPLACE FUNCTION pg_temp.guid_de_sucursal(codigo text) RETURNS uuid LA
 # --limpiar: antes de sembrar, vacía lo transaccional del entorno E2E (carritos, checkouts, pagos, pedidos y las reservas del Inventario) para que cada corrida parta de un stock conocido.
 if [ "${1:-}" = "--limpiar" ]; then
   psql_en ecommerce <<'SQL'
-TRUNCATE carrito.avisos_de_carrito, carrito.fusiones_aplicadas, carrito.lineas_de_carrito, carrito.lineas_del_checkout, carrito.checkouts, carrito.carritos CASCADE;
+TRUNCATE carrito.avisos_de_carrito, carrito.fusiones_aplicadas, carrito.lineas_de_carrito, carrito.lineas_del_checkout, carrito.checkouts, carrito.carritos, carrito.tarifas_de_envio CASCADE;
 TRUNCATE pagos.avisos_a_carrito, pagos.avisos_de_pago, pagos.compensaciones, pagos.intencion_lineas, pagos.intencion_reserva_lineas, pagos.intenciones, pagos.intentos, pagos.reembolso_lineas, pagos.reembolsos CASCADE;
 TRUNCATE pedidos.pedidos CASCADE;
 TRUNCATE auditoria.acumulado_de_limites;

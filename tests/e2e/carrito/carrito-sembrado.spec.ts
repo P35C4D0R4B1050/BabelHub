@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { agregarAlCarrito, clave, conOrigenPropio, EDICION_DIGITAL_DEL_ZORRO, EDICION_IMPRESA_DEL_ZORRO, ingresarComoClienteNuevo } from '../pedidos/ayudas';
+import { agregarAlCarrito, AYACUCHO, clave, conOrigenPropio, EDICION_DIGITAL_DEL_ZORRO, EDICION_IMPRESA_DEL_RIO, EDICION_IMPRESA_DEL_ZORRO, ingresarComoClienteNuevo, LIMA } from '../pedidos/ayudas';
 
 // Los recorridos del carrito y del checkout con el entorno sembrado (ecommerce-carrito-checkout T36): compra mixta en cinco pasos, compra solo digital en cuatro o menos, visitante que debe ingresar para pagar, el
 // bloqueo sin aceptar los textos y la accesibilidad de ambas pantallas en los dos temas. La sesión de cada recorrido sale del sembrador de desarrollo y el libro se agrega con el formulario de
@@ -50,10 +50,9 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
     await expect(pasos(page).nth(0)).toContainText('Revisar');
     await expect(pasos(page).nth(1)).toContainText('Entrega');
     // Cada línea dice su disponibilidad con texto, no solo con color; el total sale del servidor en soles.
-    await expect(page.getByText(/En tu sucursal|Hay stock|Se trae de otra sucursal/).first()).toBeVisible();
+    await expect(page.getByText(/disponibles? en su sucursal|Disponible en su sucursal/).first()).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Resumen de tu pedido' })).toContainText('S/');
 
-    await page.getByLabel('Sucursal de recojo').selectOption({ label: 'Sucursal Ayacucho (prueba)' });
     await page.getByRole('button', { name: 'Elegir recojo' }).click();
     await expect(page.getByRole('heading', { name: 'Tus datos y aceptaciones' })).toBeVisible();
     await expect(pasos(page).nth(2)).toHaveAttribute('aria-current', 'step');
@@ -65,10 +64,36 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
     await expect(page).toHaveURL(/\/checkout\/pago/);
   });
 
+  test('AC-CAR-21, AC-CAR-35: una compra de dos sucursales a domicilio cobra el envío de cada una y llega al pago', async ({ page }) => {
+    await ingresarComoClienteNuevo(page);
+    await agregarAlCarrito(page, EDICION_IMPRESA_DEL_ZORRO, 1);
+    await agregarAlCarrito(page, EDICION_IMPRESA_DEL_RIO, 1, LIMA);
+    await expect(page.getByText(`Lo atiende ${AYACUCHO.nombre}`)).toBeVisible();
+    await expect(page.getByText(`Lo atiende ${LIMA.nombre}`)).toBeVisible();
+    await page.getByRole('button', { name: 'Continuar con la compra' }).click();
+
+    await expect(page).toHaveURL(/\/checkout$/);
+    await page.getByLabel('Nombre completo').fill('Rosa Quispe Ficticia');
+    await page.getByLabel('Celular de contacto').fill('987654321');
+    await page.getByLabel('Dirección de entrega').fill('Jr. Ficticio 123, Ayacucho');
+    await page.getByLabel('Región').fill('ayacucho');
+    await page.getByRole('button', { name: 'Elegir domicilio' }).click();
+
+    // 45,00 + 38,50 de libros y S/ 30,00 de envío por cada una de las dos sucursales.
+    const resumen = page.getByRole('complementary', { name: 'Resumen de tu pedido' });
+    await expect(resumen).toContainText(AYACUCHO.nombre);
+    await expect(resumen).toContainText(LIMA.nombre);
+    await expect(resumen).toContainText(/143[.,]50/);
+
+    await marcarLosTextos(page);
+    await page.getByRole('button', { name: /^Ir al pago/ }).click();
+    await expect(page).toHaveURL(/\/checkout\/pago/);
+    await expect(page.getByRole('button', { name: /^Pagar S\/\s*143[.,]50/ })).toBeVisible();
+  });
+
   test('un bloqueo se dice en la misma pantalla y el carrito se conserva', async ({ page }) => {
     await mezclarImpresoYDigital(page);
     await irA(page, '/checkout');
-    await page.getByLabel('Sucursal de recojo').selectOption({ label: 'Sucursal Ayacucho (prueba)' });
     await page.getByRole('button', { name: 'Elegir recojo' }).click();
 
     // Sin marcar los textos no se paga y se dice junto a la casilla.

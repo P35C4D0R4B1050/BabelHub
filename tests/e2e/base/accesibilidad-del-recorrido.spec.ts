@@ -73,7 +73,6 @@ test.describe('Accesibilidad del recorrido de compra y de las pantallas base', (
       await page.getByRole('button', { name: 'Continuar con la compra' }).click();
       await expect(page).toHaveURL(/\/checkout$/);
       await axe(page, 'checkout: entrega');
-      await page.getByLabel('Sucursal de recojo').selectOption({ label: 'Sucursal Ayacucho (prueba)' });
       await page.getByRole('button', { name: 'Elegir recojo' }).click();
       await expect(page.getByRole('heading', { name: 'Tus datos y aceptaciones' })).toBeVisible();
       await axe(page, 'checkout: aceptaciones');

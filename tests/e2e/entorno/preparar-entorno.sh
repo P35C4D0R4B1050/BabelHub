@@ -46,7 +46,7 @@ poner BABELHUB__Web__Host tienda
 poner BABELHUB__Web__HostsPermitidos "localhost"
 poner BABELHUB__Web__ClaveDeSesionesTienda "$(alea 40)"
 poner BABELHUB__Web__ClaveDeSesionesGestion "$(alea 40)"
-poner BABELHUB__Carrito__CostoDeEnvio "12.00"
+poner BABELHUB__Carrito__CostoDeEnvio "30.00"
 poner BABELHUB__Pagos__Pasarela simulador
 poner BABELHUB__Pagos__ClaveDeIntentos "$(alea 40)"
 for almacen in Catalogo Supresiones; do

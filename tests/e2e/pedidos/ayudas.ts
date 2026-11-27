@@ -40,17 +40,25 @@ export async function ingresarComoPersonal(page: Page, rol: 'encargado' | 'logis
   await page.context().addCookies((await respuesta.json()).cookies);
 }
 
+// Las sucursales sembradas (`entorno/sembrar-datos.sh`): su código y el nombre que muestran las pantallas.
+export const AYACUCHO = { codigo: 'ayacucho', nombre: 'Sucursal Ayacucho (prueba)' };
+export const LIMA = { codigo: 'lima', nombre: 'Sucursal Lima (prueba)' };
+// Una segunda obra impresa, con stock solo en Lima.
+export const EDICION_IMPRESA_DEL_RIO = 'b0000000-0000-0000-0000-000000000021';
+
 // La obra sembrada de cada edición y su formato (`entorno/sembrar-datos.sh`).
 const FICHAS: Record<string, { obra: string; digital: boolean }> = {
   [EDICION_IMPRESA_DEL_ZORRO]: { obra: 'a0000000-0000-0000-0000-000000000001', digital: false },
   [EDICION_DIGITAL_DEL_ZORRO]: { obra: 'a0000000-0000-0000-0000-000000000001', digital: true },
+  [EDICION_IMPRESA_DEL_RIO]: { obra: 'a0000000-0000-0000-0000-000000000002', digital: false },
 };
 
 // Agrega al carrito como lo hace una persona: abre la ficha y envía su formulario (nunca un POST armado a mano: si la ficha deja de ofrecer comprar, el recorrido falla). Termina en el carrito.
-export async function agregarAlCarrito(page: Page, edicionId: string, cantidad: number) {
+export async function agregarAlCarrito(page: Page, edicionId: string, cantidad: number, sucursal = AYACUCHO) {
   const ficha = FICHAS[edicionId];
   await page.goto(`/catalogo/obras/${ficha.obra}?edicion=${ficha.digital ? 'digital' : 'impresa'}`);
   if (!ficha.digital) {
+    await page.getByLabel('Sucursal que atenderá tu pedido').selectOption(sucursal.codigo);
     await page.getByLabel('Cantidad').fill(String(cantidad));
   }
   await page.getByRole('button', { name: ficha.digital ? 'Comprar digital' : 'Agregar impreso al carrito' }).click();
@@ -70,17 +78,16 @@ async function aceptarLosTextosYPagar(page: Page) {
   await expect(page).toHaveURL(/\/checkout\/pago\/estado/);
 }
 
-// Carrito → checkout con recojo en Ayacucho → pago aprobado del simulador. Termina en la pantalla de estado del pago.
+// Carrito → checkout con recojo (en la sucursal de la línea, Ayacucho) → pago aprobado del simulador. Termina en la pantalla de estado del pago.
 export async function comprarUnLibroConRecojo(page: Page, cantidad = 1) {
   await agregarAlCarrito(page, EDICION_IMPRESA_DEL_ZORRO, cantidad);
   await page.goto('/carrito');
   await expect(page.getByRole('heading', { level: 1, name: 'Tu carrito' })).toBeVisible();
   await expect(page.getByText('El zorro y el cóndor del Ande', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Hay stock en la red')).toBeVisible();
+  await expect(page.getByText(`Lo atiende ${AYACUCHO.nombre}`)).toBeVisible();
   await page.getByRole('button', { name: 'Continuar con la compra' }).click();
 
   await expect(page).toHaveURL(/\/checkout$/);
-  await page.getByLabel('Sucursal de recojo').selectOption({ label: 'Sucursal Ayacucho (prueba)' });
   await page.getByRole('button', { name: 'Elegir recojo' }).click();
   await expect(page.getByRole('heading', { name: 'Tus datos y aceptaciones' })).toBeVisible();
   await aceptarLosTextosYPagar(page);

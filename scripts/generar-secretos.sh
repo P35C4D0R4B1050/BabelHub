@@ -175,7 +175,7 @@ linea "$f" BABELHUB__Web__Host gestion
 # Además del dominio, el servidor acepta el nombre y la dirección privada con los que lo llaman los otros servicios (https://<IP>:8443): un Host que no esté en la lista se rechaza con 400.
 linea "$f" BABELHUB__Web__HostsPermitidos "$HOST_GESTION,$IP_INVENTARIO,ecommerce-gestion"
 linea "$f" BABELHUB__Web__ClaveDeSesionesGestion "$(valor sesiones-gestion 40)"
-linea "$f" BABELHUB__Carrito__CostoDeEnvio "12.00"
+linea "$f" BABELHUB__Carrito__CostoDeEnvio "30.00"
 pendiente "$f" BABELHUB__Contacto__Telefono "teléfono del comercio que se muestra en el pie y en /contacto (entre comillas dobles; sin dólar, comillas, almohadilla ni barra invertida)"
 pendiente "$f" BABELHUB__Contacto__Correo "correo de atención al cliente (no la cuenta que envía los avisos)"
 pendiente "$f" BABELHUB__Contacto__Direccion "dirección del comercio (entre comillas dobles; sin dólar, comillas, almohadilla ni barra invertida)"
@@ -244,7 +244,7 @@ linea "$f" BABELHUB__Web__HostsPermitidos "$HOSTS_TIENDA,$IP_VENTAS,ecommerce"
 # El enlace «Acceso del personal» del pie y del ingreso de la tienda (opcional: sin él no se muestra). Es solo de la tienda; la réplica de gestión no lo usa.
 linea "$f" BABELHUB__Web__DireccionDeGestion "https://$HOST_GESTION"
 linea "$f" BABELHUB__Web__ClaveDeSesionesTienda "$(valor sesiones-tienda 40)"
-linea "$f" BABELHUB__Carrito__CostoDeEnvio "12.00"
+linea "$f" BABELHUB__Carrito__CostoDeEnvio "30.00"
 pendiente "$f" BABELHUB__Contacto__Telefono "teléfono del comercio que se muestra en el pie y en /contacto (entre comillas dobles; sin dólar, comillas, almohadilla ni barra invertida)"
 pendiente "$f" BABELHUB__Contacto__Correo "correo de atención al cliente (no la cuenta que envía los avisos)"
 pendiente "$f" BABELHUB__Contacto__Direccion "dirección del comercio (entre comillas dobles; sin dólar, comillas, almohadilla ni barra invertida)"

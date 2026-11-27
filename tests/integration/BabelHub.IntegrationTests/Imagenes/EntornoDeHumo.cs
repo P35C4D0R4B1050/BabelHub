@@ -66,7 +66,7 @@ internal sealed record EntornoDeHumo(IReadOnlyList<string> Argumentos, IReadOnly
             variables.Add(("BABELHUB__Identidad__Pimienta", Versionada()));
             variables.Add(("BABELHUB__Web__ClaveDeSesionesTienda", Aleatorio(40)));
             variables.Add(("BABELHUB__Web__ClaveDeSesionesGestion", Aleatorio(40)));
-            variables.Add(("BABELHUB__Carrito__CostoDeEnvio", "12.00"));
+            variables.Add(("BABELHUB__Carrito__CostoDeEnvio", "30.00"));
             variables.Add(("BABELHUB__Pagos__Pasarela", "simulador"));
             variables.Add(("BABELHUB__Pagos__ClaveDeIntentos", Aleatorio(40)));
             foreach (var almacen in new[] { "Catalogo", "Supresiones" })
