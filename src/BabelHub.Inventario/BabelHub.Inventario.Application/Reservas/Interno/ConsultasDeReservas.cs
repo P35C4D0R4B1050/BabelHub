@@ -27,7 +27,7 @@ internal sealed class ValidadorDeConsultarReserva : IValidador<ConsultarReservaE
 }
 
 /// <summary>
-/// La consulta previa de la selección de fuentes de un carrito (SEL-20): para cada <b>línea impresa</b>, la fuente que se seleccionaría, si implica traslado y su plazo, o la falta de stock. <b>Solo lee</b>: no
+/// La consulta previa de la selección de fuentes de un carrito (SEL-20): para cada <b>línea impresa</b>, la fuente que se seleccionaría, si implica traslado y su plazo, o la falta de stock; por sucursal, si la declarada la cubre (SEL-44). <b>Solo lee</b>: no
 /// reserva, no libera vencidas (las lee como vendible, FUE-03), no cuenta para los límites de reservas y no toma bloqueos. Las líneas digitales se ignoran. La llamada llega sin token del cliente (la sesión se exige solo al
 /// pagar, CAR-16) con la credencial de servicio de lectura y el límite general; aquí basta un actor con contexto. <b>No expone cantidades de la red</b> (<c>DisponibleEnLaRed</c> va en cero): un recorrido de esta
 /// consulta no debe servir para medir el inventario de la red.
@@ -84,13 +84,9 @@ internal sealed class ConsultarSeleccion(
 
         if (porSucursal)
         {
-            if (await selector.Sucursales(impresas.Select(l => l.CodigoDeSucursal!), cancelacion).ConfigureAwait(false) is null)
-            {
-                return FallosDeReservas.Validacion<SeleccionConsultada>(ResultadoDeValidacion.Invalido([FormaDeLaSolicitud.SucursalInexistente]));
-            }
-
-            // La asignación por sucursal llega en T37.
-            return FallosDeReservas.BloqueoOcupado<SeleccionConsultada>();
+            // La asignación sigue el orden de la solicitud (SEL-43), no el de las ediciones.
+            var identificadores = impresas.Select(l => l.LineaId).ToHashSet();
+            return await PorSucursal([.. entrada.Lineas.Where(l => identificadores.Contains(l.LineaId))], cancelacion).ConfigureAwait(false);
         }
 
         var destino = await selector.Resolver(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, cancelacion).ConfigureAwait(false);
@@ -99,17 +95,13 @@ internal sealed class ConsultarSeleccion(
             return FallosDeReservas.Validacion<SeleccionConsultada>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("codigoDeSucursalDeRecojo", "inexistente")]));
         }
 
-        var disponibilidad = impresas.Count == 0
-            ? []
-            : (await existencias.Disponibilidad([.. impresas.Select(l => l.EdicionId)], cancelacion).ConfigureAwait(false)).ToDictionary(d => d.EdicionId);
+        var filasPorEdicion = await Vendibles(impresas, cancelacion).ConfigureAwait(false);
 
         var lineas = new List<SeleccionDeLinea>(impresas.Count);
         var asignado = new Dictionary<(Guid FuenteId, Guid EdicionId), int>();
         foreach (var linea in impresas)
         {
-            // El vendible ya incluye lo vencido sin barrer; se presenta como filas sin reservado para reutilizar la selección de reservar.
-            var filas = disponibilidad.GetValueOrDefault(linea.EdicionId)?.PorFuente.Select(f => new ExistenciaBloqueada(f.FuenteId, linea.EdicionId, f.Vendible, 0)) ?? [];
-            var seleccion = selector.Seleccionar(destino, linea.Cantidad, filas, asignado);
+            var seleccion = selector.Seleccionar(destino, linea.Cantidad, filasPorEdicion[linea.EdicionId], asignado);
             if (seleccion.FuenteId is { } fuenteId)
             {
                 asignado[(fuenteId, linea.EdicionId)] = asignado.GetValueOrDefault((fuenteId, linea.EdicionId)) + linea.Cantidad;
@@ -119,6 +111,45 @@ internal sealed class ConsultarSeleccion(
         }
 
         return Resultado<SeleccionConsultada>.Exito(new SeleccionConsultada(lineas, reloj.Ahora));
+    }
+
+    /// <summary>Por sucursal (SEL-44): si la sucursal de cada línea la cubre, con la misma asignación en orden de reservar; sin traslado ni plazo, y la falta de stock con el vendible de esa sucursal.</summary>
+    private async Task<Resultado<SeleccionConsultada>> PorSucursal(IReadOnlyList<LineaSolicitada> impresas, CancellationToken cancelacion)
+    {
+        if (await selector.Sucursales(impresas.Select(l => l.CodigoDeSucursal!), cancelacion).ConfigureAwait(false) is not { } sucursales)
+        {
+            return FallosDeReservas.Validacion<SeleccionConsultada>(ResultadoDeValidacion.Invalido([FormaDeLaSolicitud.SucursalInexistente]));
+        }
+
+        var filas = (await Vendibles(impresas, cancelacion).ConfigureAwait(false)).SelectMany(f => f.Value);
+        var lineas = impresas.Zip(SelectorDeFuentes.AsignarPorSucursal(impresas, sucursales, filas))
+            .Select(par => new SeleccionDeLinea(
+                par.First.LineaId,
+                par.First.EdicionId,
+                par.Second.Cubierta,
+                par.Second.Cubierta ? par.First.CodigoDeSucursal : null,
+                RequiereTraslado: false,
+                PlazoEstimadoEnDias: null,
+                DisponibleEnLaRed: 0,
+                DisponibleEnLaSucursal: par.Second.Cubierta ? null : par.Second.VendibleEnLaSucursal))
+            .ToList();
+
+        return Resultado<SeleccionConsultada>.Exito(new SeleccionConsultada(lineas, reloj.Ahora));
+    }
+
+    /// <summary>El vendible de cada edición por fuente, como filas sin reservado para reutilizar la selección de reservar; ya cuenta lo vencido sin barrer (FUE-03).</summary>
+    private async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ExistenciaBloqueada>>> Vendibles(IReadOnlyList<LineaSolicitada> impresas, CancellationToken cancelacion)
+    {
+        var ediciones = impresas.Select(l => l.EdicionId).Distinct().ToList();
+        if (ediciones.Count == 0)
+        {
+            return new Dictionary<Guid, IReadOnlyList<ExistenciaBloqueada>>();
+        }
+
+        var disponibilidad = (await existencias.Disponibilidad(ediciones, cancelacion).ConfigureAwait(false)).ToDictionary(d => d.EdicionId);
+        return ediciones.ToDictionary(
+            e => e,
+            e => (IReadOnlyList<ExistenciaBloqueada>)[.. disponibilidad.GetValueOrDefault(e)?.PorFuente.Select(f => new ExistenciaBloqueada(f.FuenteId, e, f.Vendible, 0)) ?? []]);
     }
 }
 
