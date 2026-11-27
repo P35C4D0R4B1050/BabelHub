@@ -71,7 +71,8 @@ public sealed record ResumenDePedido(
     TipoDeEntregaVisible TipoDeEntrega,
     string? CodigoDeSucursalDeRecojo,
     decimal Total,
-    int CantidadDeLineas);
+    int CantidadDeLineas,
+    IReadOnlyList<string>? CodigosDeSucursales = null);
 
 /// <summary>El filtro y la paginación de un listado: el tamaño tiene un tope de 50 (PED-14).</summary>
 public sealed record FiltroDePedidos(EstadoVisibleDelPedido? Estado = null, int Pagina = 1, int Tamano = 20)

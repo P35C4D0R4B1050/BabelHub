@@ -237,7 +237,12 @@ internal static class ProyeccionesDePedidos
         Tipo(pedido.Tipo),
         pedido.CodigoDeSucursalDeRecojo,
         pedido.Total,
-        pedido.Lineas.Count);
+        pedido.Lineas.Count,
+        Sucursales(pedido, pedido.Lineas));
+
+    /// <summary>Las sucursales que atienden las líneas pedidas, en el orden en que aparecen; ninguna para las digitales.</summary>
+    private static IReadOnlyList<string> Sucursales(Pedido pedido, IReadOnlyList<LineaDePedido> lineas) =>
+        [.. lineas.Select(pedido.SucursalDeLaLinea).OfType<string>().Distinct(StringComparer.Ordinal)];
 
     public static EstadoVisibleDeLaLinea EstadoVisible(LineaDePedido linea) =>
         linea.EsDigital
@@ -251,6 +256,7 @@ internal static class ProyeccionesDePedidos
         CodigoDeSucursalDeRecojo = codigoDeSucursal,
         Total = suyas.Sum(l => l.Importe),
         CantidadDeLineas = suyas.Count,
+        CodigosDeSucursales = Sucursales(pedido, suyas),
     };
 
     public static IReadOnlyList<LineaVisibleDelPedido> Lineas(Pedido pedido, IReadOnlyList<LineaDePedido> lineas) => [.. lineas.Select(l => Linea(pedido, l))];

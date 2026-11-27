@@ -103,7 +103,9 @@ public sealed class PedidosPorSucursalAplicacionTests
 
             var fila = Assert.Single(lista.Valor.Pedidos);
             Assert.Equal((estado, importe, 1, codigo), (fila.Estado, fila.Total, fila.CantidadDeLineas, fila.CodigoDeSucursalDeRecojo));
-            Assert.Equal(fila, detalle.Valor.Resumen);
+            Assert.Equal((fila.Estado, fila.Total, fila.CantidadDeLineas), (detalle.Valor.Resumen.Estado, detalle.Valor.Resumen.Total, detalle.Valor.Resumen.CantidadDeLineas));
+            Assert.Equal([codigo], fila.CodigosDeSucursales);
+            Assert.Equal([codigo], detalle.Valor.Resumen.CodigosDeSucursales);
             var visible = Assert.Single(detalle.Valor.Lineas);
             Assert.Equal((linea, codigo), (visible.LineaId, visible.CodigoDeSucursal));
             Assert.Empty(entorno.Denegaciones.Eventos);
@@ -154,6 +156,7 @@ public sealed class PedidosPorSucursalAplicacionTests
 
         Assert.Equal(new[] { "AYA", "CUS", null }, detalle.Valor.Lineas.Select(l => l.CodigoDeSucursal));
         Assert.Equal((120m, 3, null), (detalle.Valor.Resumen.Total, detalle.Valor.Resumen.CantidadDeLineas, detalle.Valor.Resumen.CodigoDeSucursalDeRecojo));
+        Assert.Equal(["AYA", "CUS"], detalle.Valor.Resumen.CodigosDeSucursales);
     }
 
     [Fact]
