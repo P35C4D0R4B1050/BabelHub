@@ -193,9 +193,13 @@ public sealed record LineaDeInstantanea(
     bool? RequiereTrasladoInformado,
     int? PlazoInformadoDias);
 
+/// <summary>El costo de envío a domicilio de una sucursal que atiende alguna línea (CAR-09, CAR-23): lo que se muestra antes del pago y lo que viaja congelado con la compra.</summary>
+public sealed record EnvioDeSucursalDeCompra(string CodigoDeSucursal, string? NombreDeSucursal, decimal Importe);
+
 /// <summary>
 /// Lo que Carrito congela al pasar al pago y entrega a Pagos (D04, D19): <b>todo</b> lo que el pedido necesita para existir sin volver a Carrito. Lleva su <see cref="HuellaDeInstantanea"/> (un digest con clave que no
 /// expone el teléfono) que Pagos compara y no recalcula. El contacto solo existe si la entrega es a domicilio y está redactado.
+/// <see cref="EnviosPorSucursal"/> (D23), ordenado por código, lleva en una compra a domicilio nueva cada sucursal que atiende alguna línea (también con importe cero) y suma <see cref="Envio"/>; es <see langword="null"/> en recojo, en una compra solo digital y en una compra anterior.
 /// </summary>
 public sealed record InstantaneaDeCompra(
     Guid PedidoId,
@@ -209,7 +213,8 @@ public sealed record InstantaneaDeCompra(
     ContactoDeCompra? Contacto,
     IReadOnlyList<AceptacionDeCompra> Aceptaciones,
     IReadOnlyList<LineaDeInstantanea> Lineas,
-    string HuellaDeInstantanea);
+    string HuellaDeInstantanea,
+    IReadOnlyList<EnvioDeSucursalDeCompra>? EnviosPorSucursal = null);
 
 // ---------- Checkout ----------
 
