@@ -1,7 +1,7 @@
 ---
 id: web-base
 titulo: Estructura base de la interfaz web
-estado: Planned
+estado: InProgress
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
 plan_aprobado_en: 2026-11-27
 aprobado_por: Claude (delegado por Diego Amiquero)

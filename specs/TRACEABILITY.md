@@ -42,7 +42,7 @@
 | :--- | :--- | :--- | ---: | ---: | :--- |
 | asistente-compra-ia | E-commerce | Planned | 20 | 19 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad, transversal-seguridad |
 | ecommerce-biblioteca-digital | E-commerce | Done | 29 | 26 | ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, identidad-seguridad, transversal-auditoria, transversal-seguridad |
-| ecommerce-carrito-checkout | E-commerce | Planned | 50 | 42 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad, transversal-auditoria |
+| ecommerce-carrito-checkout | E-commerce | InProgress | 50 | 42 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad, transversal-auditoria |
 | ecommerce-catalogo | E-commerce | Done | 25 | 20 | inventario-fuentes, inventario-ajustes, transversal-auditoria, transversal-seguridad |
 | ecommerce-devoluciones | E-commerce | Done | 31 | 32 | ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones, identidad-seguridad, transversal-seguridad |
 | ecommerce-envios | E-commerce | InProgress | 18 | 18 | ecommerce-pedidos, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
@@ -60,6 +60,6 @@
 | transversal-plataforma | Transversal | InProgress | 43 | 38 | — |
 | transversal-seguridad | Transversal | InProgress | 32 | 29 | transversal-auditoria |
 | web-acceso | E-commerce | InProgress | 17 | 16 | web-base, identidad-seguridad, web-informacion-del-comercio, transversal-seguridad |
-| web-base | E-commerce | Planned | 49 | 42 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad, ecommerce-pagos, ecommerce-pedidos, ecommerce-devoluciones, asistente-compra-ia |
+| web-base | E-commerce | InProgress | 49 | 42 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad, ecommerce-pagos, ecommerce-pedidos, ecommerce-devoluciones, asistente-compra-ia |
 | web-indice-infinito | E-commerce | Done | 9 | 7 | web-base, transversal-seguridad |
 | web-informacion-del-comercio | E-commerce | Planned | 17 | 14 | web-base, ecommerce-devoluciones, identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-carrito-checkout |
