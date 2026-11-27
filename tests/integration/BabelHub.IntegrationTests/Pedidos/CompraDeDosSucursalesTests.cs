@@ -2,11 +2,14 @@ using System.Net;
 using System.Reflection;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Devoluciones;
+using BabelHub.Ecommerce.Application.Envios;
+using BabelHub.Ecommerce.Application.Envios.Interno;
 using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pagos;
+using BabelHub.Ecommerce.Infrastructure.Envios;
 using BabelHub.Ecommerce.Infrastructure.Pagos;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.IntegrationTests.Reservas;
@@ -21,17 +24,20 @@ using RolesDeUsuario = BabelHub.Shared.Contratos.RolesDeUsuario;
 namespace BabelHub.IntegrationTests.Pedidos;
 
 /// <summary>
-/// T49 (AC-PED-36, AC-PED-38, AC-PED-40, AC-PED-41): una compra de dos sucursales de punta a punta entre los dos servicios, con <b>Pagos, Pedidos y Devoluciones reales</b> sobre PostgreSQL y el <b>Inventario real</b> por su Api: se paga con el simulador, cada encargado prepara y entrega solo lo suyo, la anulación devuelve los dos envíos
-/// una vez y la devolución de dos líneas de un libro reingresa su suma una sola vez. El Carrito no participa: la reserva se crea en el Inventario con la sucursal de cada línea y la intención de pago, con la instantánea que Carrito le entregaría.
+/// T49 (AC-PED-20, AC-PED-36, AC-PED-38, AC-PED-40, AC-PED-41, AC-PED-42, AC-PAG-46): compras de varias sucursales de punta a punta entre los dos servicios, con <b>Pagos, Pedidos, Envíos y Devoluciones reales</b> sobre PostgreSQL y el <b>Inventario real</b> por su Api (solo el operador logístico es el simulado): se paga con el simulador, cada encargado prepara y entrega solo lo suyo, la anulación devuelve todos los envíos
+/// una vez —o, si alguna sucursal ya envió, solo el de las que no— y la devolución de dos líneas de un libro reingresa su suma una sola vez. El Carrito no participa: la reserva se crea en el Inventario con la sucursal de cada línea y la intención de pago, con la instantánea que Carrito le entregaría.
 /// </summary>
 [Collection(ColeccionDelEcommerceCompleto.Nombre)]
 public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixture bd, PostgresDeReservasFixture inventario) : IClassFixture<PostgresDeReservasFixture>, IAsyncLifetime
 {
     private const string Ayacucho = "ayacucho";
     private const string Cusco = "cusco";
+    private const string Huanta = "huanta";
     private const decimal Precio = 50m;
 
     private static readonly Guid Administrador = Guid.Parse("49494949-4949-4949-4949-494949494949");
+
+    private static readonly Guid Logistica = Guid.Parse("49494949-4949-4949-4949-494949494950");
 
     private ApiDeReservasHost _api = null!;
     private AnfitrionRealDelEcommerce _anfitrion = null!;
@@ -44,6 +50,7 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
         _libro = await inventario.AgregarEdicion();
         await inventario.PonerStock(await inventario.AgregarFuente(Ayacucho), _libro, 20, 0);
         await inventario.PonerStock(await inventario.AgregarFuente(Cusco), _libro, 30, 0);
+        await inventario.PonerStock(await inventario.AgregarFuente(Huanta), _libro, 10, 0);
         _api = await ApiDeReservasHost.Crear(inventario);
         _api.Reloj.Ahora = DateTimeOffset.UtcNow;
         _anfitrion = bd.Anfitrion(ConectarConElInventario);
@@ -52,7 +59,8 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
             INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'v1', 'v1', 'v1')
               ON CONFLICT (id) DO UPDATE SET terminos = 'v1', privacidad = 'v1', reembolso = 'v1';
             INSERT INTO identidad.usuarios (id, nombre, correo, correo_verificado, rol, activo, creada_en, acepto_terminos_version, acepto_terminos_en, acepto_privacidad_version, acepto_privacidad_en, acepto_reembolso_version, acepto_reembolso_en)
-              VALUES ('49494949-4949-4949-4949-494949494949', 'Administración de prueba', 'admin-t49@example.test', true, 'administrador-central', true, now(), 'v1', now(), 'v1', now(), 'v1', now())
+              VALUES ('49494949-4949-4949-4949-494949494949', 'Administración de prueba', 'admin-t49@example.test', true, 'administrador-central', true, now(), 'v1', now(), 'v1', now(), 'v1', now()),
+                     ('49494949-4949-4949-4949-494949494950', 'Logística de prueba', 'logistica-t49@example.test', true, 'personal-de-logistica', true, now(), 'v1', now(), 'v1', now(), 'v1', now())
               ON CONFLICT DO NOTHING;
             """);
     }
@@ -85,6 +93,8 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
         servicios.AddHttpClient(HttpClienteDelInventario.NombreDelCliente)
             .ConfigurePrimaryHttpMessageHandler(() => ((TestServer)_api.Servicios.GetRequiredService<IServer>()).CreateHandler())
             .AddHttpMessageHandler(sp => new ActorEnCabeceras(sp.GetRequiredService<IActorActual>()));
+        servicios.RemoveAll<IOperadorLogistico>();
+        servicios.AddSingleton<IOperadorLogistico>(new SimuladorOperadorLogistico());
         servicios.RemoveAll<BabelHub.Ecommerce.Application.Pagos.Interno.OpcionesDelCobro>();
         servicios.AddSingleton(new BabelHub.Ecommerce.Application.Pagos.Interno.OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
     }
@@ -151,8 +161,10 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
         return id;
     }
 
-    /// <summary>Una compra de lotes de un libro, cada uno de su sucursal: la reserva en el Inventario, la intención de pago, el cobro aprobado del simulador y el pedido creado por Pagos con la reserva confirmada.</summary>
-    private async Task<Compra> Comprar(TipoDeEntregaDeCompra entrega, params (string Sucursal, int Cantidad)[] lotes)
+    private Task<Compra> Comprar(TipoDeEntregaDeCompra entrega, params (string Sucursal, int Cantidad)[] lotes) => Comprar(entrega, _ => 30m, lotes);
+
+    /// <summary>Una compra de lotes de un libro, cada uno de su sucursal (a domicilio, con el envío que cobra cada una): la reserva en el Inventario, la intención de pago, el cobro aprobado del simulador y el pedido creado por Pagos con la reserva confirmada.</summary>
+    private async Task<Compra> Comprar(TipoDeEntregaDeCompra entrega, Func<string, decimal> tarifa, params (string Sucursal, int Cantidad)[] lotes)
     {
         var cuenta = await SembrarCuenta();
         var pedido = Guid.NewGuid();
@@ -168,14 +180,15 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
 
         var ahora = DateTimeOffset.UtcNow;
         var subtotal = lineas.Sum(l => l.Cantidad) * Precio;
-        var envio = aDomicilio ? 30m * lineas.Select(l => l.Sucursal).Distinct().Count() : 0m;
+        var sucursales = lineas.Select(l => l.Sucursal).Distinct().Order(StringComparer.Ordinal).ToList();
+        var envio = aDomicilio ? sucursales.Sum(tarifa) : 0m;
         var instantanea = new InstantaneaDeCompra(
             pedido, cuenta, entrega, null, aDomicilio ? Ayacucho : null, subtotal, envio, subtotal + envio,
             aDomicilio ? new ContactoDeCompra("Rosa Quispe Ficticia", "987654321", "Jr. Ficticio 123, Ayacucho", Ayacucho) : null,
             [new(TextoLegalDeCompra.Terminos, "v1", ahora), new(TextoLegalDeCompra.Privacidad, "v1", ahora)],
             [.. lineas.Select(l => new LineaDeInstantanea(l.Id, _libro, false, "Ficciones", null, l.Cantidad, Precio, l.Cantidad * Precio, l.Sucursal, false, null))],
             "huella-" + pedido.ToString("N"),
-            aDomicilio ? [.. lineas.Select(l => l.Sucursal).Distinct().Order(StringComparer.Ordinal).Select(s => new EnvioDeSucursalDeCompra(s, s, 30m))] : null);
+            aDomicilio ? [.. sucursales.Select(s => new EnvioDeSucursalDeCompra(s, s, tarifa(s)))] : null);
         var intencion = await Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICreadorDeIntencionesDePago>().Crear(cuenta, instantanea, instantanea.HuellaDeInstantanea, ahora + PlazosDelPago.VigenciaConImpresos));
         Assert.Equal(ResultadoDeCrearIntencion.Creada, intencion);
 
@@ -291,5 +304,48 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
         Assert.Equal((24, 0), await Stock(Cusco));
         Assert.Equal(2, await bd.Consultar<int>("SELECT count(*) FROM pagos.reembolsos WHERE intencion_id = @p AND estado = 'reembolsado' AND origen = 'devolucion'", ("p", compra.Pedido)));
         Assert.Equal(350m, await bd.Consultar<decimal>("SELECT sum(monto) FROM pagos.reembolsos WHERE intencion_id = @p", ("p", compra.Pedido)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-20")]
+    [Trait("Criterio", "AC-PED-42")]
+    [Trait("Criterio", "AC-PAG-46")]
+    public async Task Anular_con_una_sucursal_en_reparto_devuelve_las_demas_lineas_y_el_envio_solo_de_las_que_no_enviaron()
+    {
+        var compra = await Comprar(TipoDeEntregaDeCompra.Domicilio, s => s == Ayacucho ? 30m : s == Cusco ? 18.50m : 25m, (Ayacucho, 1), (Cusco, 2), (Cusco, 3), (Huanta, 1));
+        var (deAyacucho, enReparto) = (compra.Lineas[0], compra.Lineas[1]);
+        var logistica = ActorActual.DeUsuario(Logistica, RolesDeUsuario.PersonalDeLogistica, null);
+        var aPreparar = new OperarLineasEntrada(compra.Pedido, [deAyacucho, enReparto]);
+        var preparadas = await Como(logistica, sp => sp.GetRequiredService<IGestionDeDespacho>().Preparar(aPreparar));
+        Assert.True(preparadas.EsExito, preparadas.Error?.Clave);
+        var listas = await Como(logistica, sp => sp.GetRequiredService<IGestionDeDespacho>().MarcarListas(aPreparar));
+        Assert.True(listas.EsExito, listas.Error?.Clave);
+        var envioDeCusco = await bd.Consultar<string>("SELECT envio_id::text FROM pedidos.lineas_de_pedido WHERE id = @p", ("p", enReparto));
+        var deCusco = Guid.Parse(envioDeCusco!);
+        var guia = await Como(logistica, sp => sp.GetRequiredService<IEnviosDeLogistica>().SolicitarGuia(deCusco));
+        Assert.True(guia.EsExito, guia.Error?.Clave);
+        var salida = await Como(logistica, sp => sp.GetRequiredService<IEnviosDeLogistica>().PasarAEnReparto(deCusco));
+        Assert.True(salida.EsExito, salida.Error?.Clave);
+        Assert.Equal((28, 3), await Stock(Cusco));
+
+        var anulado = await Como(DelAdministrador(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(compra.Pedido, "otro")));
+
+        // Líneas anuladas: Ayacucho 50, Cusco 150 y Huanta 50; envío de Ayacucho (30) y Huanta (25), sin los 18,50 de Cusco.
+        Assert.True(anulado.EsExito, anulado.Error?.Clave);
+        Assert.Equal((305m, false), (anulado.Valor.Reembolso, anulado.Valor.ReembolsoPendiente));
+        Assert.Equal(55m, await bd.Consultar<decimal>("SELECT envio FROM pagos.reembolsos WHERE intencion_id = @p", ("p", compra.Pedido)));
+        Assert.Equal(55m, await bd.Consultar<decimal>("SELECT envio FROM pedidos.anulaciones WHERE pedido_id = @p", ("p", compra.Pedido)));
+        Assert.Equal((20, 0), await Stock(Ayacucho));
+        Assert.Equal((28, 0), await Stock(Cusco));
+        Assert.Equal((10, 0), await Stock(Huanta));
+        Assert.Equal("despachado", await bd.Consultar<string>("SELECT estado FROM pedidos.pedidos WHERE id = @p", ("p", compra.Pedido)));
+        Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM envios.envios WHERE pedido_id = @p AND estado = 'cancelado'", ("p", compra.Pedido)));
+
+        // Pagos no admite un envío acumulado mayor que el cobrado (73,50): quedan 18,50.
+        var deMas = await Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IReembolsos>().Registrar(
+            new RegistrarReembolsoEntrada(compra.Pedido, OrigenDelReembolso.Devolucion, "dev:" + Guid.NewGuid().ToString("N"), [new LineaAReembolsar(enReparto, 100m)], 18.51m)));
+
+        Assert.False(deMas.EsExito);
+        Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM pagos.reembolsos WHERE intencion_id = @p", ("p", compra.Pedido)));
     }
 }

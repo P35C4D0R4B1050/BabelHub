@@ -67,4 +67,4 @@ Plan §11. Carril «Pedidos, pagos y devoluciones», en este orden; T51 requiere
 - [x] T52 [Infra/C] Columnas `envios_por_sucursal` y `envio` repetibles sobre el esquema anterior, con su restricción, permisos por columna y repositorios (cubre: AC-PED-42, AC-PED-43)
 - [x] T47 [Web/C] Detalle y lista con la sucursal por línea (cubre: AC-PED-36, AC-PED-37)
 - [x] T48 [Aplicación/C] Devoluciones: dos líneas de una edición y reingreso agrupado por edición, con la pantalla rotulada por sucursal y sin preselección (cubre: AC-PED-41)
-- [ ] T49 [Pruebas/E] Pruebas propias de integración de una compra de dos sucursales: pedido, preparación y entrega por sucursal, anulación y devolución (cubre: AC-PED-38, AC-PED-40, AC-PED-41, AC-PED-20, AC-PED-42)
+- [x] T49 [Pruebas/E] Pruebas propias de integración de una compra de dos sucursales: pedido, preparación y entrega por sucursal, anulación y devolución (cubre: AC-PED-38, AC-PED-40, AC-PED-41, AC-PED-20, AC-PED-42)
