@@ -70,7 +70,7 @@ public sealed class CarritoController(ICarritoDelCliente carrito, IActorActual a
 
     private static readonly string[] SinCampos = [];
 
-    private const int MaximoDeUnidades = 20;
+    internal const int MaximoDeUnidades = 20;
 
     [HttpGet("/carrito")]
     public async Task<IActionResult> Index(CancellationToken cancelacion)

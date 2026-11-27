@@ -2,6 +2,15 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — La ficha del libro permite comprar
+
+### Cubierto
+- `ecommerce-carrito-checkout` T38: botones de compra en la ficha (ninguna pantalla enviaba a `POST /carrito/lineas` en `v0.1.1`), máximo de stock en el rechazo y «Gratis (recojo)» en el resumen; pruebas y E2E por el formulario real.
+- Tres errores del primer despliegue: webhook de n8n de la réplica de gestión, carpeta temporal de n8n y comandos de la guía 08.
+
+### Pendiente
+- Persona: publicar imágenes nuevas, actualizar las VMs y recorrer la tienda hasta el paso de pago. Pantallas sin enlace en `hallazgos.md`.
+
 ## 2026-11-27 — Primera versión publicada y colaboración en la interfaz (coordinación)
 
 ### Cubierto
@@ -11,7 +20,6 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 
 ### Pendiente
 - Publicar la compra desde la ficha y las mejoras de acceso, actualizar las VMs y enviar la tienda a Culqi (B14).
-
 ## 2026-11-26 — La tienda sin pasarela para la revisión de Culqi (carril `sin-pasarela`)
 
 ### Cubierto

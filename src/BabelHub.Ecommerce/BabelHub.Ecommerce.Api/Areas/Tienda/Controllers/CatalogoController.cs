@@ -18,8 +18,8 @@ public sealed record FiltrosDelCatalogo(string? Texto, string? Autor, string? Ed
     public bool HayFiltros => Texto is not null || Autor is not null || Editorial is not null || Categoria is not null || Formato is not null || PrecioMinimo is not null || PrecioMaximo is not null || SoloDisponibles;
 }
 
-/// <summary>Una edición de una tarjeta o de la ficha, ya lista para pintar: precio con formato peruano y la disponibilidad con texto, icono y color.</summary>
-public sealed record EdicionDeLaVista(Guid EdicionId, bool EsDigital, string Isbn, decimal Precio, string PrecioTexto, DisponibilidadVista Disponibilidad, string? Aviso, IReadOnlyList<FilaDeSucursal> Sucursales);
+/// <summary>Una edición de una tarjeta o de la ficha, ya lista para pintar: precio con formato peruano, la disponibilidad con texto, icono y color, y si la ficha ofrece agregarla al carrito y hasta cuántas unidades (CAR-04, CAT-12).</summary>
+public sealed record EdicionDeLaVista(Guid EdicionId, bool EsDigital, string Isbn, decimal Precio, string PrecioTexto, DisponibilidadVista Disponibilidad, string? Aviso, IReadOnlyList<FilaDeSucursal> Sucursales, bool SePuedeAgregar, int CantidadMaxima);
 
 /// <summary>El stock vendible de una sucursal (fuente) con su estado en texto: nunca solo con color.</summary>
 public sealed record FilaDeSucursal(string Codigo, string Nombre, int Vendible, string Estado, string Icono, bool EsLaTuya);
@@ -108,7 +108,7 @@ public sealed class FichaVista : ModeloBaseDePagina
 
 /// <summary>
 /// El catálogo público (WEB-17 y CAT-09, CAT-10): <c>GET /catalogo</c> (búsqueda con filtros) y <c>GET /catalogo/obras/{id}</c> (ficha). Presentación pura: lee los filtros con esquema estricto, llama a <see cref="IConsultaDeCatalogo"/> y pinta lo que devuelve, con la disponibilidad como
-/// texto e icono y los estados estándar de pantalla. Funciona sin JavaScript (un formulario <c>GET</c>); con htmx solo reemplaza los resultados. Sin carrito todavía: la ficha no ofrece comprar.
+/// texto e icono y los estados estándar de pantalla. Funciona sin JavaScript (un formulario <c>GET</c>); con htmx solo reemplaza los resultados. La ficha ofrece comprar con un formulario <c>POST /carrito/lineas</c>, que atiende <see cref="CarritoController"/>.
 /// </summary>
 [Area("Tienda")]
 public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDePagina pagina, OpcionesDeErrores opciones) : Controller
@@ -304,7 +304,12 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
             aviso = "La disponibilidad puede estar desactualizada (último dato de hace menos de 10 minutos).";
         }
 
-        return new EdicionDeLaVista(edicion.EdicionId, esDigital, edicion.Isbn, edicion.Precio, FormatoPeruano.Soles(edicion.Precio), vista, aviso, filas);
+        // Se ofrece comprar una digital a la venta y un impreso con stock o sin poder confirmarlo (CAT-12: se valida al iniciar el checkout); agotado en toda la red o fuera de venta, no.
+        var sePuedeAgregar = esDigital
+            ? d.Estado == EstadoDeDisponibilidadDelCatalogo.DisponibleAlInstante
+            : d.Estado is EstadoDeDisponibilidadDelCatalogo.Disponible or EstadoDeDisponibilidadDelCatalogo.NoSePuedeConfirmar;
+        var maximo = esDigital ? 1 : Math.Clamp(d.VendibleEnLaRed ?? CarritoController.MaximoDeUnidades, 1, CarritoController.MaximoDeUnidades);
+        return new EdicionDeLaVista(edicion.EdicionId, esDigital, edicion.Isbn, edicion.Precio, FormatoPeruano.Soles(edicion.Precio), vista, aviso, filas, sePuedeAgregar, maximo);
     }
 
     private static string EstadoDeStock(int vendible) => vendible <= 0 ? "Sin stock" : vendible <= 2 ? "Pocas unidades" : "Disponible";
