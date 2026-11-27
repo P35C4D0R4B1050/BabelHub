@@ -177,7 +177,7 @@ function estado(envios) {
       boton: botones[0] ? { tipo: botones[0].getAttribute('type'), visible: botones[0].hijos[0].textContent, nombre: botones[0].textContent, conName: botones[0].attrs.has('name') } : null,
       medidor: medidor ? { oculto: medidor.hidden, nivel: medidor.getAttribute('data-nivel'), texto: medidor.textContent } : null,
       aviso: aviso ? { oculto: aviso.hidden, coincide: aviso.getAttribute('data-coincide'), texto: aviso.textContent, icono: aviso.hijos[0].innerHTML } : null,
-      anuncios: envoltura.querySelectorAll('[role="status"]').map((r) => ({ cortesia: r.getAttribute('aria-live'), texto: r.textContent })),
+      anuncios: envoltura.querySelectorAll('[data-bh-anuncio]').map((r) => ({ cortesia: r.getAttribute('aria-live'), texto: r.textContent })),
     };
   }
 

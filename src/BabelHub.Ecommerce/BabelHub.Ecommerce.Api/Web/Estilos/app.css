@@ -285,6 +285,13 @@ body {
   display: none;
 }
 
+.bh-medidor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
 .bh-medidor-barra {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

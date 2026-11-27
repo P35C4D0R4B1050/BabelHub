@@ -167,9 +167,11 @@
 
   // Anuncia a un lector de pantalla solo los cambios, y cuando la persona deja de escribir (ACC-09).
   function anunciador(documento, ventana) {
+    // Región cortés sin rol «status»: las pantallas ya usan ese rol para sus propios mensajes.
     var region = crear(documento, 'p', 'sr-only');
-    region.setAttribute('role', 'status');
+    region.setAttribute('data-bh-anuncio', '');
     region.setAttribute('aria-live', 'polite');
+    region.setAttribute('aria-atomic', 'true');
     var espera = null;
     return {
       nodo: region,
