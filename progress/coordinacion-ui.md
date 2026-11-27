@@ -19,7 +19,7 @@ Estados: `Pendiente` (no empezar) → `Asignada` → `En curso` → `Entregada` 
 | Rama | Responsable | Archivos de interfaz | Estado (2026-11-27) | Hasta |
 | :--- | :--- | :--- | :--- | :--- |
 | `claude/acceso-v012-7467d0` | Claude | Ingreso, registro, cuenta, segundo factor, pie y plantilla común; estilos y JavaScript que agregue. | En curso | Integrada en `main` |
-| `claude/dazzling-lewin-3cbe83` | Claude | Ficha del libro, catálogo, carrito y checkout. | Terminada, sin publicar | Integrada en `main` |
+| `claude/dazzling-lewin-3cbe83` | Claude | Ficha del libro, catálogo, carrito y checkout. | En `main` desde `v0.1.2`: **ya no está reservada**, salvo lo que cambie la rama de acceso | Liberada |
 
 ## Observaciones de la persona (2026-11-27)
 
@@ -30,7 +30,7 @@ Lista común para que ambos agentes partan de lo mismo. «Decide la persona» si
 | O-1 | Ver la contraseña, avisar en vivo si coinciden y orientar con una barra de rojo a verde, sin obligar composición. | Claude | En la rama de acceso |
 | O-2 | Código QR para configurar el segundo factor. | Claude | En la rama de acceso |
 | O-3 | Un solo botón «Ingresar» en la tienda: el personal no sabe que entra por la gestión. | Claude | En la rama de acceso (enlace «Acceso del personal») |
-| O-4 | No se podía comprar: la ficha no tenía botón. | Claude | Corregida, sin publicar |
+| O-4 | No se podía comprar: la ficha no tenía botón. | Claude | En `main` (`v0.1.2`); falta desplegar |
 | O-5 | La raíz de la gestión responde 404. | Decide la persona | Abierta |
 | O-6 | Títulos gigantes en los paneles, distintos del prototipo. | Codex (UI-1) | Pendiente |
 | O-7 | Menú superior de los paneles que se parte en dos filas; el prototipo usa menú lateral. | Codex (UI-2) | Pendiente |

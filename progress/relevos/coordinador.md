@@ -41,7 +41,7 @@ Nuevas en `Done`: identidad-seguridad, inventario-ajustes, inventario-seleccion-
 
 - **Publicación:** rama → PR → CI en verde → `main` por avance directo; etiqueta `v*` solo si la persona lo pide. El lanzamiento pide **dos** aprobaciones suyas.
 - **Despliegue:** lo lleva entero la sesión «Guía en vivo» (`local_49bd6f45-…`). La coordinadora le entrega versión, digests y avisos; no guía a la persona.
-- **Versiones:** `v0.1.1` desplegada. `v0.1.2` = compra desde la ficha y tres errores de despliegue (PR 32). `v0.1.3` = rama de acceso.
+- **Versiones:** `v0.1.1` desplegada. `v0.1.2` etiquetada el 2026-11-27 sobre `938a3306` (compra desde la ficha y tres errores de despliegue; PR 31 y 32), lanzamiento 45991781088 pendiente de aprobaciones y despliegue. `v0.1.3` = rama de acceso.
 - **Antes de Culqi (B14):** `v0.1.2` desplegada, catálogo y stock cargados y recorrido hasta el paso de pago.
 - **Interfaz:** Codex según `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md` y `progress/coordinacion-ui.md`.
 - **Abierto:** observaciones O-5 a O-12 del tablero de interfaz; huecos sin enlace en `hallazgos.md`; prueba de restauración desde R2; correos de recuperación y verificación en producción.

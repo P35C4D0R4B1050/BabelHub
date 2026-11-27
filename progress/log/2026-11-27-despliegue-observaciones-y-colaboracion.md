@@ -39,3 +39,11 @@ El detalle y su estado vigente están en `progress/coordinacion-ui.md`.
 - Terminar la carga de stock y recorrer la tienda hasta el paso de pago; crear la cuenta de prueba.
 - Probar en producción la recuperación de contraseña y la verificación de correo, y una restauración real desde R2.
 - Decidir: recuperación del segundo factor del único administrador (orden de consola auditada o segundo administrador desde el inicio) y raíz de la gestión.
+
+## Publicación de `v0.1.2` (06:35, hora de Perú)
+
+- `main` avanzó a `938a3306` con las cuatro comprobaciones en verde (PR 31 y 32 fusionados) y la persona pidió publicar y etiquetar: etiqueta `v0.1.2` sobre ese commit. Lanzamiento `45991781088` en marcha, pendiente de sus dos aprobaciones.
+- Incluye la compra desde la ficha (`3b233ec1` a `0b365d1a`), tres errores del primer despliegue (webhook y `tmpfs` de n8n, guía 08) y la documentación de la colaboración en la interfaz.
+- Reemplaza lo anotado arriba como «sin publicar» para la rama de compra. **Aún no está desplegada.**
+- El despliegue pasa entero a la sesión «Guía en vivo», por decisión de la persona.
+- La rama de acceso será `v0.1.3`.

@@ -9,7 +9,7 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - Tres errores del primer despliegue: webhook de n8n de la réplica de gestión, carpeta temporal de n8n y comandos de la guía 08.
 
 ### Pendiente
-- Persona: publicar imágenes nuevas, actualizar las VMs y recorrer la tienda hasta el paso de pago. Pantallas sin enlace en `hallazgos.md`.
+- En `main` y etiquetada como `v0.1.2` (`938a3306`). Persona, con la guía en vivo: aprobar el lanzamiento, actualizar las VMs y recorrer la tienda hasta el paso de pago. Pantallas sin enlace en `hallazgos.md`.
 
 ## 2026-11-27 — Primera versión publicada y colaboración en la interfaz (coordinación)
 
