@@ -1,6 +1,6 @@
 # Evidencias del Sprint 2 (hoja única)
 
-Esta hoja recorre la rúbrica del Sprint 2 punto por punto, con la **métrica**, el **resultado honesto** y el **enlace directo a la evidencia** de cada una. El detalle de cada punto está en [`progress/evidencias/README.md`](../../progress/evidencias/README.md); el plan que fijó qué se demuestra está en [`06-plan-sprint-2.md`](06-plan-sprint-2.md). Estado de las mediciones: 2026-11-20 y 2026-11-21, en una máquina de desarrollo con Docker Desktop (no es la VM ARM de despliegue). El despliegue queda fuera del Sprint 2.
+Esta hoja recorre la rúbrica del Sprint 2 punto por punto, con la **métrica**, el **resultado honesto** y el **enlace directo a la evidencia** de cada una. El detalle de cada punto está en [`progress/evidencias/README.md`](../../progress/evidencias/README.md); el plan que fijó qué se demuestra está en [`06-plan-sprint-2.md`](06-plan-sprint-2.md). Estado de las mediciones: 2026-11-20 y 2026-11-21, en una máquina de desarrollo con Docker Desktop (no es la VM ARM de despliegue). El despliegue queda fuera del Sprint 2 (la aplicación se desplegó después y esa instalación no se midió). **Actualizado el 2026-11-27:** las cifras de pruebas, cobertura y CI son las de `main` en `938a3306` (`v0.1.2`, [ejecución de CI](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/45991774756)); las de carga conservan sus fechas, y desde su commit no cambió el código de reservas, disponibilidad, fuentes ni persistencia del Inventario. La etiqueta `sprint-2` marca la versión entregada.
 
 > **Sobre «Jest» en la rúbrica.** La rúbrica menciona Jest porque supone un stack JavaScript. BabelHub es **.NET 10**, y el equivalente de cada pieza es: **xUnit** (pruebas unitarias y de integración, en lugar de Jest), **Testcontainers** (PostgreSQL y Redis reales en las pruebas de integración), **Playwright** (extremo a extremo en Chromium, teléfono y WebKit) y **k6** (carga y atributos de calidad). Cobertura con coverlet y un reporte HTML propio (`tools/CoverageCheck`), umbrales exigidos en CI.
 
@@ -8,13 +8,13 @@ Esta hoja recorre la rúbrica del Sprint 2 punto por punto, con la **métrica**,
 
 | Punto de la rúbrica | Estado | Evidencia principal |
 | :--- | :--- | :--- |
-| 1. Estilo arquitectónico | Cumple | `docs/02` + 244 pruebas de arquitectura |
+| 1. Estilo arquitectónico | Cumple | `docs/02` + 261 pruebas de arquitectura |
 | 2. Patrón (Clean Architecture, módulos) | Cumple | `docs/03/01`, `docs/03/04`, `tests/architecture` |
-| 3. SDD con criterios de aceptación y tareas | Cumple (7 specs en `Done`; el resto converge salvo excepciones registradas) | `specs/`, `specs/TRACEABILITY.md` |
+| 3. SDD con criterios de aceptación y tareas | Cumple (11 de 23 specs en `Done`; 5 en curso y 7 planificadas) | `specs/`, `specs/TRACEABILITY.md` |
 | 4. REST con OpenAPI | Cumple | `docs/03-diseno-de-software/openapi/` (generado del código) |
 | 5. Base de datos y caché | Cumple, con hallazgos medidos | `docs/03/09` |
 | 6. SOLID y patrones | Cumple | `docs/03/03` + ejemplos de este documento |
-| 7. Pruebas, cobertura y CI/CD | Cumple en local y **en GitHub: corrida verde** de `ci` y `secretos` en el commit `e0bc86df` ([ci](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/44932437329), [secretos](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/44932437399)); el reporte de cobertura queda como artefacto | `progress/evidencias/cobertura/index.html`, `.github/workflows/` |
+| 7. Pruebas, cobertura y CI/CD | Cumple en local y **en GitHub: corrida verde** de `ci` en `938a3306` ([ci](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/45991774756)), con el reporte de cobertura como artefacto | `progress/evidencias/cobertura/index.html`, `.github/workflows/` |
 | 8. Atributos de calidad con k6 hasta 2 000 usuarios | **Parcial**: RNF02 a 50 usuarios con DD-17 y los 2 000 usuarios del perfil de estrés **no cumplen**; con el perfil realista, 2 000 sesiones **no** se sostienen con la configuración declarada (0,6 + 0,4 CPU, sostiene ≈ 1 000) y **sí** con Inventario 2 CPU + PostgreSQL 1 CPU (sección 2.3; se declara y se explica) | `progress/evidencias/k6/`, `docs/03/09` |
 
 ## 2. Métricas de los atributos de calidad
@@ -35,7 +35,7 @@ Todas medidas con k6 (imagen oficial `grafana/k6` v2.4.0 fijada por huella) cont
 
 **Lectura honesta.**
 
-- **RNF02 con el dimensionamiento declarado no se cumple.** 50 usuarios con 0,5 s de pausa piden unas 80 solicitudes por segundo; con 0,6 CPU para el Inventario y 0,4 para PostgreSQL el entorno atiende unas 44. El cuello es la CPU (PostgreSQL y servicio). La decisión de la persona (**DD-18, opción A**) es demostrar RNF02 con el entorno de prueba sin el tope de CPU de la VM y **declarar** que en la VM de 1 OCPU compartida con PostgreSQL y la réplica de gestión no se sostiene (p95 ≈ 900 ms; 1,4 s en rampa). Palancas medidas o identificadas: memoria de referencias (apagada por la decisión D05), separar PostgreSQL, ARM con más OCPU.
+- **RNF02 con el dimensionamiento declarado no se cumple.** 50 usuarios con 0,5 s de pausa piden unas 80 solicitudes por segundo; con 0,6 CPU para el Inventario y 0,4 para PostgreSQL el entorno atiende unas 44. El cuello es la CPU (PostgreSQL y servicio). La decisión de la persona (**DD-18, opción A**) es demostrar RNF02 con el entorno de prueba sin el tope de CPU de la VM y **declarar** que en la VM de 1 OCPU compartida con PostgreSQL y la réplica de gestión no se sostiene (p95 ≈ 900 ms; 1,4 s en rampa). Palancas medidas o identificadas: memoria de referencias (apagada en las mediciones del 2026-11-20 y encendida después por DD-51), separar PostgreSQL, ARM con más OCPU.
 - **2 000 usuarios del perfil de estrés no se sostienen** con p95 < 500 ms en ninguna configuración (y 2 000 sesiones del perfil realista tampoco con el dimensionamiento de DD-17; sección 2.2): el mejor resultado es 10,1 s sin errores con 4 + 2 CPU, que es **la cifra vigente** (una primera serie anterior midió 7,2 s con el código previo a la reducción de idas a la base y no se reprodujo; ver `docs/03/09` §6b-bis, punto 3). Con 2 000 usuarios y 0,5 s de pausa se piden ≈ 4 000 solicitudes por segundo, inalcanzables en 1 OCPU; con pausas de persona (5 a 10 s) serían 200 a 400 por segundo, lo que sostiene la configuración de 4 + 2 CPU con latencia degradada.
 - **Lo que sí es sólido:** no hay sobreventa (AC01), los límites responden 429 uniforme, la caída de la base responde 503 (nunca 500) y el servicio se recupera sola. Bajo sobrecarga el sistema se degrada de forma controlada.
 - Las cifras absolutas son de esta máquina (k6 comparte CPU con el entorno) y varían entre corridas; entre dos mediciones del mismo límite se vio hasta 3 veces de diferencia. El orden entre configuraciones es lo reproducible.
@@ -88,7 +88,7 @@ Cada escenario, ejecutado de nuevo con el panel web integrado de k6 y exportado 
 
 ### 2.4 Palancas 3 y 4 del rendimiento (2026-11-21, antes y después)
 
-La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, pendientes de ratificar); detalle y método en [`docs/03/09` §6e](../03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md). Resultados en `progress/evidencias/k6/2026-11-21-palancas-3-4-*` (con paneles HTML).
+La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, ratificadas el 2026-11-22); detalle y método en [`docs/03/09` §6e](../03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md). Resultados en `progress/evidencias/k6/2026-11-21-palancas-3-4-*` (con paneles HTML).
 
 - **Palanca 4 (caché de disponibilidad): ya existía** en el catálogo del E-commerce (30 s por edición, con invalidación y respaldo de 10 minutos). Simulada con el resolutor real, quita el 97,8 % de las consultas con 20 ediciones y el 56,8 % con 5 000 de popularidad tipo Zipf; el stock nunca se inventa y reservar no la usa. Se corrigió la documentación, que decía «no implementado».
 - **Palanca 3 (menos idas a la base):** se enciende la memoria de referencias de 5 s del Inventario. Medición alternada en el peor caso (50 usuarios sin pausa, tres pares): **+45 % de solicitudes atendidas** (4 615 a 4 873 frente a 2 772 a 3 425) y mediana de 0,6 s frente a 0,9 a 1,1 s. En la rampa consecutiva baja el p95 de 1,4 a 0,8 s con 50 usuarios y de 7,1 a 4,7 s con 250.
@@ -100,7 +100,7 @@ La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, pendientes de r
 ### 3.1 Estilo arquitectónico
 
 - **Qué:** dos servicios (E-commerce e Inventario), cada uno un monolito modular, comunicados solo por REST. Decisiones, tácticas y presupuesto de recursos en `docs/02-arquitectura-de-software/` ([estilo](../02-arquitectura-de-software/03-estilo-arquitectonico.md), [decisiones](../02-arquitectura-de-software/02-decisiones-arquitectonicas.md), [tácticas](../02-arquitectura-de-software/06-tacticas-arquitectonicas.md), [presupuesto de recursos](../02-arquitectura-de-software/07-presupuesto-de-recursos.md)) y modelo C4 en `docs/04`.
-- **Prueba:** `tests/architecture` hace cumplir las reglas 1, 2, 5, 6 y 13 de [`AGENTS.md`](../../AGENTS.md) (**244 pruebas**, verdes): si una referencia viola la regla, falla.
+- **Prueba:** `tests/architecture` hace cumplir las reglas 1, 2, 5, 6 y 13 de [`AGENTS.md`](../../AGENTS.md) (**261 pruebas**, verdes): si una referencia viola la regla, falla.
 - **Reproducir:** `dotnet test tests/architecture`.
 
 ### 3.2 Patrón: Clean Architecture con módulos
@@ -112,6 +112,7 @@ La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, pendientes de r
 
 - **Qué:** cada feature tiene `spec.md` (EARS, criterios `AC-XXX-NN`), `plan.md`, `tasks.md`, `decisions.md` y `verificacion.md`; ninguna se programa sin spec **Approved** y plan **Planned** ([flujo SDD](01-flujo-sdd.md)). Matriz de trazabilidad: [`specs/TRACEABILITY.md`](../../specs/TRACEABILITY.md) (cada criterio, con la prueba que lo nombra por `[Trait("Criterio", "AC-XXX-NN")]`).
 - **Estado de cierre (2026-11-21, [`progress/bloques.md`](../../progress/bloques.md)):** 547 de 611 tareas (89 %). **Siete specs en `Done`** (`Resultado: Converge`): [biblioteca digital](../../specs/ecommerce-biblioteca-digital/verificacion.md), [carrito y checkout](../../specs/ecommerce-carrito-checkout/verificacion.md), [catálogo](../../specs/ecommerce-catalogo/verificacion.md), [devoluciones](../../specs/ecommerce-devoluciones/verificacion.md), [libro de reclamaciones](../../specs/ecommerce-libro-reclamaciones/verificacion.md), [pedidos](../../specs/ecommerce-pedidos/verificacion.md) y [traslados](../../specs/inventario-traslados/verificacion.md). El resto con verificación converge **salvo** excepciones registradas (operador de envíos real, llaves de Culqi, partes humanas de la interfaz, etc.); `transversal-plataforma` (despliegue y spikes) queda fuera del Sprint 2 y dos features están diferidas (asistente y página con índice infinito).
+- **Estado al 2026-11-27:** 23 specs (11 en `Done`, 5 en `InProgress` y 7 en `Planned`) y 650 de 700 tareas (93 %), contando `web-acceso`, integrada después de `v0.1.2`. El párrafo anterior es la foto del 2026-11-21.
 - **Reproducir:** `dotnet run --project tools/SpecCheck` (estructura, tareas y trazabilidad; 0 avisos).
 
 ### 3.4 Endpoints REST con OpenAPI
@@ -125,7 +126,7 @@ La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, pendientes de r
 
 - **Qué:** [análisis con mediciones](../03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md): índices usados por las consultas críticas (`pg_stat_statements`), bloqueos (`SELECT … FOR UPDATE` ordenado, AC01), seguridad por filas, qué se cachea y qué no, capacidad medida frente a recursos y costo por solicitud antes y después de reducirlo. Modelo de datos: [`docs/03/05`](../03-diseno-de-software/05-modelo-de-datos.md) y [estados y concurrencia](../03-diseno-de-software/06-estados-y-concurrencia.md).
 - **Hallazgos corregidos con prueba:** el tope del grupo de conexiones superaba el límite de la cuenta (500; ahora 16 por omisión); la base caída respondía 500 (ahora 503 uniforme); ≈ 31 → ≈ 18 idas a la base por solicitud.
-- **Honestidad:** **no hay caché de disponibilidad** (la regla de stock manda; D05); hay caché de los contadores de límites del E-commerce (Redis dedicado) y de las claves públicas de Identidad (en memoria). El cuello medido es la CPU, no una consulta lenta.
+- **Qué se cachea:** el catálogo del E-commerce guarda la disponibilidad por edición 30 s, con invalidación al registrar un ingreso y respaldo de hasta 10 minutos (DD-50); el Inventario guarda 5 s la lista de fuentes y el formato de las ediciones, **nunca el stock** (DD-51); y hay caché de los contadores de límites (Redis dedicado) y de las claves públicas de Identidad. Reservar no usa ninguna caché de stock. El cuello medido es la CPU, no una consulta lenta.
 
 ### 3.6 SOLID y patrones
 
@@ -141,9 +142,9 @@ Catálogo y criterios en [`docs/03/03`](../03-diseno-de-software/03-principios-y
 
 ### 3.7 Pruebas automatizadas, cobertura y CI/CD
 
-- **Pruebas (estado de `main`, 2026-11-21):** 244 de arquitectura, 5 437 y 2 380 unitarias, **7 601 de 7 603 de integración** (los 2 fallos son `HumoDeImagenes`, que necesita Docker y arquitecturas que esta máquina no tiene), E2E con Playwright y carga con k6. Compilación sin advertencias (`-warnaserror`) y `SpecCheck` sin avisos. Estrategia: [`03-estrategia-de-pruebas.md`](03-estrategia-de-pruebas.md).
-- **Cobertura:** [`cobertura/index.html`](../../progress/evidencias/cobertura/index.html) (HTML por servicio, capa y archivo) y su [resumen](../../progress/evidencias/cobertura/README.md): **E-commerce 95,5 % en Dominio y Aplicación y 94,6 % total; Inventario 95,7 % y 93,7 %**, contra los umbrales de 85 % y 70 %. Es la corrida del 2026-11-20; las 13 pruebas de integración que fallaron en ella se reparten a sus dueños en ese resumen.
-- **CI/CD:** [`ci.yml`](../../.github/workflows/ci.yml) (especificaciones y trazabilidad, compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales; archiva el reporte HTML), [`secretos.yml`](../../.github/workflows/secretos.yml) (escaneo de secretos) y `dependabot.yml`. **Aún no se ha ejecutado en GitHub** (el `push` lo hace la persona): no hay corrida de CI que mostrar; en local, cada paso del flujo pasa.
+- **Pruebas (CI de `938a3306`, 2026-11-27):** 261 de arquitectura, 5 770 unitarias del E-commerce y 2 454 del Inventario, 23 de `SpecCheck`, 15 de `CoverageCheck` y **8 708 de integración correctas y 4 omitidas** (cobros reales con Culqi), sin fallos; además E2E con Playwright (fuera del CI) y carga con k6. Compilación sin advertencias (`-warnaserror`) y `SpecCheck` sin avisos. Estrategia: [`03-estrategia-de-pruebas.md`](03-estrategia-de-pruebas.md).
+- **Cobertura:** [`cobertura/index.html`](../../progress/evidencias/cobertura/index.html) (HTML por servicio, capa y archivo) y su [resumen](../../progress/evidencias/cobertura/README.md): **E-commerce 95,6 % en Dominio y Aplicación y 95,2 % total; Inventario 95,4 % y 93,7 %** en el [CI de `938a3306`](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/45991774756), contra los umbrales de 85 % y 70 %. El HTML guardado en el repositorio es el de la corrida del 2026-11-20; el vigente es el artefacto `reporte-de-cobertura` de esa ejecución (GitHub lo conserva hasta el 2026-12-27).
+- **CI/CD:** [`ci.yml`](../../.github/workflows/ci.yml) (especificaciones y trazabilidad, compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales; archiva el reporte HTML), [`secretos.yml`](../../.github/workflows/secretos.yml) (escaneo de secretos) y `dependabot.yml`. Se ejecuta en cada PR y en cada cambio de `main` ([ejecución citada en esta hoja](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/45991774756)).
 - **Reproducir:** `dotnet build BabelHub.sln -warnaserror`; `dotnet test BabelHub.sln`; `dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings` y `dotnet run --project tools/CoverageCheck -- --html`.
 
 ### 3.8 Atributos de calidad con k6
@@ -160,7 +161,9 @@ bash tests/load/entorno/bajar-carga.sh
 
 ## 4. Qué no se demuestra (declarado)
 
-- **CI en GitHub:** `ci` y `secretos` en verde sobre `e0bc86df` (compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales, escaneo de secretos del historial y de las imágenes). La primera corrida (`4ba37f6a`, 135 pruebas fallidas en Linux) y la segunda (7) se corrigieron por causa raíz: permisos de ejecución de los dobles y de los scripts, una prueba de tiempos, enlaces fuera de `docs/` en la copia de SpecCheck, y la prueba de arranque de imágenes, que no entregaba los secretos que la validación exige. Los 19 PRs de Dependabot siguen abiertos sin fundir.
+- **CI en GitHub (historia):** la primera corrida verde de `ci` y `secretos` fue sobre `e0bc86df` (compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales, escaneo de secretos del historial y de las imágenes). La primera corrida (`4ba37f6a`, 135 pruebas fallidas en Linux) y la segunda (7) se corrigieron por causa raíz: permisos de ejecución de los dobles y de los scripts, una prueba de tiempos, enlaces fuera de `docs/` en la copia de SpecCheck, y la prueba de arranque de imágenes, que no entregaba los secretos que la validación exige. Quedan 18 PRs de Dependabot abiertos sin fundir.
+- **E2E:** no corren en el CI. En la última ejecución informada (2026-11-27), `biblioteca/biblioteca.spec.ts` falla por un defecto de la propia prueba (busca «@» y encuentra el correo de contacto del pie).
+- **Instalación desplegada:** la capacidad en la VM ARM y la ruta completa de la tienda no se midieron.
 - **RNF02 y 2 000 usuarios** con el dimensionamiento declarado: no cumplen (secciones 2 y 2.2; con el perfil realista se sostienen ≈ 1 000 sesiones); con Inventario 2 CPU + PostgreSQL 1 CPU, 2 000 sesiones **sí** se sostienen (sección 2.3; solo el Inventario). Decisión DD-18.
 - **Perfil realista sin el E-commerce:** el catálogo, el carrito y el pedido (VM-VENTAS) y la latencia de extremo a extremo no se midieron; una sola corrida completa y una repetición parcial.
 - **Medición en la VM ARM real**, despliegue, restauración con carga y llaves reales de pasarela y asistente: fuera del Sprint 2.
