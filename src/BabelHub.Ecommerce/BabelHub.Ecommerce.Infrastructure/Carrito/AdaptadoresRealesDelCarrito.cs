@@ -96,6 +96,18 @@ public sealed class AuditoriaDelCarritoSobreAuditoria(IAuditoria auditoria) : IA
     public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default) =>
         Registrar(AccionesAuditables.PasoAlPagoIniciado, cancelacion, ("conImpresos", Booleano(conImpresos)), ("aDomicilio", Booleano(aDomicilio)));
 
+    public Task TarifaDeEnvioCambiada(string codigoDeSucursal, decimal anterior, decimal nuevo, CancellationToken cancelacion = default) =>
+        auditoria.Registrar(
+            new SolicitudDeRegistro(AccionesAuditables.TarifaDeEnvioCambiada)
+            {
+                ObjetoTipo = "sucursal",
+                ObjetoId = codigoDeSucursal,
+                Detalle = new Dictionary<string, string?>(StringComparer.Ordinal) { ["importeAnterior"] = Soles(anterior), ["importeNuevo"] = Soles(nuevo), ["moneda"] = "PEN" },
+            },
+            cancelacion);
+
+    private static string Soles(decimal valor) => valor.ToString("0.00", CultureInfo.InvariantCulture);
+
     private static string Numero(int valor) => valor.ToString(CultureInfo.InvariantCulture);
 
     private static string Booleano(bool valor) => valor ? "true" : "false";

@@ -215,6 +215,8 @@ public sealed class AuditoriaDelCarritoDePrueba : IAuditoriaDelCarrito
 
     public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default) => Anotar("paso-al-pago");
 
+    public Task TarifaDeEnvioCambiada(string codigoDeSucursal, decimal anterior, decimal nuevo, CancellationToken cancelacion = default) => Anotar("tarifa-de-envio");
+
     public Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default) => Anotar("aborto:" + motivo);
 }
 
@@ -384,6 +386,21 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
             _actor.Establecer(ActorActual.Anonimo());
         }
 
+        try
+        {
+            return await accion(alcance.ServiceProvider);
+        }
+        finally
+        {
+            _actor.Limpiar();
+        }
+    }
+
+    /// <summary>Una solicitud de la administración central.</summary>
+    public async Task<T> ComoAdministracion<T>(Func<IServiceProvider, Task<T>> accion)
+    {
+        using var alcance = _proveedor.CreateScope();
+        _actor.Establecer(ActorActual.DeUsuario(Guid.NewGuid(), "administrador-central", null));
         try
         {
             return await accion(alcance.ServiceProvider);

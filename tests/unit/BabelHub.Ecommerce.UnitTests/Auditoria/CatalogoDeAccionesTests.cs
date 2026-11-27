@@ -418,6 +418,24 @@ public sealed class CatalogoDeAccionesTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAR-40")]
+    public async Task Un_cambio_de_costo_de_envio_guarda_la_sucursal_el_importe_anterior_y_el_nuevo_y_se_cancela_sin_auditoria()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        var detalle = new Dictionary<string, string?> { ["importeAnterior"] = "30.00", ["importeNuevo"] = "18.50", ["moneda"] = "PEN" };
+
+        await entorno.Registrar(AccionesAuditables.TarifaDeEnvioCambiada, detalle, objetoTipo: "sucursal", objetoId: "cusco");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal(("30.00", "18.50"), (registro.Detalle.Valores["importeAnterior"], registro.Detalle.Valores["importeNuevo"]));
+        Assert.Equal(("sucursal", "cusco"), (registro.ObjetoTipo, registro.ObjetoId));
+        Assert.Equal("administrador-central", registro.Actor.Rol);
+
+        entorno.Almacen.Falla = new InvalidOperationException("la base no responde");
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Registrar(AccionesAuditables.TarifaDeEnvioCambiada, detalle, objetoTipo: "sucursal", objetoId: "cusco"));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-AUD-01")]
     public async Task Un_reembolso_automatico_del_sistema_no_lleva_numero_de_tarjeta()
     {

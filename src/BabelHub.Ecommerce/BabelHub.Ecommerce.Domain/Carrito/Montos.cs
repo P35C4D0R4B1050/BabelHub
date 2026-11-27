@@ -22,6 +22,9 @@ public sealed class CostoDeEnvio
         return costo is not null;
     }
 
+    /// <summary>El mayor costo que la administración puede fijar para una sucursal (CAR-48).</summary>
+    public const decimal MaximoPorSucursal = 500m;
+
     public static CostoDeEnvio Crear(decimal soles) =>
         TryCrear(soles, out var costo) ? costo : throw new ArgumentOutOfRangeException(nameof(soles), "El costo de envío no es una cantidad en soles válida.");
 }

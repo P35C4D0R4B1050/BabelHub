@@ -304,6 +304,8 @@ public class DoblesProvisionalesDelCarritoTests
 
         public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default) => Task.CompletedTask;
 
+        public Task TarifaDeEnvioCambiada(string codigoDeSucursal, decimal anterior, decimal nuevo, CancellationToken cancelacion = default) => Task.CompletedTask;
+
         public Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
     }
 

@@ -150,6 +150,20 @@ public sealed class AdaptadoresRealesDelCarritoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAR-40")]
+    public async Task Un_cambio_de_costo_de_envio_se_audita_con_la_sucursal_como_objeto_y_los_importes_en_soles()
+    {
+        var espia = new AuditoriaEspia();
+
+        await new AuditoriaDelCarritoSobreAuditoria(espia).TarifaDeEnvioCambiada("cusco", 30m, 18.5m);
+
+        var solicitud = Assert.Single(espia.Solicitudes);
+        Assert.Equal(AccionesAuditables.TarifaDeEnvioCambiada, solicitud.Accion);
+        Assert.Equal(("sucursal", "cusco"), (solicitud.ObjetoTipo, solicitud.ObjetoId));
+        Assert.Equal(new[] { "30.00", "18.50", "PEN" }, new[] { "importeAnterior", "importeNuevo", "moneda" }.Select(k => solicitud.Detalle[k]));
+    }
+
+    [Fact]
     public async Task Si_no_se_puede_auditar_la_excepcion_sube_y_la_operacion_no_se_aplica()
     {
         var espia = new AuditoriaEspia { Falla = true };

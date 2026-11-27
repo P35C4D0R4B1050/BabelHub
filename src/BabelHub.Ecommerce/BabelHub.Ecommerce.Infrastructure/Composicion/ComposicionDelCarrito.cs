@@ -93,6 +93,14 @@ public static class ComposicionDelCarrito
             sp.GetRequiredService<IRepositorioDeTarifasDeEnvio>()));
 
         // ---------- Contratos públicos y receptores ----------
+        servicios.TryAddScoped<IAdministracionDeEnvios>(sp => new AdministracionDeEnvios(
+            sp.GetRequiredService<AutorizadorDelCarrito>(),
+            sp.GetRequiredService<IPreferenciaDeSucursal>(),
+            sp.GetRequiredService<IRepositorioDeTarifasDeEnvio>(),
+            sp.GetRequiredService<ICostoDeEnvioConfigurado>(),
+            sp.GetRequiredService<IUnidadDeTrabajo>(),
+            sp.GetRequiredService<IReloj>(),
+            sp.GetRequiredService<IAuditoriaDelCarrito>()));
         servicios.TryAddScoped<ICarritoDelCliente, CarritoDelCliente>();
         servicios.TryAddScoped<ICheckoutDelCliente, CheckoutDelCliente>();
         servicios.TryAddScoped<IProgresoDelCheckout, ProgresoDelCheckout>();

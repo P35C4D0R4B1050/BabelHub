@@ -33,6 +33,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.PurgaDeCarritosRealizada)] = [],
         [nameof(AccionesAuditables.PasoAlPagoAbortado)] = [],
         [nameof(AccionesAuditables.PasoAlPagoIniciado)] = [],
+        [nameof(AccionesAuditables.TarifaDeEnvioCambiada)] = ["sucursal"],
         [nameof(AccionesAuditables.CobroIniciado)] = ["intento-de-cobro"],
         [nameof(AccionesAuditables.CobroResuelto)] = ["intento-de-cobro"],
         [nameof(AccionesAuditables.AvisoDeLaPasarelaRecibido)] = ["intento-de-cobro"],

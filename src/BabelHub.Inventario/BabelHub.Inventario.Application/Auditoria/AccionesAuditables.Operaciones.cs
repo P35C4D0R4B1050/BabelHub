@@ -65,6 +65,9 @@ public static partial class AccionesAuditables
     /// <summary>Se pasó al pago (intención creada y checkout en pago): con o sin impresos y el tipo de entrega; sin contacto, cuenta ni pedido (D13).</summary>
     public static readonly AccionAuditable PasoAlPagoIniciado = new(nameof(PasoAlPagoIniciado));
 
+    /// <summary>La administración cambió el costo de envío de una sucursal: el importe anterior y el nuevo.</summary>
+    public static readonly AccionAuditable TarifaDeEnvioCambiada = new(nameof(TarifaDeEnvioCambiada));
+
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
     public static readonly AccionAuditable ReingresoPorDevolucion = new(nameof(ReingresoPorDevolucion));
 

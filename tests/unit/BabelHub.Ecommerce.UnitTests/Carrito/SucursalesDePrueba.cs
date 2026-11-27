@@ -42,8 +42,19 @@ internal sealed class SucursalesDeCarritoFalsas : IPreferenciaDeSucursal
 }
 
 /// <summary>Las tarifas propias en memoria; cuenta las lecturas para comprobar que el paso al pago las lee una sola vez.</summary>
-internal sealed class TarifasDeEnvioEnMemoria : IRepositorioDeTarifasDeEnvio
+internal sealed class TarifasDeEnvioEnMemoria : IRepositorioDeTarifasDeEnvio, BabelHub.Ecommerce.UnitTests.Catalogo.IInstantanea
 {
+    public object Capturar() => new Dictionary<string, CostoDeEnvio>(Propias, StringComparer.Ordinal);
+
+    public void Restaurar(object instantanea)
+    {
+        Propias.Clear();
+        foreach (var (sucursal, costo) in (Dictionary<string, CostoDeEnvio>)instantanea)
+        {
+            Propias[sucursal] = costo;
+        }
+    }
+
     public Dictionary<string, CostoDeEnvio> Propias { get; } = new(StringComparer.Ordinal);
 
     public int Lecturas { get; private set; }

@@ -1,11 +1,11 @@
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Catalogo;
+using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Carrito;
 using BabelHub.Ecommerce.Infrastructure.Carrito;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using IRepositorioDeTarifasDeEnvio = BabelHub.Ecommerce.Application.Carrito.Interno.IRepositorioDeTarifasDeEnvio;
-using IUnidadDeTrabajo = BabelHub.Ecommerce.Application.Plataforma.IUnidadDeTrabajo;
 
 namespace BabelHub.IntegrationTests.Carrito;
 
@@ -199,6 +199,27 @@ public sealed class EsquemaYTarifasDelCarritoPostgresTests(PostgresDelCarritoFix
         var final = (await bd.Unidad.Ejecutar(token => Tarifas.Leer(token)))["cusco"].Valor;
         // Una sola cadena: cada importe (el inicial y los 20 nuevos) se reemplaza una vez, salvo el que quedó.
         Assert.Equal(hechos.Select(h => h.Nuevo).Append(100m).Where(v => v != final).Order(), hechos.Select(h => h.Anterior).Order());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-40")]
+    public async Task La_administracion_cambia_el_costo_con_su_auditoria_y_si_no_se_puede_auditar_la_base_no_cambia()
+    {
+        await using var entorno = await EntornoDelCarritoConPostgres.Crear(bd);
+        Task<Resultado<CostoDeEnvioDeSucursal>> Cambiar(decimal importe) =>
+            entorno.ComoAdministracion(sp => sp.GetRequiredService<IAdministracionDeEnvios>().Cambiar(new CambiarCostoDeEnvioEntrada(AtajosDeCarrito.Sucursal, importe)));
+
+        var cambiado = await Cambiar(18.50m);
+        entorno.Auditoria.Caida = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Cambiar(99m));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => entorno.ComoAdministracion(sp => sp.GetRequiredService<IAdministracionDeEnvios>().Cambiar(new CambiarCostoDeEnvioEntrada("cusco", 99m))));
+
+        Assert.True(cambiado.EsExito, cambiado.Error?.Clave);
+        Assert.Equal(["tarifa-de-envio"], entorno.Auditoria.Eventos);
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM carrito.tarifas_de_envio"));
+        Assert.Equal(18.50m, await bd.Consultar<decimal>($"SELECT importe FROM carrito.tarifas_de_envio WHERE codigo_de_sucursal = '{AtajosDeCarrito.Sucursal}'"));
+        var costos = (await entorno.ComoAdministracion(sp => sp.GetRequiredService<IAdministracionDeEnvios>().Listar())).Valor;
+        Assert.Equal((12m, 18.50m), (costos.Predeterminado, costos.Sucursales.Single(s => s.CodigoDeSucursal == AtajosDeCarrito.Sucursal).Importe));
     }
 
     // ---------- Efectos en la compra ----------

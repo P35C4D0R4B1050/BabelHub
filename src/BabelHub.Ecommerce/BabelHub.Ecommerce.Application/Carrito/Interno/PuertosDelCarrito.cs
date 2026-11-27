@@ -341,6 +341,9 @@ public interface IAuditoriaDelCarrito
 
     /// <summary>Se pasó al pago (la intención creada y el checkout en <c>en_pago</c>): con o sin impresos y el tipo de entrega; sin contacto, sin cuenta ni pedido en el detalle (D13).</summary>
     Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default);
+
+    /// <summary>La administración cambió el costo de envío de una sucursal (CAR-46): la sucursal y el importe anterior y el nuevo.</summary>
+    Task TarifaDeEnvioCambiada(string codigoDeSucursal, decimal anterior, decimal nuevo, CancellationToken cancelacion = default);
 }
 
 /// <summary>

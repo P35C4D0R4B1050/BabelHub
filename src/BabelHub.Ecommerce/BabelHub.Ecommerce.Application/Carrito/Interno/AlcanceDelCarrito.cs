@@ -11,6 +11,9 @@ namespace BabelHub.Ecommerce.Application.Carrito.Interno;
 internal static class RolesDelCarrito
 {
     public const string Cliente = "cliente";
+
+    /// <summary>Quien cambia los costos de envío (CAR-48); la misma prueba lo compara con <c>RolesDeUsuario.AdministradorCentral</c>.</summary>
+    public const string AdministradorCentral = "administrador-central";
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>ECO-…</c> (plan §4).</summary>
@@ -179,6 +182,20 @@ internal sealed class AutorizadorDelCarrito(IActorActual actores, IDenegacionDeA
 
         await Denegar(MotivosDeDenegacionDelCarrito.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
         return Resultado<SolicitanteDelCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.Prohibido));
+    }
+
+    /// <summary>Solo la administración central (CAR-48): devuelve el error, con su evento de acceso denegado, o <see langword="null"/> si puede seguir.</summary>
+    public async Task<ErrorDeAplicacion?> ExigirAdministracionCentral(CancellationToken cancelacion)
+    {
+        var actor = actores.Actual;
+        if (actor is { Tipo: TipoDeActor.Usuario, UsuarioId: not null, Rol: RolesDelCarrito.AdministradorCentral })
+        {
+            return null;
+        }
+
+        var anonimo = actor is null or { Tipo: TipoDeActor.Anonimo };
+        await Denegar(anonimo ? MotivosDeDenegacionDelCarrito.SinSesion : MotivosDeDenegacionDelCarrito.FueraDeRol, anonimo ? "ECO-NO-AUTENTICADO" : "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return anonimo ? new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDelCarrito.NoAutenticado) : new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.Prohibido);
     }
 
     /// <summary>Solo el sistema (un trabajo de fondo): cualquier otro actor, incluido el personal y los clientes, se rechaza con su evento.</summary>

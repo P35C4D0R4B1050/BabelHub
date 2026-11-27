@@ -59,7 +59,7 @@ Plan §11. Carril «Carrito y tienda», en este orden. T43 espera T34 de `invent
 - [x] T42 [Aplicación/C] Checkout: validación por sucursal, desglose mostrado, tarifas leídas una vez al congelar, total cambiado, rechazo de la reserva sin reasignar, compras anteriores y quitar lo comprado (cubre: AC-CAR-04, AC-CAR-08, AC-CAR-24, AC-CAR-39, AC-CAR-42)
 - [ ] T43 [Infra/C] Cliente del Inventario y `RestInventarioDelCarrito` con sucursal por línea y vendible de la sucursal (requiere T34 de `inventario-seleccion-fuente`) (cubre: AC-CAR-04, AC-CAR-24, CAR-39)
 - [x] T44 [Infra/C] Esquema `carrito` migrado de forma repetible desde el anterior con sus permisos por columna, repositorios por línea y composición (cubre: AC-CAR-39, AC-CAR-35)
-- [ ] T45 [Aplicación/C] `IAdministracionDeEnvios` con tarifas persistidas, predeterminado de S/ 30,00, denegación y la acción de auditoría `TarifaDeEnvioCambiada` (Shared y los catálogos de ambos servicios) (cubre: AC-CAR-40, AC-CAR-41)
+- [x] T45 [Aplicación/C] `IAdministracionDeEnvios` con tarifas persistidas, predeterminado de S/ 30,00, denegación y la acción de auditoría `TarifaDeEnvioCambiada` (Shared y los catálogos de ambos servicios) (cubre: AC-CAR-40, AC-CAR-41)
 - [ ] T46 [Web/C] Ficha con sucursal, stock y máximo, preselección y sin dato vigente (cubre: AC-CAR-36, AC-CAR-37)
 - [ ] T47 [Web/C] Carrito por tarjeta con sucursal y actualización al cambiar la cantidad, y checkout sin elegir sucursal con el desglose del envío (cubre: AC-CAR-38, AC-CAR-08, AC-CAR-39, AC-CAR-31)
 - [ ] T48 [Web/C] Pantalla de gestión de costos de envío y su entrada de menú (cubre: AC-CAR-40, AC-CAR-41)

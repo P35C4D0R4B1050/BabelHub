@@ -68,6 +68,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Auditada(nameof(AccionesAuditables.PurgaDeCarritosRealizada), false, false, Clave("trabajo", 40), Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.PasoAlPagoAbortado), false, false, Clave("motivo", 40));
         yield return Auditada(nameof(AccionesAuditables.PasoAlPagoIniciado), false, false, new ClaveDeDetalle("conImpresos", personal: false) { Valores = ["true", "false"] }, new ClaveDeDetalle("aDomicilio", personal: false) { Valores = ["true", "false"] });
+        yield return Auditada(nameof(AccionesAuditables.TarifaDeEnvioCambiada), false, false, Clave("importeAnterior", 16), Clave("importeNuevo", 16), Moneda());
     }
 
     private static AccionDelCatalogo Traslado(string identificador) =>

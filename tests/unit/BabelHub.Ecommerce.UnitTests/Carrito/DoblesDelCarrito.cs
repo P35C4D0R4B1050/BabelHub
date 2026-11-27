@@ -612,6 +612,19 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 
     public bool Caida { get; set; }
 
+    public List<(string Sucursal, decimal Anterior, decimal Nuevo)> Tarifas { get; } = [];
+
+    public Task TarifaDeEnvioCambiada(string codigoDeSucursal, decimal anterior, decimal nuevo, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Tarifas.Add((codigoDeSucursal, anterior, nuevo));
+        return Task.CompletedTask;
+    }
+
     /// <summary>Solo falla <c>PasoAlPagoIniciado</c> (el cuerpo de 3b): simula que 3b lanza sin que caiga el resto de la auditoría.</summary>
     public bool FallaAlIniciarElPago { get; set; }
 

@@ -163,6 +163,8 @@ public static class AccionesDeAuditoria
 
     public const string PasoAlPagoIniciado = "PasoAlPagoIniciado";
 
+    public const string TarifaDeEnvioCambiada = "TarifaDeEnvioCambiada";
+
     public const string IngresoFallido = "IngresoFallido";
 
     public const string LicenciaCambiada = "LicenciaCambiada";
@@ -329,6 +331,7 @@ public static class AccionesDeAuditoria
         PurgaDeCarritosRealizada,
         PasoAlPagoAbortado,
         PasoAlPagoIniciado,
+        TarifaDeEnvioCambiada,
         LicenciaCambiada,
         LimiteExcedido,
         LlamadaEntreServiciosSinCredencial,
