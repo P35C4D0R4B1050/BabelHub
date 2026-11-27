@@ -42,6 +42,13 @@ internal sealed class DestinoResuelto
 /// </summary>
 internal sealed class SelectorDeFuentes(IDirectorioDeFuentes directorio, IEstrategiaDeSeleccion estrategia)
 {
+    /// <summary>Las sucursales que declaran las líneas, por código; es <see langword="null"/> si alguna no existe (SEL-42). Lee el directorio sin bloquear nada.</summary>
+    public async Task<IReadOnlyDictionary<string, FuenteDeStock>?> Sucursales(IEnumerable<string> codigos, CancellationToken cancelacion)
+    {
+        var fuentes = (await directorio.Listar(cancelacion).ConfigureAwait(false)).ToDictionary(f => f.Codigo, StringComparer.Ordinal);
+        return codigos.All(fuentes.ContainsKey) ? fuentes : null;
+    }
+
     /// <summary>Resuelve el destino; es <see langword="null"/> si la sucursal de recojo no existe. Lee el directorio sin bloquear nada.</summary>
     public async Task<DestinoResuelto?> Resolver(TipoDeEntregaDeReserva tipo, string? codigoDeSucursal, string? region, CancellationToken cancelacion)
     {

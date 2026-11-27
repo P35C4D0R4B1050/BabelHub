@@ -126,6 +126,23 @@ internal sealed class ReservarUnidades(
             return falloDeEdicion;
         }
 
+        // Con las ediciones ya comprobadas, todas las líneas son impresas: se decide la forma de la solicitud antes de apartar nada (SEL-42).
+        if (FormaDeLaSolicitud.Comprobar(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.Lineas, out var porSucursal) is { } errorDeForma)
+        {
+            return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([errorDeForma]));
+        }
+
+        if (porSucursal)
+        {
+            if (await selector.Sucursales(entrada.Lineas.Select(l => l.CodigoDeSucursal!), cancelacion).ConfigureAwait(false) is null)
+            {
+                return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([FormaDeLaSolicitud.SucursalInexistente]));
+            }
+
+            // La asignación por sucursal llega en T37; hasta entonces falla cerrado, sin apartar stock.
+            return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.NoDisponible, ClavesDeReservas.BloqueoOcupado);
+        }
+
         var destino = await selector.Resolver(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, cancelacion).ConfigureAwait(false);
         if (destino is null)
         {

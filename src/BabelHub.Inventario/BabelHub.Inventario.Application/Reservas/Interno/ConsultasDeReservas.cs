@@ -9,7 +9,7 @@ internal sealed class ValidadorDeConsultarSeleccion : IValidador<ConsultarSelecc
     {
         ArgumentNullException.ThrowIfNull(entrada);
         var errores = new List<ErrorDeCampo>();
-        ReglasDeEntradaDeReservas.Entrega(errores, entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega);
+        ReglasDeEntradaDeReservas.Entrega(errores, entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, FormaDeLaSolicitud.AlgunaDeclaraSucursal(entrada.Lineas));
         ReglasDeEntradaDeReservas.Lineas(errores, entrada.Lineas);
         return ReglasDeEntradaDeReservas.Resultado(errores);
     }
@@ -69,6 +69,28 @@ internal sealed class ConsultarSeleccion(
             {
                 impresas.Add(linea);
             }
+        }
+
+        if (FormaDeLaSolicitud.Comprobar(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, impresas, out var porSucursal) is { } errorDeForma)
+        {
+            return FallosDeReservas.Validacion<SeleccionConsultada>(ResultadoDeValidacion.Invalido([errorDeForma]));
+        }
+
+        // Sin líneas impresas no hay nada que seleccionar: la sucursal que declare una digital se ignora (SEL-20).
+        if (impresas.Count == 0 && FormaDeLaSolicitud.AlgunaDeclaraSucursal(entrada.Lineas))
+        {
+            return Resultado<SeleccionConsultada>.Exito(new SeleccionConsultada([], reloj.Ahora));
+        }
+
+        if (porSucursal)
+        {
+            if (await selector.Sucursales(impresas.Select(l => l.CodigoDeSucursal!), cancelacion).ConfigureAwait(false) is null)
+            {
+                return FallosDeReservas.Validacion<SeleccionConsultada>(ResultadoDeValidacion.Invalido([FormaDeLaSolicitud.SucursalInexistente]));
+            }
+
+            // La asignación por sucursal llega en T37.
+            return FallosDeReservas.BloqueoOcupado<SeleccionConsultada>();
         }
 
         var destino = await selector.Resolver(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, cancelacion).ConfigureAwait(false);

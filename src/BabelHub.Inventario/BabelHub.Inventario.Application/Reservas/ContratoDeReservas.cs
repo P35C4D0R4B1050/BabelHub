@@ -39,8 +39,11 @@ public enum MotivoDeCierreDeReserva
     Reparto,
 }
 
-/// <summary>Una línea impresa que se pide reservar o consultar: su identificador (el que asigna el E-commerce), la edición y la cantidad.</summary>
-public sealed record LineaSolicitada(Guid LineaId, Guid EdicionId, int Cantidad);
+/// <summary>
+/// Una línea impresa que se pide reservar o consultar: su identificador (el que asigna el E-commerce), la edición, la cantidad y, en la venta por sucursal, la sucursal elegida para atenderla (SEL-41): se
+/// declara en todas las líneas impresas o en ninguna (SEL-42).
+/// </summary>
+public sealed record LineaSolicitada(Guid LineaId, Guid EdicionId, int Cantidad, string? CodigoDeSucursal = null);
 
 /// <summary>
 /// Reserva los impresos de un pedido (SEL-01): todas las líneas o ninguna. El cliente <b>no viaja aquí</b>: sale del actor verificado (un <c>clienteId</c> en el cuerpo se rechaza). Repetir el

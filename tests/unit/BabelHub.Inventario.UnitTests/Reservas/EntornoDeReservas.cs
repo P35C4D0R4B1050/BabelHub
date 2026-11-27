@@ -675,7 +675,7 @@ internal sealed class EntornoDeReservas
             Limites,
             Base.Reloj);
 
-    public static LineaSolicitada Linea(Guid edicionId, int cantidad = 1, Guid? lineaId = null) => new(lineaId ?? Guid.NewGuid(), edicionId, cantidad);
+    public static LineaSolicitada Linea(Guid edicionId, int cantidad = 1, Guid? lineaId = null, string? sucursal = null) => new(lineaId ?? Guid.NewGuid(), edicionId, cantidad, sucursal);
 
     public static ReservarEntrada ARecojo(string sucursal, IReadOnlyList<LineaSolicitada> lineas, Guid? pedidoId = null, string? clave = null) =>
         new(pedidoId ?? Guid.NewGuid(), TipoDeEntregaDeReserva.Recojo, sucursal, null, lineas, clave ?? ClaveNueva());
