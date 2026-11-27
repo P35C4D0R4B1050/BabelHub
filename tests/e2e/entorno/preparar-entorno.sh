@@ -48,6 +48,8 @@ poner BABELHUB__Web__ClaveDeSesionesTienda "$(alea 40)"
 poner BABELHUB__Web__ClaveDeSesionesGestion "$(alea 40)"
 poner BABELHUB__Carrito__CostoDeEnvio "30.00"
 poner BABELHUB__Pagos__Pasarela simulador
+# Sin operador logístico real (DD-22): el simulador genera las guías de los envíos.
+poner BABELHUB__Envios__Operador simulador
 poner BABELHUB__Pagos__ClaveDeIntentos "$(alea 40)"
 for almacen in Catalogo Supresiones; do
   poner "BABELHUB__Almacen__${almacen}__Endpoint" "https://almacen.invalido.local/"

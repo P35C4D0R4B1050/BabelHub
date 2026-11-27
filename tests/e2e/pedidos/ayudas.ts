@@ -66,7 +66,7 @@ export async function agregarAlCarrito(page: Page, edicionId: string, cantidad: 
   await expect(page.getByRole('heading', { level: 1, name: 'Tu carrito' })).toBeVisible();
 }
 
-async function aceptarLosTextosYPagar(page: Page) {
+export async function aceptarLosTextosYPagar(page: Page) {
   for (const casilla of await page.getByRole('group', { name: 'Para continuar, acepta:' }).getByRole('checkbox').all()) {
     await casilla.check();
   }

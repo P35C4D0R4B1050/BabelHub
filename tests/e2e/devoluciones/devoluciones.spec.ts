@@ -41,7 +41,8 @@ test.describe('Devoluciones', () => {
     await page.getByRole('link', { name: 'Devolver libros' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Devolver un pedido' })).toBeVisible();
     await page.getByRole('spinbutton').first().fill('1');
-    await page.getByLabel('Sucursal donde entregarás los libros').selectOption({ index: 0 });
+    // Ninguna sucursal viene preseleccionada (WEB-16): la persona elige dónde entregará los libros.
+    await page.getByLabel('Sucursal donde entregarás los libros').selectOption('ayacucho');
     await page.getByRole('textbox', { name: /^Motivo/ }).fill('No era el libro que buscaba');
     await sinViolacionesDeAccesibilidad(page);
     await page.screenshot({ path: info.outputPath('devolver-un-pedido.png'), fullPage: true });
