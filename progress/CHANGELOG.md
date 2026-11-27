@@ -2,6 +2,14 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — La ficha del libro permite comprar
+
+### Cubierto
+- `ecommerce-carrito-checkout` T38: botones de compra en la ficha (ninguna pantalla enviaba a `POST /carrito/lineas` en `v0.1.1`), máximo de stock en el rechazo y «Gratis (recojo)» en el resumen; pruebas y E2E por el formulario real.
+
+### Pendiente
+- Persona: publicar imágenes nuevas y redesplegar; cargar catálogo y stock. Pantallas sin enlace en `hallazgos.md`.
+
 ## 2026-11-26 — La tienda sin pasarela para la revisión de Culqi (carril `sin-pasarela`)
 
 ### Cubierto
