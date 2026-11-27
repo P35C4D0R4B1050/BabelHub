@@ -9,6 +9,9 @@ using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Application.Web.Interno;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.IntegrationTests.Carrito;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BabelHub.IntegrationTests.Web;
@@ -45,7 +48,7 @@ public sealed class PantallasDelCarritoTests
         return new ResultadoDeCarrito(new VistaDelCarrito(l, l.Sum(x => x.Importe), [.. avisos ?? []], compraEnCurso, sinPrecios), null, false);
     }
 
-    private static async Task<AnfitrionWeb> Iniciar(CarritoDelClienteFalso falso, bool conSesion = true)
+    private static async Task<AnfitrionWeb> Iniciar(CarritoDelClienteFalso falso, bool conSesion = true, bool conToken = false)
     {
         var actor = new ActorFijo(conSesion ? ActorActual.DeUsuario(Guid.NewGuid(), "cliente", null) : ActorActual.Anonimo());
 
@@ -56,7 +59,8 @@ public sealed class PantallasDelCarritoTests
             servicios.AddSingleton<IListaDeSucursales>(new ListaDePrueba());
             servicios.AgregarProteccionContraFalsificacion();
             servicios.AddSingleton(new OpcionesDelHostWeb(HostWeb.Tienda, []));
-        });
+        },
+        despuesDelEnrutado: conToken ? app => app.MapGet("/prueba/token", (HttpContext contexto, IAntiforgery antiforgery) => Results.Text(antiforgery.GetAndStoreTokens(contexto).RequestToken)) : null);
     }
 
     private static async Task<string> Pedir(AnfitrionWeb anfitrion, string ruta = "/carrito", bool htmx = false)
@@ -139,6 +143,39 @@ public sealed class PantallasDelCarritoTests
         Assert.Contains("Una licencia por cuenta.", html, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Quitar «Estructuras de datos» de Ayacucho del carrito\"", html, StringComparison.Ordinal);
         Assert.True(System.Text.RegularExpressions.Regex.Matches(html, "name=\"__RequestVerificationToken\"").Count >= 4);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-38")]
+    public async Task Cada_tarjeta_dice_su_sucursal_se_actualiza_sola_sin_script_hay_un_boton_y_un_cambio_rechazado_se_explica_sin_perder_la_cantidad()
+    {
+        var (enAyacucho, enCusco) = (Guid.NewGuid(), Guid.NewGuid());
+        LineaDelCarritoVista Tarjeta(Guid linea, string codigo, string nombre, int cantidad) =>
+            new(linea, Impreso, "Estructuras de datos", null, FormatoDeEdicion.Impresa, cantidad, 40m, 40m * cantidad, Disp(Impreso, EstadoDeDisponibilidad.Disponible, 7), false, codigo, nombre, 7, 7);
+        var falso = new CarritoDelClienteFalso { Respuesta = Resultado<ResultadoDeCarrito>.Exito(Carrito([Tarjeta(enAyacucho, "AYA", "Ayacucho", 3), Tarjeta(enCusco, "CUS", "Cusco", 2)])) };
+        falso.RespuestaDeCambio = Resultado<ResultadoDeCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, "carrito-sin-stock", [new ErrorDeCampo("maximo", "2"), new ErrorDeCampo("sucursal", "CUS")]));
+        await using var anfitrion = await Iniciar(falso, conToken: true);
+
+        var html = await Pedir(anfitrion);
+        using var respuestaDelToken = await anfitrion.Cliente.GetAsync("/prueba/token");
+        var cookie = respuestaDelToken.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith(ProteccionContraFalsificacion.NombreDeLaCookie + "=", StringComparison.Ordinal)).Split(';')[0];
+        using var solicitud = new HttpRequestMessage(HttpMethod.Post, $"/carrito/lineas/{enCusco:D}") { Content = new FormUrlEncodedContent([new("cantidad", "5")]) };
+        solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+        solicitud.Headers.TryAddWithoutValidation("Cookie", cookie);
+        solicitud.Headers.TryAddWithoutValidation(ProteccionContraFalsificacion.NombreDeLaCabecera, await respuestaDelToken.Content.ReadAsStringAsync());
+        using var rechazada = await anfitrion.Cliente.SendAsync(solicitud);
+        var despues = WebUtility.HtmlDecode(await rechazada.Content.ReadAsStringAsync());
+
+        Assert.Contains("Lo atiende <strong>Ayacucho</strong>", html, StringComparison.Ordinal);
+        Assert.Contains("Lo atiende <strong>Cusco</strong>", html, StringComparison.Ordinal);
+        Assert.Contains($"data-bh-cantidad=\"{enAyacucho:D}\"", html, StringComparison.Ordinal);
+        Assert.Contains($"data-bh-cantidad=\"{enCusco:D}\"", html, StringComparison.Ordinal);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "<noscript><button type=\"submit\"[^>]*>Actualizar</button></noscript>").Count);
+        Assert.Contains("data-bh-anuncio", html, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.Conflict, rechazada.StatusCode);
+        Assert.Contains("El máximo disponible en Cusco es de 2 unidades", despues, StringComparison.Ordinal);
+        Assert.Contains("name=\"cantidad\" value=\"2\"", despues, StringComparison.Ordinal);
+        Assert.Equal(new ModificarLineaEntrada(enCusco, 5), Assert.IsType<ModificarLineaEntrada>(falso.Entradas.Single(e => e is ModificarLineaEntrada)));
     }
 
     [Fact]

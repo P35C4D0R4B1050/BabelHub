@@ -42,7 +42,14 @@ public sealed class CarritoDelClienteFalso : ICarritoDelCliente
 
     public Task<Resultado<ResultadoDeCarrito>> AgregarLinea(AgregarLineaEntrada entrada, CancellationToken cancelacion = default) => Anotar("agregar", entrada);
 
-    public Task<Resultado<ResultadoDeCarrito>> ModificarLinea(ModificarLineaEntrada entrada, CancellationToken cancelacion = default) => Anotar("cambiar", entrada);
+    /// <summary>Si se fija, es lo que responde un cambio de cantidad (las lecturas siguen con <see cref="Respuesta"/>).</summary>
+    public Resultado<ResultadoDeCarrito>? RespuestaDeCambio { get; set; }
+
+    public async Task<Resultado<ResultadoDeCarrito>> ModificarLinea(ModificarLineaEntrada entrada, CancellationToken cancelacion = default)
+    {
+        var anotada = await Anotar("cambiar", entrada);
+        return RespuestaDeCambio ?? anotada;
+    }
 
     public Task<Resultado<ResultadoDeCarrito>> EliminarLinea(EliminarLineaEntrada entrada, CancellationToken cancelacion = default) => Anotar("quitar", entrada);
 
