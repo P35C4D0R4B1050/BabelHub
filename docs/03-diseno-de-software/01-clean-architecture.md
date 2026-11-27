@@ -112,6 +112,7 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
 | Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Oracle Object Storage); en desarrollo, un emulador compatible con S3 o una carpeta local |
+| Generador de código QR | E-commerce | `Net.Codecrete.QrCodeGenerator` en el propio servicio, sin terceros (web-acceso); la vista lo dibuja como SVG |
 | Usuario actual | Todos | Lectura de los claims del JWT |
 | Unidad de trabajo | E-commerce e Inventario | Transacción de PostgreSQL |
 

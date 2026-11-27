@@ -25,6 +25,11 @@
                 <li><a class="link link-hover" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Terminos)">Términos y condiciones</a></li>
                 <li><a class="link link-hover" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Privacidad)">Política de privacidad</a></li>
                 <li><a class="link link-hover" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Reembolso)">Cambios y devoluciones</a></li>
+                @* El mismo enlace para cualquiera, solo en la tienda y solo si está configurado (web-acceso ACC-10, ACC-11): no concede nada; el host de gestión conserva sus controles. *@
+                @if (Model.AccesoDelPersonal is { } personal)
+                {
+                    <li><a class="link link-hover" href="@personal" data-bh-acceso-del-personal>Acceso del personal</a></li>
+                }
             </ul>
         </nav>
     </div>

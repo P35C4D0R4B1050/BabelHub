@@ -47,3 +47,10 @@ El detalle y su estado vigente están en `progress/coordinacion-ui.md`.
 - Reemplaza lo anotado arriba como «sin publicar» para la rama de compra. **Aún no está desplegada.**
 - El despliegue pasa entero a la sesión «Guía en vivo», por decisión de la persona.
 - La rama de acceso será `v0.1.3`.
+
+## Venta por sucursal y reparto de la interfaz (decisiones de la persona)
+
+- Aprobadas las reglas de venta por sucursal (`progress/relevos/venta-por-sucursal.md`); pide terminarlas en `v0.1.3` si es posible, con carriles en paralelo. Reemplazan lo anotado como abierto sobre la sucursal (O-9, O-10).
+- Asignados O-5, O-11 y O-12 a un carril de accesos pendientes.
+- La rama de acceso se integra en `main` sin etiqueta; `web-acceso` queda en `InProgress`.
+- Toda la UI/UX pasa a Codex, también la de lo ya construido; se amplían sus rutas de JavaScript.

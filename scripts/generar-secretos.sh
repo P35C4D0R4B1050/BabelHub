@@ -241,6 +241,8 @@ linea "$f" BABELHUB__Ecommerce__Redis__Tls true
 # En quién confía la tienda para el origen del cliente (BABELHUB__Ecommerce__ProxiesConocidos) NO va aquí ni en ecommerce-gestion.env: lo fijan los Compose (DD-101, DD-104).
 linea "$f" BABELHUB__Web__Host tienda
 linea "$f" BABELHUB__Web__HostsPermitidos "$HOSTS_TIENDA,$IP_VENTAS,ecommerce"
+# El enlace «Acceso del personal» del pie y del ingreso de la tienda (opcional: sin él no se muestra). Es solo de la tienda; la réplica de gestión no lo usa.
+linea "$f" BABELHUB__Web__DireccionDeGestion "https://$HOST_GESTION"
 linea "$f" BABELHUB__Web__ClaveDeSesionesTienda "$(valor sesiones-tienda 40)"
 linea "$f" BABELHUB__Carrito__CostoDeEnvio "12.00"
 pendiente "$f" BABELHUB__Contacto__Telefono "teléfono del comercio que se muestra en el pie y en /contacto (entre comillas dobles; sin dólar, comillas, almohadilla ni barra invertida)"

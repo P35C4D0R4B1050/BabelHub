@@ -39,6 +39,12 @@
           "Microsoft.Extensions.Resilience": "10.10.0"
         }
       },
+      "Net.Codecrete.QrCodeGenerator": {
+        "type": "Direct",
+        "requested": "[3.2.1, )",
+        "resolved": "3.2.1",
+        "contentHash": "MLseDo4x2T8+7gbXDt5vLjC4b6v4SavtrwoM+adKjlicnTHAqII4zAWy8VL5D94oB3VA8qz7bvMyOxfVLJnARg=="
+      },
       "Npgsql": {
         "type": "Direct",
         "requested": "[10.0.3, )",

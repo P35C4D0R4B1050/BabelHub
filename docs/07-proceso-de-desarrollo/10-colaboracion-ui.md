@@ -22,7 +22,7 @@ No hay un canal directo entre agentes: se coordinan con [`progress/coordinacion-
 | :--- | :--- |
 | `Api/Views/**/*.cshtml`, `Api/Areas/*/Views/**/*.cshtml` | Marcado y clases de las pantallas. |
 | `Api/Web/Estilos/**/*.css` | Estilos y animaciones. |
-| `Api/wwwroot/js/ui-*.js` | JavaScript visual nuevo, en archivos propios. |
+| `Api/wwwroot/js/*.js` (no `lib/`) | JavaScript de la interfaz. Prefiere archivos nuevos `ui-*.js`; cambiar uno existente se revisa a mano. |
 | `Api/wwwroot/img/**` | Imágenes de la interfaz (`svg`, `png`, `webp`). |
 | `docs/06-experiencia-de-usuario/**` | Documentación de experiencia de usuario. |
 | `prototype/ui-v2/**` | Prototipo de referencia. |
@@ -30,7 +30,9 @@ No hay un canal directo entre agentes: se coordinan con [`progress/coordinacion-
 
 **Excepciones dentro de las vistas (no se tocan):** `_ViewImports.cshtml`, `_ViewStart.cshtml`, `_TokenAntifalsificacion.cshtml`, `Views/Legal/**` y `Views/Textos/**`.
 
-**Todo lo demás está prohibido**, en particular: Dominio, Aplicación, Infraestructura, controladores y cualquier `.cs`; base de datos; `specs/`; `tests/`; `infra/`, `scripts/`, `.github/`; archivos de proyecto y dependencias; `AGENTS.md` y `CLAUDE.md`; textos legales; secretos; `bh.js`, `admin-catalogo.js` e `indice-infinito.js`.
+**Todo lo demás está prohibido**, en particular: Dominio, Aplicación, Infraestructura, controladores y cualquier `.cs`; base de datos; `specs/`; `tests/`; `infra/`, `scripts/`, `.github/`; archivos de proyecto y dependencias; `AGENTS.md` y `CLAUDE.md`; textos legales; secretos; y las bibliotecas de `wwwroot/lib/`.
+
+**Toda la UI/UX es tarea de Codex** (decisión de la persona, 2026-11-27): Claude entrega las funciones nuevas con una interfaz sencilla y Codex la mejora después. Si una prueba u otro archivo prohibido impide una mejora visual, no se renuncia a ella: se anota en «Peticiones» y Claude hace ese cambio.
 
 ## 2 bis. Qué referencia vale
 
@@ -52,7 +54,7 @@ El trabajo de ramas sin integrar todavía no está en `main`: se consulta en «R
 2. **Formularios intactos:** no se cambian `action`, `method`, nombres ni valores de campos, atributos `asp-*` o `hx-*`, el token antifalsificación ni los `id` que usan las pruebas.
 3. **CSP:** sin scripts ni estilos en línea (`<script>` con código, `<style>`, `style="…"`) y sin recursos de otros dominios.
 4. **Sin lógica en las vistas:** nada de `@inject`, `Html.Raw` ni cálculos de negocio.
-5. **Mejora progresiva:** cada pantalla sigue funcionando sin JavaScript. El JavaScript visual no hace solicitudes ni usa cookies o almacenamiento.
+5. **Mejora progresiva:** cada pantalla sigue funcionando sin JavaScript. El JavaScript visual nuevo no hace solicitudes ni usa cookies o almacenamiento.
 6. **Diseño y accesibilidad** (`AGENTS.md` §6 y `docs/06-experiencia-de-usuario/`): tokens de los temas, sin colores sueltos, contraste AA, foco visible, teclado, el estado nunca solo por color.
 7. **Animaciones:** respetan `prefers-reduced-motion`, no retrasan ninguna acción ni ocultan contenido si el script falla.
 8. **Textos** en español (es-PE). No se prometen funciones que no existen ni se simula stock. No se quitan avisos al usuario.
@@ -70,7 +72,7 @@ El trabajo de ramas sin integrar todavía no está en `main`: se consulta en «R
    - `dotnet run --project tools/SpecCheck`
    - `bash scripts/guardia-ui.sh codex/<tarea> main`
    - Capturas en tema claro y oscuro, escritorio y móvil, guardadas fuera del repositorio.
-5. Anota la entrega en el tablero (rama, commits, qué cambió, qué verificaste y qué no) y haz commit.
+5. Anota la entrega en el tablero (rama, commits, qué cambió, qué verificaste y qué no) y haz commit. **La entrega es la rama**, no un ZIP ni carpetas sueltas en la copia principal. Si tu entorno no puede usar Git, dilo antes de empezar.
 6. **Sin `push`, PR, etiquetas ni fusiones.** No reescribas historia ni borres ramas.
 
 ## 5. Revisión y publicación (Claude)

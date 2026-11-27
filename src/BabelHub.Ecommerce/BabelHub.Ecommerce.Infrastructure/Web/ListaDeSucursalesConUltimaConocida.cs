@@ -129,6 +129,8 @@ public static class ModuloWebExtensiones
         servicios.AddSingleton<IFuenteDeSucursales>(sp => sp.GetService<BabelHub.Ecommerce.Application.Plataforma.IClienteDelInventario>() is { } cliente ? new FuenteDeSucursalesDelInventario(cliente) : new FuenteDeSucursalesNoDisponible());
         servicios.AddSingleton<IListaDeSucursales, ListaDeSucursalesConUltimaConocida>();
         servicios.AddScoped<IPreferenciaDeSucursal, PreferenciaDeSucursal>();
+        // El código QR del segundo factor (web-acceso): se genera aquí, sin terceros.
+        servicios.TryAddSingleton<IGeneradorDeCodigoQr, CodecreteGeneradorDeCodigoQr>();
         return servicios;
     }
 

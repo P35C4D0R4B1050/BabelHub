@@ -22,6 +22,7 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
     private Resultado<EstadoDeLaCancelacionDeCuenta> _cancelacion = Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(new EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion.SinSolicitud, 0, null, null, false));
     private bool _textosPendientes;
     private bool _reconocida;
+    private BabelHub.Ecommerce.Api.Web.Acceso.DireccionDelAccesoDelPersonal? _accesoDelPersonal;
     private ErrorDeAplicacion? _falla;
 
     private static readonly Guid Aviso = Guid.Parse("a1000000-0000-0000-0000-000000000001");
@@ -81,6 +82,10 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
                 s.AddSingleton(cancelaciones);
                 s.AddSingleton(solicitudes);
                 s.AddSingleton(borradores);
+                if (_accesoDelPersonal is not null)
+                {
+                    s.AddSingleton(_accesoDelPersonal);
+                }
             },
             despuesDelHandler: app => app.Use(async (contexto, siguiente) =>
             {
@@ -156,6 +161,61 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         Assert.DoesNotContain("<script>", await inventado.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 [Fact]    [Trait("Criterio", "AC-WEB-33")]    public async Task Cambiar_la_contrasena_o_desactivar_el_segundo_factor_entrega_a_Identidad_la_renovacion_de_la_sesion_actual_para_conservarla()    {        using var contrasena = await Enviar("/cuenta/contrasena", ("actual", "la contraseña actual"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _argumentos.Remove("renovacion");        using var desactivado = await Enviar("/cuenta/segundo-factor/desactivar", ("actual", "la contraseña actual"), ("codigo", "123456"));        Assert.Equal(HttpStatusCode.SeeOther, contrasena.StatusCode);        Assert.Equal(HttpStatusCode.SeeOther, desactivado.StatusCode);        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _sesiones.Renovacion = null;        _argumentos.Remove("renovacion");        using var sinSesionLegible = await Enviar("/cuenta/contrasena", ("actual", "x"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Null(_argumentos["renovacion"]);    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ACC-09")]
+    public async Task Un_cliente_con_sesion_ve_el_mismo_enlace_del_personal_en_el_pie()
+    {
+        var configuracion = Microsoft.Extensions.Configuration.MemoryConfigurationBuilderExtensions.AddInMemoryCollection(new Microsoft.Extensions.Configuration.ConfigurationBuilder(), new Dictionary<string, string?> { ["Web:DireccionDeGestion"] = "https://gestion.example.org" }).Build();
+        _accesoDelPersonal = BabelHub.Ecommerce.Api.Web.Acceso.DireccionDelAccesoDelPersonal.Leer(configuracion, new BabelHub.Ecommerce.Infrastructure.Plataforma.LectorDeSecretos(configuracion), permitirHttpLocal: false);
+        await _anfitrion.DisposeAsync();
+        _anfitrion = await Armar();
+
+        using var respuesta = await Pedir("/cuenta");
+
+        Assert.Contains("href=\"https://gestion.example.org/\" data-bh-acceso-del-personal>Acceso del personal</a>", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ACC-12")]
+    [Trait("Criterio", "AC-ACC-13")]
+    public async Task Al_activar_el_segundo_factor_en_la_cuenta_el_codigo_QR_dice_la_direccion_del_enlace_junto_a_la_clave_sin_cache()
+    {
+        using var respuesta = await Enviar("/cuenta/segundo-factor/iniciar", ("actual", "la contraseña actual"));
+
+        var html = await respuesta.Content.ReadAsStringAsync();
+        var (texto, margen, _) = CodigoQrDelSegundoFactorTests.LeerElQr(html);
+        Assert.Equal("otpauth://totp/BabelHub:ana%40correo.example?secret=JBSWY3DPEHPK3PXP&issuer=BabelHub", texto);
+        Assert.Contains("href=\"" + texto.Replace("&", "&amp;", StringComparison.Ordinal) + "\"", html, StringComparison.Ordinal);
+        Assert.True(margen >= 4);
+        Assert.Contains("JBSWY3DPEHPK3PXP</p>", html, StringComparison.Ordinal);
+        Assert.Contains("no-store", respuesta.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("<img", html, StringComparison.OrdinalIgnoreCase);
+        // La única llamada es la de iniciar el segundo factor: nada guarda la dirección ni el código (ni un borrador).
+        Assert.Equal(["iniciar-2fa"], _llamadas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-13")]
+    [Trait("Criterio", "AC-ACC-01")]
+    [Trait("Criterio", "AC-ACC-16")]
+    public async Task El_cambio_de_contrasena_de_la_cuenta_pide_las_diez_de_la_politica_con_su_ayuda_y_sin_minlength_del_navegador()
+    {
+        using var respuesta = await Pedir("/cuenta/datos");
+
+        var crudo = await respuesta.Content.ReadAsStringAsync();
+        var html = System.Net.WebUtility.HtmlDecode(crudo);
+        Assert.Contains("mínimo 10 caracteres", html, StringComparison.Ordinal);
+        Assert.Contains("<strong>Obligatorio:</strong> de 10 a 128 caracteres.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("12 caracteres", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("minlength", html, StringComparison.OrdinalIgnoreCase);
+        var campos = GuionDeContrasenasTests.CamposDe(crudo);
+        Assert.Equal(["actual", "nueva", "confirmacion"], campos.Select(c => c["name"]));
+        Assert.Equal(["la contraseña actual", "la contraseña nueva", "la repetición de la contraseña nueva"], campos.Select(c => System.Net.WebUtility.HtmlDecode(c["data-bh-nombre"])));
+        Assert.True(campos[1].ContainsKey("data-bh-nueva"));
+        Assert.Equal("nueva", campos[2]["data-bh-repite"]);
+        Assert.All(campos, c => Assert.Equal(("false", "none"), (c["spellcheck"], c["autocapitalize"])));
+    }
 
     [Fact]
     [Trait("Criterio", "AC-WEB-29")]

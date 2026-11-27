@@ -1,0 +1,36 @@
+@using System.Globalization
+@using System.Text
+@using BabelHub.Ecommerce.Application.Web
+@model CodigoQr
+@* El código QR de la configuración del segundo factor (web-acceso ACC-13, ACC-15): un SVG en la propia página, sin imagen externa ni guiones, con 4 módulos de margen. Los colores son clases de la hoja de estilos
+   (oscuro sobre claro en los dos temas) y el texto alternativo no dice la clave. *@
+@{
+    const int Margen = 4;
+    var lienzo = Model.Lado + (2 * Margen);
+    var trazo = new StringBuilder();
+    for (var fila = 0; fila < Model.Lado; fila++)
+    {
+        var columna = 0;
+        while (columna < Model.Lado)
+        {
+            if (!Model.EsOscuro(columna, fila))
+            {
+                columna++;
+                continue;
+            }
+
+            var fin = columna + 1;
+            while (fin < Model.Lado && Model.EsOscuro(fin, fila))
+            {
+                fin++;
+            }
+
+            trazo.Append(CultureInfo.InvariantCulture, $"M{columna + Margen} {fila + Margen}h{fin - columna}v1h-{fin - columna}z");
+            columna = fin;
+        }
+    }
+}
+<svg class="bh-qr" viewBox="0 0 @lienzo @lienzo" role="img" aria-label="Código QR para agregar esta cuenta a tu aplicación de autenticación" shape-rendering="crispEdges" focusable="false" data-bh-qr>
+    <rect class="bh-qr-fondo" width="@lienzo" height="@lienzo"></rect>
+    <path class="bh-qr-tinta" d="@trazo.ToString()"></path>
+</svg>

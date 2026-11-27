@@ -191,9 +191,11 @@ internal sealed class AccesoApiHost : IAsyncDisposable
 
     public HostWeb Host { get; private set; }
 
-    public static async Task<AccesoApiHost> Crear(HostWeb host = HostWeb.Tienda)
+    private Action<IServiceCollection>? _extra;
+
+    public static async Task<AccesoApiHost> Crear(HostWeb host = HostWeb.Tienda, Action<IServiceCollection>? extra = null)
     {
-        var anfitrion = new AccesoApiHost { Host = host };
+        var anfitrion = new AccesoApiHost { Host = host, _extra = extra };
         await anfitrion.Iniciar();
         return anfitrion;
     }
@@ -254,6 +256,7 @@ internal sealed class AccesoApiHost : IAsyncDisposable
                 servicios.AddSingleton(new OpcionesDeVerificacionWeb("clave-de-sitio-de-prueba"));
                 servicios.AgregarIngresoWeb();
                 servicios.AgregarProteccionContraFalsificacion();
+                _extra?.Invoke(servicios);
             },
             despuesDelEnrutado: app => app.MapGet("/prueba/token", (HttpContext contexto, IAntiforgery antiforgery) => Results.Text(antiforgery.GetAndStoreTokens(contexto).RequestToken)));
         Cliente = _anfitrion.Cliente;

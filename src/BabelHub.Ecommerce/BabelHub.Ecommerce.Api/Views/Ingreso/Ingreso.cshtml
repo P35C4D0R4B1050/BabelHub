@@ -16,13 +16,17 @@
             <form method="post" action="/ingreso" class="mt-6 flex flex-col gap-4" id="formulario-de-ingreso">
                 <partial name="_TokenAntifalsificacion" />
                 <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
-                <label class="form-control"><span class="label-text">Contraseña</span><input type="password" name="contrasena" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                <partial name="_CampoDeContrasena" model='new CampoDeContrasena("contrasena", "Contraseña", "la contraseña", "current-password")' />
                 <verificacion-de-persona></verificacion-de-persona>
                 <button type="submit" class="btn btn-primary">Ingresar</button>
             </form>
             @if (!gestion)
             {
                 <p class="mt-4 text-sm"><a class="link" href="/recuperacion">Olvidé mi contraseña</a></p>
+            }
+            @if (Model.AccesoDelPersonal is { } personal)
+            {
+                <p class="mt-4 text-sm">¿Trabajas en la tienda o en una sucursal? <a class="link" href="@personal" data-bh-acceso-del-personal>Acceso del personal</a>.</p>
             }
             break;
 
@@ -40,9 +44,13 @@
 
         case PantallaDelIngreso.ConfigurarSegundoFactor:
             <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Configura tu segundo factor</h1>
-            <p class="mt-2">Para proteger tu cuenta necesitas una aplicación de autenticación (Google Authenticator, Microsoft Authenticator, Aegis u otra). Agrega esta cuenta con la clave de abajo y escribe el código de 6 dígitos que te muestre.</p>
+            <p class="mt-2">Para proteger tu cuenta necesitas una aplicación de autenticación (Google Authenticator, Microsoft Authenticator, Aegis u otra). Agrega esta cuenta @(Model.Qr is null ? "con la clave de abajo" : "escaneando el código QR o escribiendo la clave") y escribe el código de 6 dígitos que te muestre.</p>
             <partial name="_MensajeDelIngreso" model="Model" />
             <div class="my-4 rounded-box border border-base-300 p-4">
+                @if (Model.Qr is { } qr)
+                {
+                    <div class="mb-4 flex justify-center"><partial name="_CodigoQr" model="qr" /></div>
+                }
                 <p class="text-sm font-semibold">Clave para tu aplicación (se muestra solo ahora)</p>
                 <p class="mt-1 break-all font-mono text-lg" data-bh-secreto>@Model.SecretoBase32</p>
                 <p class="mt-2 text-sm"><a class="link" href="@Model.UriDelSecreto">Abrir en mi aplicación de autenticación</a></p>
@@ -57,12 +65,12 @@
 
         case PantallaDelIngreso.ContrasenaTemporal:
             <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Cambia tu contraseña temporal</h1>
-            <p class="mt-2">Ingresaste con una contraseña temporal. Elige una nueva de al menos 12 caracteres; puedes pegarla desde tu gestor de contraseñas.</p>
+            <p class="mt-2">Ingresaste con una contraseña temporal. Elige una nueva de al menos @BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima caracteres; puedes pegarla desde tu gestor de contraseñas.</p>
             <partial name="_MensajeDelIngreso" model="Model" />
             <form method="post" action="/ingreso/contrasena" class="mt-6 flex flex-col gap-4">
                 <partial name="_TokenAntifalsificacion" />
-                <label class="form-control"><span class="label-text">Contraseña nueva</span><input type="password" name="contrasenaNueva" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
-                <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                <partial name="_CampoDeContrasena" model='CampoDeContrasena.Nueva("contrasenaNueva", "Contraseña nueva")' />
+                <partial name="_CampoDeContrasena" model='CampoDeContrasena.Repeticion("confirmacion", "contrasenaNueva")' />
                 <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
             </form>
             <partial name="_CancelarElIngreso" />

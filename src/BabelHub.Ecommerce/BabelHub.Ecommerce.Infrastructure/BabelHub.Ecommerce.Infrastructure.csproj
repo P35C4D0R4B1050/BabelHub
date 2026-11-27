@@ -9,6 +9,8 @@
     <PackageReference Include="MailKit" />
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <!-- El código QR del segundo factor se genera en el servidor (web-acceso D01). -->
+    <PackageReference Include="Net.Codecrete.QrCodeGenerator" />
   </ItemGroup>
   <ItemGroup>
     <!-- El repositorio de claves de Data Protection (IXmlRepository, T12) vive en el marco compartido de ASP.NET Core, sin paquetes nuevos que fijar en packages.lock.json. -->

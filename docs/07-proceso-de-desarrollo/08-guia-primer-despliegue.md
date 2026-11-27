@@ -571,22 +571,23 @@ scp -r ventas     babelhub-ventas:/tmp/secretos-ventas
 
 **Nunca** copies la carpeta `~/babelhub-secretos` entera ni `custodia/`: `desplegar.sh` se niega a desplegar si ve una clave privada ajena en la carpeta de la VM. En cada VM, deja los secretos fuera del repositorio y solo legibles por root:
 
-**[VM-X]** Cambia la **primera línea** según la VM (VM-INVENTARIO: `VM=inventario; IP=10.0.0.20`; VM-VENTAS: `VM=ventas; IP=10.0.0.10`) y pega el bloque entero. **Antes de reemplazar nada comprueba en qué máquina estás**: copiar la carpeta de una VM en la otra es fácil (los dos accesos SSH se parecen) y borraría los secretos buenos.
+**[VM-X]** Cambia la **primera línea** según la VM (VM-INVENTARIO: `VM=inventario`; VM-VENTAS: `VM=ventas`) y pega el bloque entero. **Antes de reemplazar nada comprueba en qué máquina estás**: copiar la carpeta de una VM en la otra es fácil (los dos accesos SSH se parecen) y borraría los secretos buenos.
 
 ```bash
-VM=inventario; IP=10.0.0.20
+VM=inventario
+case "$VM" in inventario) IP=10.0.0.20; PROPIO=postgres.env ;; ventas) IP=10.0.0.10; PROPIO=ecommerce.env ;; *) IP=ninguna; PROPIO=ninguno ;; esac
 hostname; hostname -I
-if hostname -I | grep -qw "$IP" && test -d "/tmp/secretos-$VM"; then
+if hostname -I | grep -qw "$IP" && test -f "/tmp/secretos-$VM/$PROPIO"; then
   sudo mkdir -p /etc/babelhub && sudo rm -rf /etc/babelhub/secretos \
     && sudo mv "/tmp/secretos-$VM" /etc/babelhub/secretos \
     && sudo sh -c 'chown -R root:root /etc/babelhub/secretos && chmod 700 /etc/babelhub/secretos && chmod 600 /etc/babelhub/secretos/*' \
     && sudo ls -l /etc/babelhub/secretos
 else
-  echo "PARA: esta máquina no es la de «$VM» o no está /tmp/secretos-$VM. No se ha tocado nada."
+  echo "PARA: esta máquina no es la de «$VM» o /tmp/secretos-$VM no trae $PROPIO. No se ha tocado nada."
 fi
 ```
 
-**Debes ver** el nombre de la máquina (el que le diste en §7.3), su dirección privada y todos los archivos `-rw-------  root root`. Si dice «PARA», estás en la VM equivocada o falta copiar la carpeta: no sigas. (Los permisos se cambian con `sudo sh -c` porque, con la carpeta en `700`, tu usuario no puede expandir el comodín `*`.)
+**Debes ver** el nombre de la máquina (el que le diste en §7.3), su dirección privada y todos los archivos `-rw-------  root root`. Si dice «PARA», estás en la VM equivocada, falta copiar la carpeta o quedó anidada por copiarla dos veces: no sigas. **Si en esta máquina quedó la carpeta de la otra VM, bórrala** (trae secretos que no le corresponden): en VM-INVENTARIO, `rm -rf /tmp/secretos-ventas`; en VM-VENTAS, `rm -rf /tmp/secretos-inventario`. (Los permisos se cambian con `sudo sh -c` porque, con la carpeta en `700`, tu usuario no puede expandir el comodín `*`.)
 
 **Cómo deshacer / rotar:** vuelve a generar en una carpeta **nueva** (el script nunca pisa) y repite; para rotar credenciales de una VM en marcha: `scripts/rotar-credenciales.sh` (ver su cabecera).
 
@@ -629,7 +630,7 @@ sudo docker ps --format 'table {{.Names}}\t{{.Status}}'                         
 sudo docker logs --tail 20 babelhub-inventario-postgres-1                                # sin FATAL
 sudo docker exec babelhub-inventario-postgres-1 pg_isready -d postgres                   # «accepting connections»
 # El Inventario por HTTPS, validando el certificado con tu CA privada:
-sudo docker run --rm --user 0 --network babelhub-inventario_default -v /etc/babelhub/secretos/tls-ca.pem:/ca.pem:ro \
+sudo docker run --rm --user 0 --read-only --cap-drop ALL --security-opt no-new-privileges --network babelhub-inventario_default -v /etc/babelhub/secretos/tls-ca.pem:/ca.pem:ro \
   curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93 \
   -sS --cacert /ca.pem https://inventario:8443/health/ready
 ```
@@ -1007,6 +1008,46 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 | **T05** Volumen cifrado efímero | Una VM o distro de ensayo **aparte** con `swapon --show` vacío; crea un volumen LUKS (`cryptsetup`), restaura ahí, destrúyelo (`cryptsetup luksClose` y borra la llave) y comprueba que no quedan datos en `/tmp`, el historial de la shell ni los registros de Docker (`docker system prune -af --volumes`). | Qué quedó fuera del volumen (residual) y la constancia de destrucción. |
 
 (T29 y T31, los scripts de restauración y de ensayo aislado, **aún no están hechos**: esos spikes se hacen a mano como arriba.)
+
+### 15.5 Actualizar una tienda desplegada de `v0.1.2` a `v0.1.3`
+
+Qué trae: ayudas al escribir contraseñas, las diez letras de la política en las pantallas, el código QR del segundo factor y el enlace «Acceso del personal». No cambia la base de datos ni los secretos que ya tienes, salvo una línea nueva y opcional. Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5).
+
+**1. [Cada VM] Traer el código.** Mira primero que la VM no tenga cambios hechos a mano:
+
+```bash
+cd /opt/babelhub && sudo git status --short
+```
+
+No debe salir ningún archivo. Si en VM-VENTAS aparece `infra/docker-compose.ventas.yml`, la VM sigue con el arreglo de n8n aplicado a mano sobre `v0.1.1` (ya viene en las versiones siguientes): mira qué cambió con `sudo git diff infra/docker-compose.ventas.yml` y, solo si la única diferencia es el `tmpfs` de `/home/node/.cache`, descártala con `sudo git checkout -- infra/docker-compose.ventas.yml`. Si aparece otra cosa, para y revisa antes de seguir.
+
+```bash
+sudo git fetch --tags && sudo git checkout v0.1.3 && sudo git log -1 --format='%h %s'
+```
+
+**2. [VM-VENTAS] Añadir la dirección del personal** (los secretos ya generados no la tienen; sin ella la tienda funciona igual, pero no muestra el enlace). El comando solo la agrega si falta y no imprime ningún secreto:
+
+```bash
+sudo sh -c 'f=/etc/babelhub/secretos/ecommerce.env; test -f "$f" || { echo "PARA: esta no es VM-VENTAS"; exit 1; }; grep -q "^BABELHUB__Web__DireccionDeGestion=" "$f" || printf "\nBABELHUB__Web__DireccionDeGestion=\"https://gestion.babel-hub.shop\"\n" >> "$f"; grep "^BABELHUB__Web__DireccionDeGestion=" "$f"'
+```
+
+Debe mostrar `BABELHUB__Web__DireccionDeGestion="https://gestion.babel-hub.shop"`. Va solo en `ecommerce.env` (la tienda). Si la escribes mal (sin `https://`, con una ruta o con espacios), la tienda **no arranca** y el registro nombra esa variable.
+
+**3. Desplegar con los digests de `v0.1.3`:** primero VM-INVENTARIO con el comando de §11 y después VM-VENTAS con el de §13.1 (con `--sin evolution-api` mientras no tengas el número de WhatsApp).
+
+**4. Comprobar** desde tu equipo:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
+```
+
+```bash
+curl -s https://babel-hub.shop/ingreso | grep -c "data-bh-acceso-del-personal"
+```
+
+La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR, que debe leer la cámara de su teléfono.
+
+**Para volver atrás:** `sudo git checkout v0.1.2` y los digests de esa versión. La línea de la dirección del personal se puede quedar (esa versión la ignora).
 
 ## 16. Si algo sale mal: tabla de rescate
 

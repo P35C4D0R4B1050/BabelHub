@@ -90,7 +90,7 @@ test.describe('Visitante: ingreso, registro y recuperación', () => {
   test('el registro ofrece la aceptación de los textos, la declaración de edad y es accesible (AC-WEB-20)', async ({ page }) => {
     await page.goto('/registro');
     await expect(page.getByRole('heading', { level: 1, name: 'Crear mi cuenta' })).toBeVisible();
-    await expect(page.getByLabel('Contraseña (mínimo 12 caracteres)')).toHaveAttribute('autocomplete', 'new-password');
+    await expect(page.getByLabel('Contraseña (mínimo 10 caracteres)')).toHaveAttribute('autocomplete', 'new-password');
     // El pie también enlaza los textos legales: la aceptación se busca dentro del formulario.
     const formulario = page.getByRole('main');
     await expect(formulario.getByRole('link', { name: 'términos y condiciones', exact: true })).toHaveAttribute('href', '/legal/terminos');

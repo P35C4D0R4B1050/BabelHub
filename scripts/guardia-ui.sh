@@ -31,7 +31,7 @@ permitida() {
   esac
   [[ "$ruta" =~ ^$API/(Areas/[^/]+/Views|Views)/.+\.cshtml$ ]] && return 0
   [[ "$ruta" =~ ^$API/Web/Estilos/.+\.css$ ]] && return 0
-  [[ "$ruta" =~ ^$API/wwwroot/js/ui-[^/]+\.js$ ]] && return 0
+  [[ "$ruta" =~ ^$API/wwwroot/js/[^/]+\.js$ ]] && return 0
   [[ "$ruta" =~ ^$API/wwwroot/img/.+\.(svg|png|webp)$ ]] && return 0
   [[ "$ruta" == docs/06-experiencia-de-usuario/* ]] && return 0
   [[ "$ruta" == prototype/ui-v2/* ]] && return 0
@@ -71,8 +71,15 @@ while IFS= read -r -d '' estado && IFS= read -r -d '' ruta; do
       ! buscar "$agregadas" '<form|<input|name=|action=|asp-|hx-' || revisar "$ruta: agrega formularios, campos o atributos de comportamiento"
       ;;
     "$API"/wwwroot/js/*)
-      ! buscar "$agregadas" 'eval\(|new Function|fetch\(|XMLHttpRequest|sendBeacon|WebSocket|document\.cookie|localStorage|sessionStorage|innerHTML|outerHTML|insertAdjacentHTML|https?://' \
-        || rechazar "$ruta: el JavaScript visual no hace solicitudes, no usa cookies ni almacenamiento, ni inyecta HTML"
+      # En un guion nuevo se rechaza; en uno que ya existía (algunos usan cookies de preferencias) se marca para revisar a mano.
+      if buscar "$agregadas" 'eval\(|new Function|fetch\(|XMLHttpRequest|sendBeacon|WebSocket|document\.cookie|localStorage|sessionStorage|innerHTML|outerHTML|insertAdjacentHTML|https?://'; then
+        if [[ "$estado" == A ]]; then
+          rechazar "$ruta: el JavaScript visual no hace solicitudes, no usa cookies ni almacenamiento, ni inyecta HTML"
+        else
+          revisar "$ruta: agrega solicitudes, cookies, almacenamiento o inyección de HTML"
+        fi
+      fi
+      [[ "$estado" == A ]] || revisar "$ruta: modifica un guion que ya existía"
       ;;
     "$API"/*.css)
       ! buscar "$agregadas" 'url\([[:space:]]*["'"'"']?(https?:)?//|@import[^;]*(https?:)?//' || rechazar "$ruta: carga un recurso de otro dominio"

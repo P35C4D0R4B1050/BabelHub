@@ -931,6 +931,24 @@ public sealed class DesplegarShTests : IDisposable
     }
 
     [Fact]
+    [Trait("Criterio", "AC-ACC-09")]
+    [Trait("Criterio", "AC-ACC-10")]
+    public void ElGenerador_EscribeLaDireccionDelPersonalSoloEnLaTienda_YNoEsUnaClaveExigida()
+    {
+        var destino = Path.Combine(_carpeta, "generados-acceso");
+
+        var (codigo, salida, errores) = Generar(destino);
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Equal("https://gestion.ejemplo.pe", Valor(Path.Combine(destino, "ventas"), "ecommerce.env", "BABELHUB__Web__DireccionDeGestion"));
+        Assert.DoesNotContain("DireccionDeGestion", File.ReadAllText(Path.Combine(destino, "inventario", "ecommerce-gestion.env")), StringComparison.Ordinal);
+        // Las carpetas ya generadas no la tienen: si fuera una fila exigida, desplegar.sh las rechazaría.
+        Assert.DoesNotContain(
+            File.ReadAllLines(Path.Combine(ComposeDeVms.Raiz(), "infra", "secretos-requeridos.txt")),
+            l => !l.TrimStart().StartsWith('#') && l.Contains("DireccionDeGestion", StringComparison.Ordinal));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PLA-44")]
     public void UnArchivoSueltoConLaAdministracionDeR2EnLaCarpetaDeSecretos_NoSeDespliega()
     {

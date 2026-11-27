@@ -1,4 +1,5 @@
 @using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Application.Identidad
 @using BabelHub.Ecommerce.Application.Web
 @model RegistroVista
 @{
@@ -22,7 +23,7 @@
                 <partial name="_TokenAntifalsificacion" />
                 <label class="form-control"><span class="label-text">Nombre completo</span><input type="text" name="nombre" class="input input-bordered w-full" required maxlength="120" autocomplete="name" /></label>
                 <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
-                <label class="form-control"><span class="label-text">Contraseña (mínimo 12 caracteres)</span><input type="password" name="contrasena" class="input input-bordered w-full" required minlength="12" maxlength="1024" autocomplete="new-password" /></label>
+                <partial name="_CampoDeContrasena" model='CampoDeContrasena.Nueva("contrasena", $"Contraseña (mínimo {BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima} caracteres)", "la contraseña")' />
                 @if (Model.Textos is { } textos)
                 {
                     <input type="hidden" name="versionDeTerminos" value="@textos.Textos.FirstOrDefault(t => t.Tipo == TipoDeTextoLegal.Terminos)?.Version" />
@@ -82,8 +83,8 @@
                 <partial name="_TokenAntifalsificacion" />
                 <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" value="@Model.Correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
                 <label class="form-control"><span class="label-text">Código</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" spellcheck="false" /></label>
-                <label class="form-control"><span class="label-text">Contraseña nueva (mínimo 12 caracteres)</span><input type="password" name="contrasenaNueva" class="input input-bordered w-full" required minlength="12" maxlength="1024" autocomplete="new-password" /></label>
-                <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                <partial name="_CampoDeContrasena" model='CampoDeContrasena.Nueva("contrasenaNueva", $"Contraseña nueva (mínimo {BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima} caracteres)")' />
+                <partial name="_CampoDeContrasena" model='CampoDeContrasena.Repeticion("confirmacion", "contrasenaNueva")' />
                 <button type="submit" class="btn btn-primary">Cambiar mi contraseña</button>
             </form>
             break;

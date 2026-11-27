@@ -1,0 +1,34 @@
+@model CampoDeContrasena
+@* El único campo de contraseña de la interfaz (web-acceso). Sin guiones es un campo normal con su ayuda; «contrasenas.js» agrega el botón de ver u ocultar, la barra y el aviso de coincidencia (nada inerte sin guiones, ACC-08).
+   Las ayudas de escritura van desactivadas siempre: al hacerlo visible, el navegador o el teclado no deben corregirlo, aprenderlo ni enviarlo a un corrector (ACC-17). Sin «minlength»: la longitud la decide el servidor. *@
+<div class="flex flex-col gap-1" data-bh-campo-de-contrasena>
+    <label class="form-control">
+        <span class="label-text">@Model.Etiqueta</span>
+        @if (Model.EsNueva)
+        {
+            <input type="password" name="@Model.Nombre" class="input input-bordered w-full" required maxlength="1024" autocomplete="@Model.Autocompletar" spellcheck="false" autocapitalize="none" autocorrect="off" writingsuggestions="false" data-bh-nombre="@Model.NombreAccesible" data-bh-nueva="@BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima" aria-describedby="ayuda-de-contrasena" />
+        }
+        else if (Model.RepiteA is not null)
+        {
+            <input type="password" name="@Model.Nombre" class="input input-bordered w-full" required maxlength="1024" autocomplete="@Model.Autocompletar" spellcheck="false" autocapitalize="none" autocorrect="off" writingsuggestions="false" data-bh-nombre="@Model.NombreAccesible" data-bh-repite="@Model.RepiteA" />
+        }
+        else
+        {
+            <input type="password" name="@Model.Nombre" class="input input-bordered w-full" required maxlength="1024" autocomplete="@Model.Autocompletar" spellcheck="false" autocapitalize="none" autocorrect="off" writingsuggestions="false" data-bh-nombre="@Model.NombreAccesible" />
+        }
+    </label>
+    @if (Model.EsNueva)
+    {
+        <div class="text-sm" id="ayuda-de-contrasena" data-bh-ayuda>
+            <p><strong>Obligatorio:</strong> de @BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima a @BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMaxima caracteres.</p>
+            <p><strong>Recomendado:</strong> usar mayúsculas, minúsculas, números y símbolos, y preferir una frase larga.</p>
+            <p>Al guardar comprobamos que no sea una contraseña común o filtrada.</p>
+        </div>
+    }
+    @if (Model.RepiteA is not null)
+    {
+        @* Los iconos del aviso de coincidencia: el guion los copia (un «template» no se dibuja). *@
+        <template data-bh-icono="exito"><bh-icono nombre="exito" /></template>
+        <template data-bh-icono="error"><bh-icono nombre="error" /></template>
+    }
+</div>

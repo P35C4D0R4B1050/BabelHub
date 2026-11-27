@@ -29,6 +29,9 @@ public sealed class IngresoVista : ModeloBaseDePagina
 
     public string? UriDelSecreto { get; set; }
 
+    /// <summary>El código QR de esa misma dirección (web-acceso ACC-13); nulo si no se está configurando o si no se pudo generar.</summary>
+    public CodigoQr? Qr { get; set; }
+
     public IReadOnlyList<string> CodigosDeRespaldo { get; set; } = [];
 
     public string Destino { get; set; } = "/";
@@ -49,6 +52,7 @@ public sealed class IngresoController(
     IExigenciaDeVerificacionDePersona verificacion,
     CierreDelIngresoWeb cierre,
     ContextoDePagina pagina,
+    IGeneradorDeCodigoQr codigos,
     OpcionesDelHostWeb host) : Controller
 {
     public const string Ruta = "/ingreso";
@@ -338,7 +342,8 @@ public sealed class IngresoController(
     /// <summary>Las razones de una contraseña nueva rechazada, en palabras de la persona y sin repetir lo que escribió.</summary>
     private static string TextoDeLaContrasena(ErrorDeAplicacion error) => error.Errores.FirstOrDefault()?.Clave switch
     {
-        "demasiado-corta" => "La contraseña es demasiado corta: usa al menos 12 caracteres.",
+        "demasiado-corta" => $"La contraseña es demasiado corta: usa al menos {ReglasDeContrasena.LongitudMinima} caracteres.",
+        "demasiado-larga" => $"La contraseña es demasiado larga: usa como máximo {ReglasDeContrasena.LongitudMaxima} caracteres.",
         "demasiado-comun" => "Esa contraseña es muy común. Elige otra.",
         "igual-a-la-actual" => "La contraseña nueva debe ser distinta de la anterior.",
         _ => "La contraseña no cumple las reglas. Elige otra más larga y poco común.",
@@ -358,13 +363,16 @@ public sealed class IngresoController(
             return await Pintar(PantallaDelIngreso.ConfigurarSegundoFactor, TextoNoDisponible, StatusCodes.Status503ServiceUnavailable, cancelacion);
         }
 
+        // El código QR dice lo mismo que el enlace y viaja solo en esta respuesta, que no se guarda en caché (web-acceso ACC-13, ACC-14).
+        var direccion = ConfiguracionDelSegundoFactor.Direccion(secreto.Valor);
         var vista = await pagina.Completar(
             new IngresoVista
             {
                 Pantalla = PantallaDelIngreso.ConfigurarSegundoFactor,
                 Mensaje = mensaje,
                 SecretoBase32 = secreto.Valor.SecretoBase32.Revelar(),
-                UriDelSecreto = $"otpauth://totp/{Uri.EscapeDataString(secreto.Valor.Emisor)}:{Uri.EscapeDataString(secreto.Valor.Cuenta)}?secret={secreto.Valor.SecretoBase32.Revelar()}&issuer={Uri.EscapeDataString(secreto.Valor.Emisor)}",
+                UriDelSecreto = direccion,
+                Qr = codigos.Generar(new ValorSecreto(direccion)),
                 EsGestion = host.Host == HostWeb.Gestion,
             },
             "Configura tu segundo factor",
