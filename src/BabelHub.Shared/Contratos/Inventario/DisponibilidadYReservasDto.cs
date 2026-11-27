@@ -30,15 +30,20 @@ public sealed record DisponibilidadDeEdicionesDto(
     [property: JsonPropertyName("ediciones")] IReadOnlyList<DisponibilidadDeEdicionDto> Ediciones,
     [property: JsonPropertyName("noRegistradas")] IReadOnlyList<Guid> NoRegistradas);
 
-/// <summary>Una línea impresa de un pedido o carrito: su identificador (el que asigna el E-commerce), la edición y la cantidad.</summary>
+/// <summary>
+/// Una línea impresa de un pedido o carrito: su identificador (el que asigna el E-commerce), la edición, la cantidad y, en la venta por sucursal, la sucursal
+/// elegida para atenderla (SEL-41). Se declara en todas las líneas impresas o en ninguna (SEL-42); sin ella el campo no viaja.
+/// </summary>
 public sealed record LineaDeSolicitudDto(
     [property: JsonPropertyName("lineaId")] Guid LineaId,
     [property: JsonPropertyName("edicionId")] Guid EdicionId,
-    [property: JsonPropertyName("cantidad")] int Cantidad);
+    [property: JsonPropertyName("cantidad")] int Cantidad,
+    [property: JsonPropertyName("codigoDeSucursal"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CodigoDeSucursal = null);
 
 /// <summary>
 /// Consulta previa de la selección de fuentes de un carrito, sin reservar (SEL-20). Recojo: <c>codigoDeSucursalDeRecojo</c>; domicilio:
-/// <c>regionDeEntrega</c>, el identificador de región de la dirección en minúsculas y con guiones (el mismo de la fuente).
+/// <c>regionDeEntrega</c>, el identificador de región de la dirección en minúsculas y con guiones (el mismo de la fuente). Con sucursal por línea, el recojo
+/// omite <c>codigoDeSucursalDeRecojo</c> y la región sigue siendo obligatoria a domicilio.
 /// </summary>
 public sealed record ConsultaPreviaDto(
     [property: JsonPropertyName("tipoDeEntrega")] string TipoDeEntrega,
@@ -46,7 +51,10 @@ public sealed record ConsultaPreviaDto(
     [property: JsonPropertyName("regionDeEntrega")] string? RegionDeEntrega,
     [property: JsonPropertyName("lineas")] IReadOnlyList<LineaDeSolicitudDto> Lineas);
 
-/// <summary>Fuente que se seleccionaría para una línea, si implica traslado y su plazo en días (<c>null</c> es «a confirmar», FUE-13), o la falta de stock.</summary>
+/// <summary>
+/// Fuente que se seleccionaría para una línea, si implica traslado y su plazo en días (<c>null</c> es «a confirmar», FUE-13), o la falta de stock.
+/// <c>disponibleEnLaSucursal</c> acompaña la falta de stock de una línea con sucursal declarada: el vendible que le quedaba allí (SEL-44).
+/// </summary>
 public sealed record SeleccionDeLineaDto(
     [property: JsonPropertyName("lineaId")] Guid LineaId,
     [property: JsonPropertyName("edicionId")] Guid EdicionId,
@@ -54,7 +62,8 @@ public sealed record SeleccionDeLineaDto(
     [property: JsonPropertyName("codigoDeFuente")] string? CodigoDeFuente,
     [property: JsonPropertyName("requiereTraslado")] bool RequiereTraslado,
     [property: JsonPropertyName("plazoEstimadoDias")] int? PlazoEstimadoDias,
-    [property: JsonPropertyName("disponibleEnLaRed")] int DisponibleEnLaRed);
+    [property: JsonPropertyName("disponibleEnLaRed")] int DisponibleEnLaRed,
+    [property: JsonPropertyName("disponibleEnLaSucursal"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DisponibleEnLaSucursal = null);
 
 /// <summary>Respuesta de la consulta previa: una entrada por línea impresa; las digitales se ignoran (SEL-20).</summary>
 public sealed record ConsultaPreviaRespuestaDto(
@@ -127,12 +136,16 @@ public sealed record CierreDeReservaDto(
     [property: JsonPropertyName("pedidoId")] Guid PedidoId,
     [property: JsonPropertyName("lineas")] IReadOnlyList<ResultadoDeCierreDto> Lineas);
 
-/// <summary>Una línea sin stock suficiente y lo máximo que hay en la red (CAR-04, CAR-27).</summary>
+/// <summary>
+/// Una línea sin stock suficiente y lo máximo que hay en la red (CAR-04, CAR-27); con sucursal declarada, además el vendible que le quedaba en esa sucursal
+/// (SEL-43).
+/// </summary>
 public sealed record LineaSinStockDto(
     [property: JsonPropertyName("lineaId")] Guid LineaId,
     [property: JsonPropertyName("edicionId")] Guid EdicionId,
     [property: JsonPropertyName("solicitada")] int Solicitada,
-    [property: JsonPropertyName("disponibleEnLaRed")] int DisponibleEnLaRed);
+    [property: JsonPropertyName("disponibleEnLaRed")] int DisponibleEnLaRed,
+    [property: JsonPropertyName("disponibleEnLaSucursal"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DisponibleEnLaSucursal = null);
 
 /// <summary>Cuerpo del <c>409</c> con el código <c>INV-STOCK-INSUFICIENTE</c>: qué líneas no tienen stock; no se reservó ninguna.</summary>
 public sealed record ProblemaDeStockDto : ProblemaDto

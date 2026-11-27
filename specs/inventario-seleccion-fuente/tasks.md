@@ -45,7 +45,7 @@ Formato de cada línea: `- [ ] T01 [Capa/Nivel] Descripción (cubre: AC-XXX-01, 
 
 Un solo carril (Inventario y Shared), en este orden, salvo T45, que hace el carril del Carrito porque toca los catálogos de auditoría de ambos servicios; T34 se entrega antes porque el E-commerce lo necesita para compilar. Plan §11.
 
-- [ ] T34 [Shared/C] Contrato aditivo de §11.1 (`codigoDeSucursal` por línea y `disponibleEnLaSucursal` en la falta de stock y la consulta previa, omitidos si son nulos), con sus pruebas de serialización y de contrato, el documento OpenAPI del Inventario regenerado (cubre: AC-SEL-42, AC-SEL-45, SEL-41)
+- [x] T34 [Shared/C] Contrato aditivo de §11.1 (`codigoDeSucursal` por línea y `disponibleEnLaSucursal` en la falta de stock y la consulta previa, omitidos si son nulos), con sus pruebas de serialización y de contrato, el documento OpenAPI del Inventario regenerado (cubre: AC-SEL-42, AC-SEL-45, SEL-41)
 - [ ] T35 [Dominio/C] Recojo sin sucursal de cabecera, `SucursalDeEntregaDe` y la regla pura `AsignacionPorSucursal` acumulada por fuente y edición, con las líneas que no alcanzan y el vendible de la sucursal (cubre: AC-SEL-42, AC-SEL-43, SEL-41, SEL-43)
 - [ ] T36 [Aplicación/C] Validación de la forma por sucursal (todas las líneas impresas o ninguna con la digital ignorada, formato del código, sin sucursal común, sucursal existente, edición repetida solo por sucursal) y carga canónica con la sucursal solo cuando se declara (cubre: AC-SEL-44, SEL-42)
 - [ ] T37 [Aplicación/C] `ReservarUnidades` (con el reemplazo) y `ConsultarSeleccion` por sucursal sin estrategia, sin traslado ni plazo, y la confirmación que no genera traslados; las pruebas de la forma anterior siguen en verde (cubre: AC-SEL-42, AC-SEL-43, AC-SEL-45, AC-SEL-50, SEL-44)

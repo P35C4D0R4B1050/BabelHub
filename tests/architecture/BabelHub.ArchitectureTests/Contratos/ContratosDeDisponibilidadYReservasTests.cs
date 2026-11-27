@@ -135,6 +135,42 @@ public sealed class ContratosDeDisponibilidadYReservasTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEL-42")]
+    public void Por_sucursal_cada_linea_viaja_con_su_codigo_y_sin_el_no_viaja_el_campo()
+    {
+        var linea = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002");
+        var edicion = Guid.Parse("cccccccc-0000-0000-0000-000000000003");
+        var opciones = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var conSucursal = JsonSerializer.Serialize(new LineaDeSolicitudDto(linea, edicion, 18, "cusco"), opciones);
+        var sinSucursal = JsonSerializer.Serialize(new LineaDeSolicitudDto(linea, edicion, 18), opciones);
+
+        Assert.EndsWith("\"cantidad\":18,\"codigoDeSucursal\":\"cusco\"}", conSucursal, StringComparison.Ordinal);
+        Assert.DoesNotContain("codigoDeSucursal", sinSucursal, StringComparison.Ordinal);
+        Assert.Equal("cusco", JsonSerializer.Deserialize<LineaDeSolicitudDto>(conSucursal, opciones)!.CodigoDeSucursal);
+        Assert.Null(JsonSerializer.Deserialize<LineaDeSolicitudDto>(sinSucursal, opciones)!.CodigoDeSucursal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-45")]
+    public void El_vendible_de_la_sucursal_viaja_en_la_falta_de_stock_y_en_la_consulta_previa_solo_si_existe()
+    {
+        var opciones = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var faltaPorSucursal = JsonSerializer.Serialize(new LineaSinStockDto(Guid.Empty, Guid.Empty, 3, 0, 5), opciones);
+        var faltaEnLaRed = JsonSerializer.Serialize(new LineaSinStockDto(Guid.Empty, Guid.Empty, 3, 1), opciones);
+        var seleccionSinStock = new SeleccionDeLineaDto(Guid.Empty, Guid.Empty, ResultadosDeSeleccion.SinStock, null, false, null, 0, 0);
+        var porSucursal = JsonSerializer.Serialize(seleccionSinStock, opciones);
+        var enLaRed = JsonSerializer.Serialize(new SeleccionDeLineaDto(Guid.Empty, Guid.Empty, ResultadosDeSeleccion.Disponible, "AYA", false, null, 0), opciones);
+
+        Assert.Contains("\"disponibleEnLaSucursal\":5", faltaPorSucursal, StringComparison.Ordinal);
+        Assert.DoesNotContain("disponibleEnLaSucursal", faltaEnLaRed, StringComparison.Ordinal);
+
+        // Un vendible de cero sí es un dato: la sucursal está agotada.
+        Assert.Contains("\"disponibleEnLaSucursal\":0", porSucursal, StringComparison.Ordinal);
+        Assert.DoesNotContain("disponibleEnLaSucursal", enLaRed, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Un_limite_de_reservas_responde_con_el_formato_unico_de_limites_y_uno_de_los_tres_motivos()
     {
         Assert.IsAssignableFrom<ProblemaDto>(new RespuestaDeLimiteDto { Motivo = MotivosDeLimiteDeReservas.PendientePorCliente });

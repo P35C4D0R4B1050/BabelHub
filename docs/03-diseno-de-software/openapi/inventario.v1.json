@@ -4325,6 +4325,10 @@
                     }
                   ],
                   "format": "int32"
+                },
+                "codigoDeSucursal": {
+                  "type": "string",
+                  "nullable": true
                 }
               }
             }
@@ -4400,6 +4404,25 @@
                     }
                   ],
                   "format": "int32"
+                },
+                "disponibleEnLaSucursal": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        null
+                      ],
+                      "nullable": true
+                    }
+                  ],
+                  "format": "int32",
+                  "nullable": true
                 }
               }
             }
@@ -4479,6 +4502,10 @@
                     }
                   ],
                   "format": "int32"
+                },
+                "codigoDeSucursal": {
+                  "type": "string",
+                  "nullable": true
                 }
               }
             }
