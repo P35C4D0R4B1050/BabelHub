@@ -167,6 +167,7 @@ public sealed class PilaDeReservas : IDisposable
         Registro = new RegistroDeTrabajosEspia();
 
         var servicios = new ServiceCollection();
+        servicios.AddLogging();
         servicios.AddSingleton(bd.Acceso);
         servicios.AddSingleton<IActorActual>(actor);
         servicios.AddSingleton<IEstablecedorDeActor>(actor);

@@ -236,6 +236,15 @@ public interface IGeneradorDeIdentificadorAnonimo
     Guid Generar(Guid titularId);
 }
 
+/// <summary>
+/// Puerto que <b>declara</b> <c>Reservas</c> (la Aplicación no usa paquetes de registro): anota que las reservas de una edición en una sucursal superaron el máximo en la ventana (SEL-47). Recibe solo la edición, el
+/// código de la sucursal y las unidades: ni cliente, ni pedido, ni origen.
+/// </summary>
+public interface IRegistroDeConcentracion
+{
+    void Registrar(Guid edicionId, string codigoDeSucursal, int unidades);
+}
+
 // ---------- Para Traslados: consultar, consumir en el origen y recrear en el destino ----------
 
 /// <summary>Cómo terminó un movimiento de la reserva de un pedido que pide <c>Traslados</c>.</summary>
