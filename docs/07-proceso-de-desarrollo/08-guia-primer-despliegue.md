@@ -142,7 +142,7 @@ Las VMs no construyen nada: **bajan imágenes ya construidas** del registro de c
 ### 5.1 Preparación única en GitHub (10 minutos)
 
 1. **Protege las etiquetas de versión.** GitHub → tu repositorio → *Settings → Rules → Rulesets → New ruleset → New tag ruleset*. *Target:* etiquetas `v*`. Reglas: *Restrict creations*, *Restrict updates*, *Restrict deletions*. *Bypass list:* solo tú. Así nadie más puede crear la versión que se publica.
-2. **Crea el entorno `lanzamiento`.** *Settings → Environments → New environment* → nombre `lanzamiento` → *Required reviewers*: tú. Así cada publicación te pide aprobación (un botón verde) antes de construir. Como la revisora eres tú, **desmarca *Prevent self-review*** (si no, no podrías aprobar tus propias publicaciones) y desmarca *Allow administrators to bypass*; **pulsa *Save protection rules*** (sin ese botón no se guarda nada). En el paso 1, *Enforcement status* nace en *Disabled*: ponlo en **Active**.
+2. **Crea el entorno `lanzamiento`.** *Settings → Environments → New environment* → nombre `lanzamiento` → *Required reviewers*: tú. Así cada publicación te pide aprobación (un botón verde) dos veces: antes de construir y antes de publicar. Como la revisora eres tú, **desmarca *Prevent self-review*** (si no, no podrías aprobar tus propias publicaciones) y desmarca *Allow administrators to bypass*; **pulsa *Save protection rules*** (sin ese botón no se guarda nada). En el paso 1, *Enforcement status* nace en *Disabled*: ponlo en **Active**.
 3. Confirma que el flujo `ci` y el de `secretos` están **en verde** en `main` (pestaña *Actions*). El flujo de lanzamiento se niega a publicar si el commit no pasó ambos.
 
 ### 5.2 Lanzar
@@ -158,9 +158,12 @@ git tag -a v0.1.0 -m "primer despliegue"
 git push origin v0.1.0
 ```
 
-GitHub → pestaña *Actions* → «lanzamiento» → te pide **Review deployments** → *Approve*. Tarda 15–30 minutos (construye 6 imágenes: 3 × 2 arquitecturas).
+GitHub → pestaña *Actions* → abre la ejecución de «lanzamiento». **Se aprueba dos veces**, con los mismos pasos: botón **Review deployments** → marca la casilla `lanzamiento` → **Approve and deploy**.
 
-**Qué debes ver:** los seis trabajos «Construir …» en verde y, al final, el resumen **«Digests para los Compose»** con tres líneas:
+1. **Primera aprobación**, al empezar: autoriza los seis trabajos «Construir …» (3 imágenes × 2 arquitecturas). Tardan 15–30 minutos.
+2. **Segunda aprobación**, cuando los seis estén en verde: el flujo vuelve a quedar en *Waiting* con la franja amarilla (si no la ves, recarga la página). Autoriza los tres trabajos «Publicar …», que tardan pocos minutos. **No es un fallo:** sin esta aprobación no se publica ninguna imagen.
+
+**Qué debes ver:** los trabajos «Construir …» y «Publicar …» en verde y, al final, el resumen **«Digests para los Compose»** con tres líneas:
 
 ```
 IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64 caracteres>
@@ -182,7 +185,7 @@ Alternativa (si prefieres paquetes privados): crea un *Personal Access Token (cl
 
 La procedencia firmada demuestra qué commit y qué flujo construyó cada imagen:
 
-**[Tu equipo]** (necesita la CLI `gh`)
+**[Tu equipo]** (necesita la CLI `gh`; en `--source-ref` pon la etiqueta que publicaste, aquí `v0.1.0`)
 
 ```bash
 gh attestation verify oci://ghcr.io/<propietario>/babelhub-inventario@sha256:<64> --repo <propietario>/BabelHub --source-ref refs/tags/v0.1.0
