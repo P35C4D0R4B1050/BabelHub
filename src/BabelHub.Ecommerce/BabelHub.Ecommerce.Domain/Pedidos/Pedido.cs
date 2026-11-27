@@ -598,9 +598,23 @@ public sealed partial class Pedido
 
     private static ResultadoDeOperacionDeLinea Resultado(bool aplicada) => aplicada ? ResultadoDeOperacionDeLinea.Aplicada : ResultadoDeOperacionDeLinea.EstadoInvalido;
 
-    private EstadoDePedido Derivar() => DerivacionDelEstadoDelPedido.Derivar(
-        [.. _lineas.Where(l => !l.EsDigital).Select(l => l.EstadoImpreso!.Value)],
-        [.. _lineas.Where(l => l.EsDigital).Select(l => l.EstadoDigital!.Value)]);
+    /// <summary>
+    /// El estado que derivan (PED-20) solo las líneas pedidas, que deben ser de este pedido: el que ve el encargado de las líneas de su sucursal (PED-08).
+    /// </summary>
+    public EstadoDePedido EstadoDeLasLineas(IReadOnlyCollection<LineaDePedido> lineas)
+    {
+        ArgumentNullException.ThrowIfNull(lineas);
+        if (lineas.Any(l => l.PedidoId != Id))
+        {
+            throw new ArgumentException("Hay líneas que no son de este pedido.", nameof(lineas));
+        }
+
+        return DerivacionDelEstadoDelPedido.Derivar(
+            [.. lineas.Where(l => !l.EsDigital).Select(l => l.EstadoImpreso!.Value)],
+            [.. lineas.Where(l => l.EsDigital).Select(l => l.EstadoDigital!.Value)]);
+    }
+
+    private EstadoDePedido Derivar() => EstadoDeLasLineas(_lineas);
 
     private static RechazoDeCrearPedido? RechazoDeLinea(DatosDeLineaNueva linea)
     {

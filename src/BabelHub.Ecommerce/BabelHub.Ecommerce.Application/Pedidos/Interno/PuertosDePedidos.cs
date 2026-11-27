@@ -4,8 +4,8 @@ namespace BabelHub.Ecommerce.Application.Pedidos.Interno;
 
 // Los puertos propios del módulo Pedidos (plan §2): lo externo que la Aplicación necesita y la Infraestructura del módulo implementa. Usan tipos del Dominio, así que son internos al módulo y no están en la raíz del contrato público (regla 13).
 
-/// <summary>Los criterios de un listado: la cuenta (el cliente), la sucursal de recojo (el encargado), solo pedidos a domicilio (logística, PED-26), el estado derivado y la página; el tamaño ya viene acotado a 50.</summary>
-public sealed record CriterioDeListado(Guid? CuentaId, string? CodigoDeSucursalDeRecojo, bool SoloADomicilio, EstadoDePedido? Estado, int Pagina, int Tamano);
+/// <summary>Los criterios de un listado: la cuenta (el cliente), la sucursal del encargado (los pedidos de recojo con alguna línea suya, PED-08), solo pedidos a domicilio (logística, PED-26), el estado y la página; el tamaño ya viene acotado a 50. Con la sucursal del encargado, el estado se compara con el que derivan <b>sus</b> líneas.</summary>
+public sealed record CriterioDeListado(Guid? CuentaId, string? CodigoDeSucursalDelEncargado, bool SoloADomicilio, EstadoDePedido? Estado, int Pagina, int Tamano);
 
 /// <summary>Un estado de traslado ya aplicado (<c>estados_de_traslado_recibidos</c>): el evento, el traslado, el pedido, el estado y la huella del cuerpo; se purga a los 90 días.</summary>
 public sealed record EstadoDeTrasladoRegistrado(string EventoId, Guid TrasladoId, Guid PedidoId, string Estado, string HuellaDelCuerpo, DateTimeOffset RecibidoEn);

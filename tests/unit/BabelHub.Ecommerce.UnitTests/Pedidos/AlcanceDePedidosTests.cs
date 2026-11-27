@@ -226,11 +226,12 @@ public sealed class AlcanceDePedidosTests
         var (autorizador, denegaciones) = Crear(Admin());
         var pedido = Pedido(TipoDeEntregaDelPedido.Domicilio);
         var propia = pedido.Lineas[0].Id;
+        var quien = new SolicitanteDePedidos(RolesDePedidos.AdministradorCentral, Guid.NewGuid(), null);
 
-        Assert.Null(await autorizador.ComprobarLineas(pedido, [propia], default));
-        var ajena = await autorizador.ComprobarLineas(pedido, [propia, Guid.NewGuid()], default);
-        var repetida = await autorizador.ComprobarLineas(pedido, [propia, propia], default);
-        var vacia = await autorizador.ComprobarLineas(pedido, [], default);
+        Assert.Null(await autorizador.ComprobarLineas(pedido, quien, [propia], default));
+        var ajena = await autorizador.ComprobarLineas(pedido, quien, [propia, Guid.NewGuid()], default);
+        var repetida = await autorizador.ComprobarLineas(pedido, quien, [propia, propia], default);
+        var vacia = await autorizador.ComprobarLineas(pedido, quien, [], default);
 
         Assert.All(new[] { ajena, repetida, vacia }, e => Assert.Equal((CategoriaDeError.NoEncontrado, "no-encontrado"), (e!.Categoria, e.Clave)));
         Assert.Equal(3, denegaciones.Eventos.Count);

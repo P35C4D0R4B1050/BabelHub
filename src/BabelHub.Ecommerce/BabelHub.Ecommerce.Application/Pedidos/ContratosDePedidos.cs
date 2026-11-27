@@ -59,7 +59,8 @@ public sealed record LineaVisibleDelPedido(
     DateTimeOffset? ListoEn,
     DateTimeOffset? EntregadaEn,
     DateTimeOffset? AnuladaEn,
-    bool Operable = false);
+    bool Operable = false,
+    string? CodigoDeSucursal = null);
 
 /// <summary>Una fila de un listado: nunca lleva contacto, cuenta ni identificador de usuario.</summary>
 public sealed record ResumenDePedido(

@@ -60,7 +60,7 @@ Plan §11. Carril «Pedidos, pagos y devoluciones», en este orden; T51 requiere
 
 - [x] T43 [Dominio/C] Varias líneas por edición impresa, sucursal de la línea y recojo sin sucursal común, con los pedidos anteriores intactos (cubre: AC-PED-36, AC-PED-39, PED-43)
 - [x] T44 [Dominio/C] Pagos: instantánea con recojo sin sucursal común y líneas repetidas de una edición impresa, sin cambiar las intenciones anteriores (cubre: AC-PED-36, AC-PED-39)
-- [ ] T45 [Aplicación/C] Alcance del encargado por línea, todas sus salidas filtradas, avisos por sucursal, confirmación de la compra y reembolso de todo el envío cuando nada salió (cubre: AC-PED-37, AC-PED-38, AC-PED-40)
+- [x] T45 [Aplicación/C] Alcance del encargado por línea, todas sus salidas filtradas, avisos por sucursal, confirmación de la compra y reembolso de todo el envío cuando nada salió (cubre: AC-PED-37, AC-PED-38, AC-PED-40)
 - [ ] T50 [Dominio/C] Envío por sucursal en el pedido y en el plan de anulación, con la sucursal que no llegó a enviar y sin contar sucursales sin líneas (cubre: AC-PED-20, AC-PED-42, PED-22, PED-45)
 - [ ] T51 [Aplicación/C] Copia al confirmar la compra sin duplicar, importe de envío guardado en la anulación y en el reintento, y recálculo cuando algo sale (cubre: AC-PED-42, AC-PED-43, PED-44)
 - [ ] T46 [Infra/C] Esquema `pedidos` migrado de forma repetible y lista y filtro del encargado por sus líneas (cubre: AC-PED-37, AC-PED-39)

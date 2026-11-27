@@ -40,7 +40,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                     parametros.Add(new NpgsqlParameter("cuenta", cuenta));
                 }
 
-                if (criterio.CodigoDeSucursalDeRecojo is { } sucursal)
+                if (criterio.CodigoDeSucursalDelEncargado is { } sucursal)
                 {
                     filtros.Add("tipo_de_entrega = 'recojo' AND codigo_de_sucursal_de_recojo = @sucursal");
                     parametros.Add(new NpgsqlParameter("sucursal", sucursal));

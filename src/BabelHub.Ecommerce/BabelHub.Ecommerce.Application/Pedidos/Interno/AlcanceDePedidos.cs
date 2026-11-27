@@ -145,10 +145,54 @@ internal sealed class AutorizadorDePedidos(IActorActual actores, IDenegacionDeAc
         return NoEncontrado();
     }
 
-    /// <summary>El paso 3: cada <c>lineaId</c> debe ser del pedido; uno ajeno (o repetido) es el mismo «no encontrado» con su evento.</summary>
-    public async Task<ErrorDeAplicacion?> ComprobarLineas(Pedido pedido, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion)
+    /// <summary>
+    /// Las líneas del pedido que quien pide puede ver y operar: todas, salvo al encargado de sucursal, que solo ve las impresas que atiende su sucursal en un pedido de recojo (PED-08, PED-42, PED-43). Una sucursal que no se puede resolver no es suya.
+    /// </summary>
+    public async Task<IReadOnlyList<LineaDePedido>> LineasDelAlcance(Pedido pedido, SolicitanteDePedidos solicitante, CancellationToken cancelacion)
     {
-        if (lineaIds.Count > 0 && lineaIds.Distinct().Count() == lineaIds.Count && lineaIds.All(id => pedido.Lineas.Any(l => l.Id == id)))
+        ArgumentNullException.ThrowIfNull(pedido);
+        ArgumentNullException.ThrowIfNull(solicitante);
+        if (!solicitante.EsEncargado)
+        {
+            return pedido.Lineas;
+        }
+
+        if (pedido.Tipo != TipoDeEntregaDelPedido.Recojo)
+        {
+            return [];
+        }
+
+        var esSuya = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var lineas = new List<LineaDePedido>();
+        foreach (var linea in pedido.Lineas)
+        {
+            if (pedido.SucursalDeLaLinea(linea) is not { } codigo)
+            {
+                continue;
+            }
+
+            if (!esSuya.TryGetValue(codigo, out var suya))
+            {
+                suya = await sucursales.IdentificadorDe(codigo, cancelacion).ConfigureAwait(false) is { } id && solicitante.SucursalId == id;
+                esSuya[codigo] = suya;
+            }
+
+            if (suya)
+            {
+                lineas.Add(linea);
+            }
+        }
+
+        return lineas;
+    }
+
+    /// <summary>
+    /// El paso 3: cada <c>lineaId</c> debe ser del pedido y, para el encargado, de su sucursal (PED-42); uno ajeno (o repetido) rechaza la operación entera con el mismo «no encontrado» y su evento.
+    /// </summary>
+    public async Task<ErrorDeAplicacion?> ComprobarLineas(Pedido pedido, SolicitanteDePedidos solicitante, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion)
+    {
+        var suyas = (await LineasDelAlcance(pedido, solicitante, cancelacion).ConfigureAwait(false)).Select(l => l.Id).ToHashSet();
+        if (lineaIds.Count > 0 && lineaIds.Distinct().Count() == lineaIds.Count && lineaIds.All(suyas.Contains))
         {
             return null;
         }
@@ -174,12 +218,7 @@ internal sealed class AutorizadorDePedidos(IActorActual actores, IDenegacionDeAc
             return pedido.Tipo == TipoDeEntregaDelPedido.Domicilio;
         }
 
-        if (solicitante.EsEncargado && pedido.Tipo == TipoDeEntregaDelPedido.Recojo && pedido.CodigoDeSucursalDeRecojo is { } codigo)
-        {
-            return await sucursales.IdentificadorDe(codigo, cancelacion).ConfigureAwait(false) is { } id && solicitante.SucursalId == id;
-        }
-
-        return false;
+        return solicitante.EsEncargado && (await LineasDelAlcance(pedido, solicitante, cancelacion).ConfigureAwait(false)).Count > 0;
     }
 
     private static bool RolPermitido(OperacionDePedidos operacion, string rol) => operacion switch
