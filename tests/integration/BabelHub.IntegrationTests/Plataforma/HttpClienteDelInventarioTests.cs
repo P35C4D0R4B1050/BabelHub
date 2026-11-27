@@ -771,6 +771,78 @@ public sealed class HttpClienteDelInventarioTests
         Assert.Empty(servidor.Rutas);
     }
 
+    // ---------- Venta por sucursal (T43) ----------
+
+    private static string Seleccion(Guid linea, string resultado, int? enLaSucursal) =>
+        $"{{\"lineaId\":\"{linea}\",\"edicionId\":\"{Edicion1}\",\"resultado\":\"{resultado}\",\"codigoDeFuente\":{(resultado == "disponible" ? "\"cusco\"" : "null")},\"requiereTraslado\":false,\"plazoEstimadoDias\":null,\"disponibleEnLaRed\":9{(enLaSucursal is { } n ? $",\"disponibleEnLaSucursal\":{n}" : string.Empty)}}}";
+
+    private static string Previa(params string[] lineas) => $"{{\"lineas\":[{string.Join(',', lineas)}],\"consultadaEn\":\"{DateTimeOffset.UtcNow:O}\"}}";
+
+    [Theory]
+    [Trait("Criterio", "AC-CAR-04")]
+    [InlineData(TipoDeEntregaDeLaReserva.Recojo, null)]
+    [InlineData(TipoDeEntregaDeLaReserva.Domicilio, "ayacucho")]
+    public async Task ConsultarPrevia_ConSucursalPorLinea_LaDeclaraSinSucursalComun_YTraeElVendibleDeLaSucursal(TipoDeEntregaDeLaReserva tipo, string? region)
+    {
+        var (una, otra) = (Guid.NewGuid(), Guid.NewGuid());
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Previa(Seleccion(una, "disponible", null), Seleccion(otra, "sin-stock", 2)))));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(tipo, null, region, [new LineaDeSolicitud(una, Edicion1, 1, "cusco"), new LineaDeSolicitud(otra, Edicion1, 3, "lima")]));
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal([(true, (int?)null), (false, 2)], resultado.Valor.Lineas.Select(l => (l.Disponible, l.DisponibleEnLaSucursal)));
+        var enviado = System.Text.Json.JsonDocument.Parse(Assert.Single(servidor.Cuerpos)!).RootElement;
+        Assert.False(enviado.TryGetProperty("codigoDeSucursalDeRecojo", out var comun) && comun.ValueKind != System.Text.Json.JsonValueKind.Null);
+        Assert.Equal(["cusco", "lima"], enviado.GetProperty("lineas").EnumerateArray().Select(l => l.GetProperty("codigoDeSucursal").GetString()));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task ConsultarPrevia_ConUnVendibleDeLaSucursalNegativo_EsNoDisponible()
+    {
+        var linea = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Previa(Seleccion(linea, "sin-stock", -1)))));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(TipoDeEntregaDeLaReserva.Recojo, null, null, [new LineaDeSolicitud(linea, Edicion1, 1, "lima")]));
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, resultado.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-24")]
+    public async Task Reservar_Con409DeStockPorSucursal_TraeElVendibleDeLaSucursal()
+    {
+        var linea = Guid.NewGuid();
+        var cuerpo = $"{{\"type\":\"about:blank\",\"title\":\"x\",\"status\":409,\"detail\":\"d\",\"code\":\"INV-STOCK-INSUFICIENTE\",\"traceId\":\"t\",\"lineas\":[{{\"lineaId\":\"{linea}\",\"edicionId\":\"{Edicion1}\",\"solicitada\":3,\"disponibleEnLaRed\":9,\"disponibleEnLaSucursal\":2}}]}}";
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict) { Content = new StringContent(cuerpo, Encoding.UTF8, "application/problem+json") }));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.Reservar(new SolicitudDeReservaDeStock(Guid.NewGuid(), TipoDeEntregaDeLaReserva.Recojo, null, null, [new LineaDeSolicitud(linea, Edicion1, 3, "lima")]), Clave);
+
+        Assert.Equal(2, Assert.Single(resultado.LineasSinStock!).DisponibleEnLaSucursal);
+        Assert.Contains("\"codigoDeSucursal\":\"lima\"", Assert.Single(servidor.Cuerpos), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task Reservar_ConLaSucursalSoloEnAlgunasLineas_OJuntoALaSucursalComun_NoSale()
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("{}", HttpStatusCode.Created)));
+        var (cliente, _) = Crear(servidor);
+        LineaDeSolicitud Linea(string? sucursal) => new(Guid.NewGuid(), Edicion1, 1, sucursal);
+        Task Reservar(string? comun, string? region, params LineaDeSolicitud[] lineas) =>
+            cliente.Reservar(new SolicitudDeReservaDeStock(Guid.NewGuid(), region is null ? TipoDeEntregaDeLaReserva.Recojo : TipoDeEntregaDeLaReserva.Domicilio, comun, region, lineas), Clave);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => Reservar(null, null, Linea("lima"), Linea(null)));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reservar("lima", null, Linea("lima")));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reservar(null, null, Linea(" ")));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reservar(null, null, Linea(new string('x', 41))));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reservar(null, null, Linea(null)));
+        Assert.Empty(servidor.Rutas);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-CAR-14")]
     public async Task Liberar_UsaLaCredencialDeExpiracionSinToken_SeReintenta_YValidaElMotivo()

@@ -195,7 +195,7 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
     {
         ArgumentNullException.ThrowIfNull(consulta);
         ValidarLasLineas(consulta.Lineas, nameof(consulta));
-        ValidarLaEntrega(consulta.Tipo, consulta.CodigoDeSucursalDeRecojo, consulta.RegionDeEntrega, nameof(consulta));
+        ValidarLaEntrega(consulta.Tipo, consulta.CodigoDeSucursalDeRecojo, consulta.RegionDeEntrega, consulta.Lineas, nameof(consulta));
 
         var cuerpo = JsonSerializer.Serialize(new ConsultaPreviaDto(TextoDelTipo(consulta.Tipo), consulta.CodigoDeSucursalDeRecojo, consulta.RegionDeEntrega, ALasLineasDelContrato(consulta.Lineas)), Json);
         var pedidas = consulta.Lineas.ToDictionary(l => l.LineaId);
@@ -212,7 +212,7 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
                 var vistas = new HashSet<Guid>();
                 var lineas = (dto.Lineas ?? throw new JsonException("Faltan las líneas.")).Select(l =>
                 {
-                    if (!pedidas.TryGetValue(l.LineaId, out var pedida) || pedida.EdicionId != l.EdicionId || !vistas.Add(l.LineaId) || l.DisponibleEnLaRed < 0 || l.PlazoEstimadoDias is < 0)
+                    if (!pedidas.TryGetValue(l.LineaId, out var pedida) || pedida.EdicionId != l.EdicionId || !vistas.Add(l.LineaId) || l.DisponibleEnLaRed < 0 || l.DisponibleEnLaSucursal is < 0 || l.PlazoEstimadoDias is < 0)
                     {
                         throw new JsonException("Una línea no es de las pedidas o no cumple el contrato.");
                     }
@@ -220,7 +220,7 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
                     var disponible = l.Resultado == ResultadosDeSeleccion.Disponible;
                     return !disponible && l.Resultado != ResultadosDeSeleccion.SinStock
                         ? throw new JsonException("El resultado de una línea no es del contrato.")
-                        : new SeleccionDeLineaDelInventario(l.LineaId, l.EdicionId, disponible, l.CodigoDeFuente, l.RequiereTraslado, l.PlazoEstimadoDias, l.DisponibleEnLaRed);
+                        : new SeleccionDeLineaDelInventario(l.LineaId, l.EdicionId, disponible, l.CodigoDeFuente, l.RequiereTraslado, l.PlazoEstimadoDias, l.DisponibleEnLaRed, l.DisponibleEnLaSucursal);
                 }).ToList();
                 return new RespuestaDeConsultaPrevia(lineas, dto.ConsultadaEn);
             },
@@ -237,7 +237,7 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         }
 
         ValidarLasLineas(solicitud.Lineas, nameof(solicitud));
-        ValidarLaEntrega(solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega, nameof(solicitud));
+        ValidarLaEntrega(solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega, solicitud.Lineas, nameof(solicitud));
         if (string.IsNullOrEmpty(claveDeIdempotencia) || !ClaveValida.IsMatch(claveDeIdempotencia))
         {
             throw new ArgumentException("La clave de idempotencia tiene de 16 a 80 caracteres de [A-Za-z0-9_-].", nameof(claveDeIdempotencia));
@@ -286,14 +286,21 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         }
     }
 
-    private static void ValidarLaEntrega(TipoDeEntregaDeLaReserva tipo, string? sucursal, string? region, string parametro)
+    /// <summary>La sucursal se declara en todas las líneas o en ninguna (SEL-42): con ella el recojo no lleva sucursal común y sin ella la exige; el domicilio lleva la región y nunca una sucursal común.</summary>
+    private static void ValidarLaEntrega(TipoDeEntregaDeLaReserva tipo, string? sucursal, string? region, IReadOnlyList<LineaDeSolicitud> lineas, string parametro)
     {
+        var porLinea = lineas.Any(l => l.CodigoDeSucursal is not null);
+        if (porLinea && lineas.Any(l => string.IsNullOrWhiteSpace(l.CodigoDeSucursal) || l.CodigoDeSucursal.Length > IdentificadorDeSucursal.LargoMaximoDelCodigo))
+        {
+            throw new ArgumentException("La sucursal se declara en todas las líneas, con un código válido, o en ninguna.", parametro);
+        }
+
         var correcta = tipo == TipoDeEntregaDeLaReserva.Recojo
-            ? !string.IsNullOrWhiteSpace(sucursal) && string.IsNullOrWhiteSpace(region)
+            ? string.IsNullOrWhiteSpace(sucursal) == porLinea && string.IsNullOrWhiteSpace(region)
             : !string.IsNullOrWhiteSpace(region) && string.IsNullOrWhiteSpace(sucursal);
         if (!correcta)
         {
-            throw new ArgumentException("El recojo lleva la sucursal y el domicilio, la región; nunca los dos.", parametro);
+            throw new ArgumentException("El recojo lleva la sucursal (común o por línea) y el domicilio, la región.", parametro);
         }
     }
 
@@ -410,7 +417,7 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
 
     private static string TextoDelTipo(TipoDeEntregaDeLaReserva tipo) => tipo == TipoDeEntregaDeLaReserva.Recojo ? TiposDeEntrega.Recojo : TiposDeEntrega.Domicilio;
 
-    private static List<LineaDeSolicitudDto> ALasLineasDelContrato(IReadOnlyList<LineaDeSolicitud> lineas) => [.. lineas.Select(l => new LineaDeSolicitudDto(l.LineaId, l.EdicionId, l.Cantidad))];
+    private static List<LineaDeSolicitudDto> ALasLineasDelContrato(IReadOnlyList<LineaDeSolicitud> lineas) => [.. lineas.Select(l => new LineaDeSolicitudDto(l.LineaId, l.EdicionId, l.Cantidad, l.CodigoDeSucursal))];
 
     /// <summary>La reserva del contrato con sus valores validados: la del pedido pedido y, si se sabe, solo con líneas de las pedidas (la liberación no las conoce).</summary>
     private static ReservaDelInventario AReserva(ReservaDto dto, Guid pedidoId, HashSet<Guid>? lineasPedidas)
@@ -645,8 +652,8 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         try
         {
             var dto = texto is null ? null : JsonSerializer.Deserialize<ProblemaDeStockDto>(texto, Json);
-            return dto is { Lineas.Count: > 0 and <= LimitesDeContrato.MaximoDeLineasPorReserva } && dto.Lineas.All(l => l.LineaId != Guid.Empty && l.EdicionId != Guid.Empty && l.Solicitada > 0 && l.DisponibleEnLaRed >= 0)
-                ? [.. dto.Lineas.Select(l => new LineaSinStockDelInventario(l.LineaId, l.EdicionId, l.Solicitada, l.DisponibleEnLaRed))]
+            return dto is { Lineas.Count: > 0 and <= LimitesDeContrato.MaximoDeLineasPorReserva } && dto.Lineas.All(l => l.LineaId != Guid.Empty && l.EdicionId != Guid.Empty && l.Solicitada > 0 && l.DisponibleEnLaRed >= 0 && l.DisponibleEnLaSucursal is not < 0)
+                ? [.. dto.Lineas.Select(l => new LineaSinStockDelInventario(l.LineaId, l.EdicionId, l.Solicitada, l.DisponibleEnLaRed, l.DisponibleEnLaSucursal))]
                 : null;
         }
         catch (JsonException)

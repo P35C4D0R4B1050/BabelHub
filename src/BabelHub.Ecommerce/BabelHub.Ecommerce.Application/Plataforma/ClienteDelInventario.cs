@@ -229,7 +229,7 @@ public enum TipoDeEntregaDeLaReserva
 }
 
 /// <summary>Una línea impresa de un carrito o pedido: su identificador (el que asigna el E-commerce), la edición y la cantidad.</summary>
-public sealed record LineaDeSolicitud(Guid LineaId, Guid EdicionId, int Cantidad);
+public sealed record LineaDeSolicitud(Guid LineaId, Guid EdicionId, int Cantidad, string? CodigoDeSucursal = null);
 
 /// <summary>
 /// La consulta previa de la selección de fuentes de un carrito, sin reservar (SEL-20). Recojo: <see cref="CodigoDeSucursalDeRecojo"/>; domicilio: <see cref="RegionDeEntrega"/>, el identificador de región de la dirección en
@@ -238,7 +238,7 @@ public sealed record LineaDeSolicitud(Guid LineaId, Guid EdicionId, int Cantidad
 public sealed record ConsultaPrevia(TipoDeEntregaDeLaReserva Tipo, string? CodigoDeSucursalDeRecojo, string? RegionDeEntrega, IReadOnlyList<LineaDeSolicitud> Lineas);
 
 /// <summary>La fuente que se seleccionaría para una línea (o la falta de stock), si implica traslado y su plazo en días (<see langword="null"/> es «a confirmar», FUE-13).</summary>
-public sealed record SeleccionDeLineaDelInventario(Guid LineaId, Guid EdicionId, bool Disponible, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoDias, int DisponibleEnLaRed);
+public sealed record SeleccionDeLineaDelInventario(Guid LineaId, Guid EdicionId, bool Disponible, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoDias, int DisponibleEnLaRed, int? DisponibleEnLaSucursal = null);
 
 /// <summary>La respuesta de la consulta previa: una entrada por línea impresa; las digitales se ignoran (SEL-20).</summary>
 public sealed record RespuestaDeConsultaPrevia(IReadOnlyList<SeleccionDeLineaDelInventario> Lineas, DateTimeOffset ConsultadaEn);
@@ -268,7 +268,7 @@ public sealed record ExtensionDeLaReserva(bool Extendida, ReservaDelInventario R
 public sealed record ReservaDelInventario(Guid PedidoId, string Estado, DateTimeOffset CreadaEn, DateTimeOffset? ExpiraEn, IReadOnlyList<LineaReservada> Lineas, IReadOnlyList<TrasladoDeLaReserva> Traslados);
 
 /// <summary>Una línea sin stock suficiente y lo máximo que hay en la red (CAR-04, CAR-27).</summary>
-public sealed record LineaSinStockDelInventario(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed);
+public sealed record LineaSinStockDelInventario(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed, int? DisponibleEnLaSucursal = null);
 
 /// <summary>Un rechazo por límite: la clave de la política, la espera sugerida y el instante desde el que se puede reintentar. La respuesta es la misma para todos los motivos (SEL-15).</summary>
 public sealed record RechazoPorLimiteDelInventario(string Motivo, int EsperaEnSegundos, DateTimeOffset DisponibleDesde);

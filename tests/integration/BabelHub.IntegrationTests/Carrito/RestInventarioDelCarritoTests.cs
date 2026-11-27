@@ -379,6 +379,60 @@ public sealed class RestInventarioDelCarritoTests
         Assert.Equal((TipoDeEntregaDeLaReserva.Domicilio, null, "ayacucho"), (solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega));
     }
 
+    // ---------- Venta por sucursal (T43) ----------
+
+    private static LineaParaElInventario EnSucursal(string sucursal, int cantidad = 2) => new(Guid.NewGuid(), Guid.NewGuid(), cantidad, sucursal);
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task La_consulta_previa_y_la_reserva_declaran_la_sucursal_de_cada_linea_y_no_una_de_recojo()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var lineas = new[] { EnSucursal("cusco"), EnSucursal("lima", 1) };
+        cliente.Previa = c => ResultadoDelInventario<RespuestaDeConsultaPrevia>.ConValor(new RespuestaDeConsultaPrevia(
+            [new SeleccionDeLineaDelInventario(lineas[0].LineaId, lineas[0].EdicionId, true, "cusco", false, null, 9), new SeleccionDeLineaDelInventario(lineas[1].LineaId, lineas[1].EdicionId, false, null, false, null, 9, 0)], Inicio));
+        cliente.Reserva = (s, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(s.PedidoId, lineas));
+
+        var previa = await adaptador.ConsultarPrevia(Recojo, lineas);
+        await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, lineas);
+
+        Assert.Equal([(true, (int?)null), (false, 0)], previa.Valor.Lineas.Select(l => (l.HayStock, l.DisponibleEnLaSucursal)));
+        var consulta = Assert.Single(cliente.Previas);
+        var (solicitud, _) = Assert.Single(cliente.Reservas);
+        Assert.Equal(["cusco", "lima"], consulta.Lineas.Select(l => l.CodigoDeSucursal));
+        Assert.Equal(["cusco", "lima"], solicitud.Lineas.Select(l => l.CodigoDeSucursal));
+        Assert.Equal(((string?)null, (string?)null), (consulta.CodigoDeSucursalDeRecojo, solicitud.CodigoDeSucursalDeRecojo));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task Una_linea_con_sucursal_sin_stock_que_no_dice_cuanto_queda_alli_es_sin_respuesta()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var linea = EnSucursal("lima");
+        cliente.Previa = _ => ResultadoDelInventario<RespuestaDeConsultaPrevia>.ConValor(new RespuestaDeConsultaPrevia([new SeleccionDeLineaDelInventario(linea.LineaId, linea.EdicionId, false, null, false, null, 9)], Inicio));
+
+        var respuesta = await adaptador.ConsultarPrevia(Recojo, [linea]);
+
+        Assert.Equal(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, respuesta.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-24")]
+    public async Task Sin_stock_al_reservar_trae_lo_que_queda_en_la_sucursal_y_nunca_toma_lo_de_la_red_como_suyo()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var (con, sin) = (EnSucursal("cusco", 3), EnSucursal("lima", 3));
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(409, "INV-STOCK-INSUFICIENTE") with
+        {
+            LineasSinStock = [new LineaSinStockDelInventario(con.LineaId, con.EdicionId, 3, 9, 2), new LineaSinStockDelInventario(sin.LineaId, sin.EdicionId, 3, 9)],
+        };
+
+        var resultado = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [con, sin]);
+
+        Assert.Equal([(int?)2, 0], resultado.SinStock!.Select(l => l.DisponibleEnLaSucursal));
+    }
+
     [Fact]
     public async Task Liberar_manda_el_motivo_y_es_idempotente_y_cada_resultado_se_traduce()
     {

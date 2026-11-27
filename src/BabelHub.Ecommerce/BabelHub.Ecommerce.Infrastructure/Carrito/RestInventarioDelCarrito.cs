@@ -142,7 +142,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
         ResultadoDelInventario<RespuestaDeConsultaPrevia> resultado;
         try
         {
-            resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(Tipo(entrega.Tipo), null, entrega.RegionDeEntrega, [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad))]), cancelacion).ConfigureAwait(false);
+            resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(Tipo(entrega.Tipo), null, entrega.RegionDeEntrega, ALasLineas(lineas)), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
         {
@@ -161,17 +161,18 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
                 return RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.SinRespuesta;
         }
 
-        // Una línea de más, de menos, repetida o con una edición distinta de la pedida se trata como «sin respuesta»: nunca como stock (SEG-13).
+        // Una línea de más, de menos, repetida o con una edición distinta de la pedida, o una sin stock en su sucursal que no dice cuánto queda allí, se trata como «sin respuesta»: nunca como stock (SEG-13).
         var respuesta = resultado.Valor;
         if (respuesta.Lineas is null || respuesta.Lineas.Count != lineas.Count || respuesta.Lineas.Any(l => l is null || l.DisponibleEnLaRed < 0 || (l.Disponible && string.IsNullOrWhiteSpace(l.CodigoDeFuente)))
-            || !CoincidenConLoPedido(lineas, respuesta.Lineas.Select(l => (l.LineaId, l.EdicionId))))
+            || !CoincidenConLoPedido(lineas, respuesta.Lineas.Select(l => (l.LineaId, l.EdicionId)))
+            || respuesta.Lineas.Any(l => !l.Disponible && l.DisponibleEnLaSucursal is null && ConSucursal(lineas, l.LineaId)))
         {
             return RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.SinRespuesta;
         }
 
         var consultadaEn = respuesta.ConsultadaEn > reloj.Ahora ? reloj.Ahora : respuesta.ConsultadaEn;
         return RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.ConValor(new ConsultaPreviaDelInventario(
-            [.. respuesta.Lineas.Select(l => new SeleccionDeLinea(l.LineaId, l.EdicionId, l.Disponible, l.CodigoDeFuente, l.RequiereTraslado, l.PlazoEstimadoDias, l.DisponibleEnLaRed))],
+            [.. respuesta.Lineas.Select(l => new SeleccionDeLinea(l.LineaId, l.EdicionId, l.Disponible, l.CodigoDeFuente, l.RequiereTraslado, l.PlazoEstimadoDias, l.DisponibleEnLaRed, l.DisponibleEnLaSucursal))],
             consultadaEn));
     }
 
@@ -182,7 +183,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
         ResultadoDelInventario<ReservaDelInventario> resultado;
         try
         {
-            var solicitud = new SolicitudDeReservaDeStock(pedidoId, Tipo(entrega.Tipo), null, entrega.RegionDeEntrega, [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad))]);
+            var solicitud = new SolicitudDeReservaDeStock(pedidoId, Tipo(entrega.Tipo), null, entrega.RegionDeEntrega, ALasLineas(lineas));
             resultado = await cliente.Reservar(solicitud, ClaveDeReserva.Para(pedidoId, generacionDeReserva), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
@@ -197,7 +198,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
             case EstadoDeLlamadaAlInventario.LimiteExcedido:
                 return ResultadoDeReservar.De(TipoDeResultadoDeReservar.LimiteExcedido, resultado.Codigo, resultado.Limite?.DisponibleDesde);
             case EstadoDeLlamadaAlInventario.Rechazada:
-                return TraducirRechazoDeReservar(resultado);
+                return TraducirRechazoDeReservar(resultado, lineas);
             default:
                 return ResultadoDeReservar.De(TipoDeResultadoDeReservar.NoDisponible);
         }
@@ -266,10 +267,15 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
             EsRepeticion: false));
     }
 
-    private static ResultadoDeReservar TraducirRechazoDeReservar(ResultadoDelInventario resultado) => resultado.Codigo switch
+    private static List<LineaDeSolicitud> ALasLineas(IReadOnlyList<LineaParaElInventario> lineas) => [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad, l.CodigoDeSucursal))];
+
+    private static bool ConSucursal(IReadOnlyList<LineaParaElInventario> lineas, Guid lineaId) => lineas.Any(l => l.LineaId == lineaId && l.CodigoDeSucursal is not null);
+
+    /// <summary>El rechazo del contrato traducido; de una línea con sucursal sin el dato de su sucursal se toma cero, nunca lo de la red como si fuera suyo.</summary>
+    private static ResultadoDeReservar TraducirRechazoDeReservar(ResultadoDelInventario resultado, IReadOnlyList<LineaParaElInventario> pedidas) => resultado.Codigo switch
     {
         CodigosDelInventario.StockInsuficiente when resultado.LineasSinStock is { Count: > 0 } sin =>
-            ResultadoDeReservar.Sin([.. sin.Select(l => new LineaSinStock(l.LineaId, l.EdicionId, l.Solicitada, l.DisponibleEnLaRed))]),
+            ResultadoDeReservar.Sin([.. sin.Select(l => new LineaSinStock(l.LineaId, l.EdicionId, l.Solicitada, l.DisponibleEnLaRed, l.DisponibleEnLaSucursal ?? (ConSucursal(pedidas, l.LineaId) ? 0 : null)))]),
         CodigosDelInventario.IdempotenciaEnCurso => ResultadoDeReservar.De(TipoDeResultadoDeReservar.EnCurso, resultado.Codigo),
         CodigosDelInventario.IdempotenciaEnConflicto => ResultadoDeReservar.De(TipoDeResultadoDeReservar.ConflictoDeIdempotencia, resultado.Codigo),
         CodigosDelInventario.ReservaEstadoInvalido => ResultadoDeReservar.De(TipoDeResultadoDeReservar.EstadoInvalido, resultado.Codigo),
