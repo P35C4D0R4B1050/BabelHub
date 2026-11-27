@@ -2,6 +2,8 @@
 
 Reglas: [`docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`](../docs/07-proceso-de-desarrollo/10-colaboracion-ui.md). La versión vigente es la de `main`. Claude y la persona escriben «Tareas», «Reservado» y «Respuestas»; Codex escribe «Entregas» y «Peticiones». Solo se agregan filas.
 
+**Dónde está cada documento** (en `main` desde `v0.1.2`): reglas en `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md` (con el prefijo `10-`; no existe un `colaboracion-ui.md` sin él), este tablero en `progress/coordinacion-ui.md`, control en `scripts/guardia-ui.sh` y reparto entre agentes en `progress/coordinacion.md` §4. El despliegue no es tarea de Codex.
+
 Estados: `Pendiente` (no empezar) → `Asignada` → `En curso` → `Entregada` → `Corregir` o `Integrada`.
 
 ## Tareas

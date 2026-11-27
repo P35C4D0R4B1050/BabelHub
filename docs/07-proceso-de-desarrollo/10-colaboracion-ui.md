@@ -8,7 +8,7 @@ Decisión de la persona responsable (2026-11-27): **Codex** puede trabajar el ap
 | :--- | :--- |
 | **Persona responsable** | Decide prioridades y diseño, avisa a cada agente, aprueba la publicación. |
 | **Codex** | Cambios visuales dentro de las rutas permitidas (§2), en su rama `codex/…`. |
-| **Claude** | Todo lo demás; revisa cada entrega de Codex y atiende sus peticiones. |
+| **Claude** | Todo lo demás; revisa cada entrega de Codex y atiende sus peticiones. La sesión «Guía en vivo» lleva todo lo de despliegue (`progress/coordinacion.md` §4). |
 
 No hay un canal directo entre agentes: se coordinan con [`progress/coordinacion-ui.md`](../../progress/coordinacion-ui.md) y con Git.
 

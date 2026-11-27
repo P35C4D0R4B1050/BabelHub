@@ -36,3 +36,13 @@ Fixtures de PostgreSQL y de claves sin literales (se arman por variable o concat
 ## 9. Cierre de las cinco ramas de la noche del 2026-11-21 al 22 (orquestador)
 Ramas fundidas a `main` (sin push): `cierre-inventario`, `cierre-notificaciones`, `cierre-web`, `cierre-seguridad`, `cierre-rendimiento`. Conflictos solo en `progress/*`, en `specs/TRACEABILITY.md` (regenerada) y en `tests/load/ejecutar.sh` (se conservaron las dos variables nuevas de la lista). Validado en `main`: compilación sin advertencias, SpecCheck 20 specs y 0 avisos, unitarias 5673 y 2389, arquitectura 259, integración 7965 (los 2 fallos fueron del archivo temporal de salida, que el escáner de secretos leyó; repetidas esas pruebas pasan 2624 de 2624), escáner de secretos limpio.
 Nuevas en `Done`: identidad-seguridad, inventario-ajustes, inventario-seleccion-fuente. Siguen con reserva: web-base (partes humanas de T32–T34 y AC-WEB-16 con TLS; protocolo en su evidencia), transversal-notificaciones (S1 con WhatsApp real y ratificar DD-45 a DD-49), transversal-seguridad (SEG-31 del asistente, diferido), inventario-fuentes (FUE-09/11 diferidas y FUE-10 por DD-18). DD-30 a DD-54 (las 18 existentes) fueron ratificadas por la persona el 2026-11-22. Trampa: no escribir salidas de prueba dentro del repositorio (el escáner las lee).
+
+## 10. Estado y reglas del 2026-11-27 (prevalecen sobre lo anterior)
+
+- **Publicación:** rama → PR → CI en verde → `main` por avance directo; etiqueta `v*` solo si la persona lo pide. El lanzamiento pide **dos** aprobaciones suyas.
+- **Despliegue:** lo lleva entero la sesión «Guía en vivo» (`local_49bd6f45-…`). La coordinadora le entrega versión, digests y avisos; no guía a la persona.
+- **Versiones:** `v0.1.1` desplegada. `v0.1.2` = compra desde la ficha y tres errores de despliegue (PR 32). `v0.1.3` = rama de acceso.
+- **Antes de Culqi (B14):** `v0.1.2` desplegada, catálogo y stock cargados y recorrido hasta el paso de pago.
+- **Interfaz:** Codex según `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md` y `progress/coordinacion-ui.md`.
+- **Abierto:** observaciones O-5 a O-12 del tablero de interfaz; huecos sin enlace en `hallazgos.md`; prueba de restauración desde R2; correos de recuperación y verificación en producción.
+- Bitácora: `progress/log/2026-11-27-despliegue-observaciones-y-colaboracion.md`.
