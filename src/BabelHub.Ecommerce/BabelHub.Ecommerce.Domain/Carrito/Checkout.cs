@@ -55,8 +55,6 @@ public sealed class Checkout
             TipoDeEntrega = datos.TipoDeEntrega,
             CodigoDeSucursalDeRecojo = datos.CodigoDeSucursalDeRecojo,
             RegionDeEntrega = datos.RegionDeEntrega,
-            EnvioCongelado = datos.EnvioCongelado,
-            TotalCongelado = datos.TotalCongelado,
             PedidoId = datos.PedidoId,
             PedidoDescartado = datos.PedidoDescartado,
             ReservandoDesde = datos.ReservandoDesde,
@@ -73,6 +71,19 @@ public sealed class Checkout
         foreach (var aceptacion in datos.Aceptaciones)
         {
             checkout.Aceptaciones.Aceptar(aceptacion.Texto, aceptacion.Version, aceptacion.AceptadoEn);
+        }
+
+        // Lo congelado solo vale fuera de la edición: una fila en edición que aún lo guarde se lee sin ello (CAR-23, CAR-49).
+        if (datos.Estado != EstadoDelCheckout.EnEdicion)
+        {
+            if (datos.EnviosCongelados is { } envios && envios.Sum(e => e.Costo.Valor) != datos.EnvioCongelado)
+            {
+                throw new ArgumentException("El envío de cada sucursal no suma el envío congelado.", nameof(datos));
+            }
+
+            checkout.EnvioCongelado = datos.EnvioCongelado;
+            checkout.TotalCongelado = datos.TotalCongelado;
+            checkout.EnviosCongelados = datos.EnviosCongelados is { } guardados ? [.. guardados.OrderBy(e => e.CodigoDeSucursal, StringComparer.Ordinal)] : null;
         }
 
         if (datos.ContactoNombre is not null || datos.ContactoTelefono is not null || datos.ContactoDireccion is not null)
@@ -128,6 +139,9 @@ public sealed class Checkout
     public decimal? EnvioCongelado { get; private set; }
 
     public decimal? TotalCongelado { get; private set; }
+
+    /// <summary>Lo que se congeló de envío para cada sucursal que atiende, ordenado por código y sumando <see cref="EnvioCongelado"/> (CAR-23); nulo en recojo, en una compra solo digital y en una compra anterior que solo guardó la suma.</summary>
+    public IReadOnlyList<EnvioDeSucursal>? EnviosCongelados { get; private set; }
 
     /// <summary>El identificador de la intención de pago, de la reserva y del pedido (D04); nulo hasta pasar al pago y tras un aborto.</summary>
     public Guid? PedidoId { get; private set; }
@@ -426,26 +440,26 @@ public sealed class Checkout
         return ResultadoDeCheckout.Aplicada();
     }
 
-    /// <summary>El total de las líneas con el envío solo si la entrega es a domicilio (CAR-23): <paramref name="costoDelEnvio"/> es la suma de las sucursales que atienden; sin entrega elegida no lleva envío.</summary>
-    public TotalDeCompra CalcularTotal(CostoDeEnvio costoDelEnvio) =>
-        TotalDeCompra.Calcular(_lineas.Select(l => new ImporteDeLinea(l.PrecioUnitario, l.Cantidad.Valor)), TipoDeEntrega ?? Tipo.Recojo, costoDelEnvio);
+    /// <summary>El total de las líneas con el envío solo si la entrega es a domicilio (CAR-23): la suma de lo que cobra cada sucursal que atiende; sin entrega elegida no lleva envío.</summary>
+    public TotalDeCompra CalcularTotal(IReadOnlyList<EnvioDeSucursal> enviosPorSucursal) =>
+        TotalDeCompra.Calcular(_lineas.Select(l => new ImporteDeLinea(l.PrecioUnitario, l.Cantidad.Valor)), TipoDeEntrega ?? Tipo.Recojo, EnvioPorSucursales.Suma(enviosPorSucursal));
 
     // ------------------------------------------------------------------ pasar al pago
 
     /// <summary>
-    /// El paso 1 de pasar al pago (D18): con la entrega elegida y sin retiros pendientes ni líneas sin sucursal (CAR-45), congela el envío (la suma que se recibe, CAR-23) y el total, calcula las dos huellas, asigna el <c>pedidoId</c> (conserva el que ya tiene tras editar con el pago abierto), sube la
+    /// El paso 1 de pasar al pago (D18): con la entrega elegida y sin retiros pendientes ni líneas sin sucursal (CAR-45), congela el envío de cada sucursal que atiende (CAR-23; a domicilio, exactamente una vez cada una), su suma y el total, calcula las dos huellas, asigna el <c>pedidoId</c> (conserva el que ya tiene tras editar con el pago abierto), sube la
     /// generación de reserva <b>solo si cambió la huella de reserva</b> y pasa a <c>reservando</c>. Una repetición con lo mismo continúa sin cambiar nada (<see cref="EfectoDeTransicion.SinCambios"/>: el doble clic y el atajo de «ya en
     /// pago»). Las comprobaciones de cuenta, licencia, posesión y aceptaciones las hace la Aplicación antes. Las huellas las calcula quien llama a partir del texto canónico que se le da: ese texto lleva datos personales y no se guarda ni se registra.
     /// </summary>
     public ResultadoDeCheckout PrepararPasoAlPago(
         Guid pedidoIdNuevo,
-        CostoDeEnvio costoDelEnvio,
+        IReadOnlyList<EnvioDeSucursal> enviosPorSucursal,
         Func<string, string> calcularHuellaDeReserva,
         Func<string, string> calcularHuellaDeInstantanea,
         Carrito carrito,
         DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(costoDelEnvio);
+        ArgumentNullException.ThrowIfNull(enviosPorSucursal);
         ArgumentNullException.ThrowIfNull(calcularHuellaDeReserva);
         ArgumentNullException.ThrowIfNull(calcularHuellaDeInstantanea);
         ExigirCarritoPropio(carrito);
@@ -467,7 +481,7 @@ public sealed class Checkout
             case EstadoDelCheckout.Pagado or EstadoDelCheckout.Cancelado or EstadoDelCheckout.Reiniciado:
                 return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.YaTerminado);
             case EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago:
-                var misma = HuellaDeReserva == calcularHuellaDeReserva(CanonicoDeReserva()) && HuellaDeInstantanea == calcularHuellaDeInstantanea(CanonicoDeInstantanea(EnvioCongelado ?? 0m, TotalCongelado ?? 0m));
+                var misma = HuellaDeReserva == calcularHuellaDeReserva(CanonicoDeReserva()) && HuellaDeInstantanea == calcularHuellaDeInstantanea(CanonicoDeInstantanea(EnvioCongelado ?? 0m, TotalCongelado ?? 0m, EnviosCongelados));
                 return misma
                     ? ResultadoDeCheckout.SinCambios()
                     : ResultadoDeCheckout.Rechazar(Estado == EstadoDelCheckout.Reservando ? RechazoDeCheckout.EnCurso : RechazoDeCheckout.EstadoNoPermite);
@@ -498,9 +512,20 @@ public sealed class Checkout
             return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.FaltaElContacto);
         }
 
-        var total = CalcularTotal(costoDelEnvio);
+        IReadOnlyList<EnvioDeSucursal>? congelados = null;
+        if (TipoDeEntrega == Tipo.Domicilio)
+        {
+            congelados = [.. enviosPorSucursal.OrderBy(e => e.CodigoDeSucursal, StringComparer.Ordinal)];
+            if (!congelados.Select(e => e.CodigoDeSucursal).SequenceEqual(SucursalesQueAtienden, StringComparer.Ordinal))
+            {
+                throw new ArgumentException("A domicilio se cobra una vez el envío de cada sucursal que atiende alguna línea.", nameof(enviosPorSucursal));
+            }
+        }
+
+        var total = CalcularTotal(congelados ?? []);
         EnvioCongelado = total.Envio;
         TotalCongelado = total.Total;
+        EnviosCongelados = congelados;
 
         var huellaDeReserva = calcularHuellaDeReserva(CanonicoDeReserva());
         if (huellaDeReserva != HuellaDeReserva)
@@ -509,7 +534,7 @@ public sealed class Checkout
             HuellaDeReserva = huellaDeReserva;
         }
 
-        HuellaDeInstantanea = calcularHuellaDeInstantanea(CanonicoDeInstantanea(total.Envio, total.Total));
+        HuellaDeInstantanea = calcularHuellaDeInstantanea(CanonicoDeInstantanea(total.Envio, total.Total, congelados));
         PedidoId ??= pedidoIdNuevo;
         ReservandoDesde = ahora;
         ReservaExpiraEn = null;
@@ -614,6 +639,7 @@ public sealed class Checkout
         ReservaExpiraEn = null;
         ReservandoDesde = null;
         Estado = EstadoDelCheckout.EnEdicion;
+        DescartarLoCongelado();
         var retiradas = carrito.AplicarRetirosPendientes(ahora);
         Cambiar(porLaPersona: false, ahora);
         return ResultadoDeCheckout.Aplicada(retiradas);
@@ -635,6 +661,7 @@ public sealed class Checkout
         GeneracionDeReserva++;
         ReservandoDesde = null;
         Estado = EstadoDelCheckout.EnEdicion;
+        DescartarLoCongelado();
         var retiradas = carrito.AplicarRetirosPendientes(ahora);
         Cambiar(porLaPersona: false, ahora);
         return ResultadoDeCheckout.Aplicada(retiradas);
@@ -653,6 +680,7 @@ public sealed class Checkout
 
         ReservandoDesde = null;
         Estado = EstadoDelCheckout.EnEdicion;
+        DescartarLoCongelado();
         Cambiar(porLaPersona: false, ahora);
         return ResultadoDeCheckout.Aplicada();
     }
@@ -919,11 +947,20 @@ public sealed class Checkout
     private ResultadoDeCheckout VolverAEnEdicion(Carrito carrito, DateTimeOffset ahora, bool porLaPersona)
     {
         Estado = EstadoDelCheckout.EnEdicion;
+        DescartarLoCongelado();
         LimitePendienteEn = null;
         PagoPendienteDesde = null;
         var retiradas = carrito.AplicarRetirosPendientes(ahora);
         Cambiar(porLaPersona, ahora);
         return ResultadoDeCheckout.Aplicada(retiradas);
+    }
+
+    /// <summary>Al volver a edición lo congelado se descarta: el siguiente paso al pago vuelve a leer las tarifas (CAR-23, CAR-49).</summary>
+    private void DescartarLoCongelado()
+    {
+        EnvioCongelado = null;
+        TotalCongelado = null;
+        EnviosCongelados = null;
     }
 
     private ResultadoDeCheckout Terminar(EstadoDelCheckout destino, Carrito carrito, DateTimeOffset ahora, bool porLaPersona, bool desdeReservando = false)
@@ -1066,7 +1103,7 @@ public sealed class Checkout
     }
 
     /// <summary>La huella de instantánea cubre todo lo congelado: entrega, contacto, envío, total y cada línea con lo informado. Lleva datos personales: solo es la entrada de un cálculo y no se guarda.</summary>
-    private string CanonicoDeInstantanea(decimal envio, decimal total)
+    private string CanonicoDeInstantanea(decimal envio, decimal total, IReadOnlyList<EnvioDeSucursal>? enviosPorSucursal)
     {
         var texto = new StringBuilder("instantanea-v1");
         Campo(texto, TipoDeEntrega?.ToString());
@@ -1083,6 +1120,14 @@ public sealed class Checkout
 
         Campo(texto, envio.ToString("0.00", CultureInfo.InvariantCulture));
         Campo(texto, total.ToString("0.00", CultureInfo.InvariantCulture));
+        // El envío de cada sucursal entra solo cuando existe (código e importe, nunca el nombre), para no cambiar la huella de una compra anterior (CAR-50).
+        foreach (var envioDeSucursal in enviosPorSucursal ?? [])
+        {
+            texto.Append("|E");
+            Campo(texto, envioDeSucursal.CodigoDeSucursal);
+            Campo(texto, envioDeSucursal.Costo.Valor.ToString("0.00", CultureInfo.InvariantCulture));
+        }
+
         foreach (var l in _lineas.OrderBy(l => l.EdicionId).ThenBy(l => l.LineaId))
         {
             Campo(texto, l.LineaId.ToString("N"));
@@ -1156,6 +1201,8 @@ public sealed record DatosGuardadosDelCheckout
     public decimal? EnvioCongelado { get; init; }
 
     public decimal? TotalCongelado { get; init; }
+
+    public IReadOnlyList<EnvioDeSucursal>? EnviosCongelados { get; init; }
 
     public Guid? PedidoId { get; init; }
 

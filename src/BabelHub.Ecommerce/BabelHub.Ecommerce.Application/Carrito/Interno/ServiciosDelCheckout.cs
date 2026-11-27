@@ -210,12 +210,12 @@ internal sealed partial class ServiciosDelCheckout(
         return EnvioPorSucursales.Desglose(sucursales, propias, costoDeEnvio.Valor);
     }
 
-    /// <summary>Lo que la vista necesita además del checkout: los nombres de sus sucursales y, a domicilio, el desglose vigente. <b>Fuera de una transacción</b>: los nombres pueden consultar la lista del Inventario.</summary>
+    /// <summary>Lo que la vista necesita además del checkout: los nombres de sus sucursales y, a domicilio y en edición, el desglose con las tarifas vigentes. <b>Fuera de una transacción</b>: los nombres pueden consultar la lista del Inventario.</summary>
     public async Task<DatosDeEnvio> LeerDatosDeEnvio(Checkout checkout, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(checkout);
         var nombres = checkout.SucursalesQueAtienden.Count > 0 ? await carrito.NombresDeSucursales(cancelacion).ConfigureAwait(false) : new Dictionary<string, string>();
-        var desglose = checkout.TipoDeEntrega == Tipo.Domicilio ? await DesgloseDelEnvio(checkout, cancelacion).ConfigureAwait(false) : null;
+        var desglose = checkout.TipoDeEntrega == Tipo.Domicilio && checkout.Estado == EstadoDelCheckout.EnEdicion ? await DesgloseDelEnvio(checkout, cancelacion).ConfigureAwait(false) : null;
         return new DatosDeEnvio(nombres, desglose);
     }
 
@@ -298,7 +298,7 @@ internal sealed partial class ServiciosDelCheckout(
     // ---------- La vista ----------
 
     /// <summary>
-    /// La vista del checkout. El envío a domicilio es el congelado o, sin congelar, la suma de las tarifas de <paramref name="datos"/>; el desglose solo se muestra si esas tarifas reproducen el importe (CAR-09).
+    /// La vista del checkout. Reservando, en pago o con el pago pendiente se muestran el envío y el desglose congelados (uno anterior sin desglose muestra solo la suma); si no, las tarifas de <paramref name="datos"/> (CAR-09, CAR-23).
     /// </summary>
     public VistaDelCheckout Vista(Checkout checkout, CarritoDeDominio? delCarrito, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion, DatosDeEnvio datos)
     {
@@ -321,12 +321,13 @@ internal sealed partial class ServiciosDelCheckout(
             l.CodigoDeSucursal is null ? null : datos.Nombres.GetValueOrDefault(l.CodigoDeSucursal, l.CodigoDeSucursal))).ToList();
 
         var subtotal = Soles.Redondear(lineas.Where(l => !l.Retirada).Sum(l => l.Importe));
-        var vigente = datos.Desglose is { } d ? EnvioPorSucursales.Suma(d) : CostoDeEnvio.Cero;
-        // Lo congelado vale mientras no se vuelva a edición: allí rigen las tarifas vigentes.
-        var congelada = checkout.Estado != EstadoDelCheckout.EnEdicion;
+        // Lo congelado solo se muestra y se usa fuera de la edición: allí rigen las tarifas vigentes.
+        var congelada = checkout.Estado is EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente;
+        var porSucursal = congelada ? checkout.EnviosCongelados : datos.Desglose;
+        var vigente = EnvioPorSucursales.Suma(datos.Desglose ?? []);
         var envio = checkout.TipoDeEntrega == Tipo.Domicilio ? (congelada ? checkout.EnvioCongelado : null) ?? vigente.Valor : (decimal?)null;
-        var totalAPagar = (congelada ? checkout.TotalCongelado : null) ?? checkout.CalcularTotal(vigente).Total;
-        IReadOnlyList<EnvioDeSucursalDeCompra>? desglose = envio is { } importe && datos.Desglose is { Count: > 0 } porSucursal && vigente.Valor == importe
+        var totalAPagar = (congelada ? checkout.TotalCongelado : null) ?? checkout.CalcularTotal(datos.Desglose ?? []).Total;
+        IReadOnlyList<EnvioDeSucursalDeCompra>? desglose = envio is not null && porSucursal is { Count: > 0 }
             ? [.. porSucursal.Select(e => new EnvioDeSucursalDeCompra(e.CodigoDeSucursal, datos.Nombres.GetValueOrDefault(e.CodigoDeSucursal, e.CodigoDeSucursal), e.Costo.Valor))]
             : null;
 

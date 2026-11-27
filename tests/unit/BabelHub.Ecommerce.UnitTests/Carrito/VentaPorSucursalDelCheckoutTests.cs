@@ -49,7 +49,7 @@ public sealed class VentaPorSucursalDelCheckoutTests
         checkout.ElegirDomicilio(Contacto(), Ahora);
 
         var desglose = EnvioPorSucursales.Desglose(checkout.SucursalesQueAtienden, new Dictionary<string, CostoDeEnvio> { ["cusco"] = CostoDeEnvio.Crear(18.50m) }, CostoDeEnvio.Crear(30m));
-        var total = checkout.CalcularTotal(EnvioPorSucursales.Suma(desglose));
+        var total = checkout.CalcularTotal(desglose);
 
         Assert.Equal([("ayacucho", 30m), ("cusco", 18.50m)], desglose.Select(d => (d.CodigoDeSucursal, d.Costo.Valor)));
         Assert.Equal((200m, 48.50m, 248.50m), (total.Subtotal, total.Envio, total.Total));
@@ -192,6 +192,7 @@ public sealed class VentaPorSucursalDelCheckoutTests
         Assert.True(confirmado.EsExito, confirmado.Error?.Clave);
         Assert.Equal(lecturas + 1, e.Tarifas.Lecturas);
         Assert.Equal((48.50m, 1048.50m), (checkout.EnvioCongelado, checkout.TotalCongelado));
+        Assert.Equal([("cusco", 18.50m), (Sucursal.Principal, 30m)], Importes(checkout.EnviosCongelados));
         Assert.Equal((48.50m, (string?)null), (confirmado.Valor.Instantanea!.Envio, confirmado.Valor.Instantanea.CodigoDeSucursalDeRecojo));
         Assert.Equal([Sucursal.Principal, Sucursal.Principal, Sucursal.Cusco], confirmado.Valor.LineasImpresas.Select(l => l.CodigoDeSucursal));
 
@@ -234,6 +235,169 @@ public sealed class VentaPorSucursalDelCheckoutTests
 
         Assert.Equal((TipoDeResultadoDelPaso.Abortar, "fuente-distinta"), (resultado.Tipo, resultado.MotivoDelAborto));
         Assert.Null(resultado.NuevoInformado);
+    }
+
+    // ---------- El envío congelado de cada sucursal (DD-136) ----------
+
+    private static EnvioDeSucursal Envio(string sucursal, decimal importe) => new(sucursal, CostoDeEnvio.Crear(importe));
+
+    private static IEnumerable<(string, decimal)>? Importes(IReadOnlyList<EnvioDeSucursal>? envios) => envios?.Select(e => (e.CodigoDeSucursal, e.Costo.Valor));
+
+    /// <summary>Un checkout a domicilio con una línea en Ayacucho y otra en Cusco, listo para pagar.</summary>
+    private static (Checkout Checkout, CarritoDeDominio Carrito) ADomicilioConDosSucursales(Guid lineaA, Guid lineaB)
+    {
+        var carrito = Guid.NewGuid();
+        var ids = new Queue<Guid>([lineaA, lineaB]);
+        var checkout = ConTextos(Checkout.Iniciar(Guid.NewGuid(), Cuenta, carrito, [Impreso(lineaA, "ayacucho"), Impreso(lineaB, "cusco")], ids.Dequeue, Ahora));
+        checkout.ElegirDomicilio(Contacto(), Ahora);
+        return (checkout, CarritoPropio(carrito));
+    }
+
+    private static ResultadoDeCheckout Preparar(Checkout checkout, CarritoDeDominio carrito, params EnvioDeSucursal[] envios) =>
+        checkout.PrepararPasoAlPago(Guid.NewGuid(), envios, s => s, s => s, carrito, Ahora);
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-21")]
+    public void Pagar_congela_el_importe_de_cada_sucursal_tambien_el_cero_junto_con_su_suma()
+    {
+        var (checkout, carrito) = ADomicilioConDosSucursales(Guid.NewGuid(), Guid.NewGuid());
+
+        Preparar(checkout, carrito, Envio("cusco", 0m), Envio("ayacucho", 30m));
+
+        Assert.Equal([("ayacucho", 30m), ("cusco", 0m)], Importes(checkout.EnviosCongelados));
+        Assert.Equal((30m, 130m), (checkout.EnvioCongelado, checkout.TotalCongelado));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-21")]
+    public void La_huella_de_la_instantanea_distingue_el_reparto_con_la_misma_suma_y_la_de_reserva_no_depende_de_las_tarifas()
+    {
+        var (a, b) = (Guid.NewGuid(), Guid.NewGuid());
+        (string Instantanea, string Reserva) Huellas(decimal ayacucho, decimal cusco)
+        {
+            var (checkout, carrito) = ADomicilioConDosSucursales(a, b);
+            Preparar(checkout, carrito, Envio("ayacucho", ayacucho), Envio("cusco", cusco));
+            return (checkout.HuellaDeInstantanea!, checkout.HuellaDeReserva!);
+        }
+
+        var (uno, otro) = (Huellas(30m, 10m), Huellas(10m, 30m));
+
+        Assert.NotEqual(uno.Instantanea, otro.Instantanea);
+        Assert.Equal(uno.Reserva, otro.Reserva);
+        Assert.Contains("|E|8:ayacucho|5:30.00|E|5:cusco|5:10.00|", uno.Instantanea, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("ayacucho")]
+    [InlineData("ayacucho,cusco,lima")]
+    [InlineData("ayacucho,ayacucho")]
+    public void A_domicilio_el_envio_debe_cubrir_exactamente_las_sucursales_que_atienden(string sucursales)
+    {
+        var (checkout, carrito) = ADomicilioConDosSucursales(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Throws<ArgumentException>(() => Preparar(checkout, carrito, [.. sucursales.Split(',').Select(s => Envio(s, 30m))]));
+        Assert.Equal((EstadoDelCheckout.EnEdicion, (decimal?)null), (checkout.Estado, checkout.EnvioCongelado));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-CAR-42")]
+    [InlineData("editar")]
+    [InlineData("abortar")]
+    [InlineData("limite")]
+    [InlineData("retiro")]
+    public void Cada_vuelta_a_edicion_descarta_lo_congelado(string camino)
+    {
+        var (checkout, carrito) = ADomicilioConDosSucursales(Guid.NewGuid(), Guid.NewGuid());
+        Preparar(checkout, carrito, Envio("ayacucho", 30m), Envio("cusco", 30m));
+        var (pedido, generacion) = (checkout.PedidoId!.Value, checkout.GeneracionDeReserva);
+
+        var vuelta = camino switch
+        {
+            "abortar" => checkout.AbortarPasoAlPago(EstadoDelCheckout.Reservando, pedido, generacion, carrito, Ahora),
+            "limite" => checkout.VolverALaRevisionPorLimite(pedido, generacion, Ahora),
+            "retiro" => checkout.VolverALaEdicionPorRetiroPendiente(pedido, generacion, carrito, Ahora),
+            _ => EnPagoYEditar(),
+        };
+
+        ResultadoDeCheckout EnPagoYEditar()
+        {
+            checkout.ConfirmarEnPago(pedido, generacion, checkout.HuellaDeInstantanea!, Ahora.AddMinutes(15), carrito);
+            return checkout.Editar(carrito, Ahora);
+        }
+
+        Assert.Equal(EfectoDeTransicion.Aplicada, vuelta.Efecto);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+        Assert.Equal(((decimal?)null, (decimal?)null), (checkout.EnvioCongelado, checkout.TotalCongelado));
+        Assert.Null(checkout.EnviosCongelados);
+    }
+
+    private static Checkout Guardado(EstadoDelCheckout estado, Guid carrito, IReadOnlyList<EnvioDeSucursal>? envios, decimal envio = 60m) => Checkout.Restaurar(new DatosGuardadosDelCheckout
+    {
+        Id = Guid.NewGuid(),
+        CuentaId = Cuenta,
+        CarritoId = carrito,
+        Estado = estado,
+        Version = 3,
+        CreadoEn = Ahora,
+        ModificadoPorLaPersonaEn = Ahora,
+        PasoDeEdicion = PasoDelCheckout.DatosYAceptaciones,
+        Lineas = [LineaDelCheckout.Restaurar(Guid.NewGuid(), Libro, false, "Libro", "9780000000019", 1, 50m, null, null, null, null, Guid.NewGuid(), "ayacucho")],
+        TipoDeEntrega = TipoDeEntrega.Domicilio,
+        RegionDeEntrega = "ayacucho",
+        EnvioCongelado = envio,
+        TotalCongelado = 50m + envio,
+        EnviosCongelados = envios,
+        PedidoId = Guid.NewGuid(),
+    });
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-39")]
+    public void Una_fila_en_edicion_con_montos_congelados_los_descarta_al_leerse_y_una_en_pago_los_conserva()
+    {
+        var enEdicion = Guardado(EstadoDelCheckout.EnEdicion, Guid.NewGuid(), [Envio("ayacucho", 60m)]);
+        var enPago = Guardado(EstadoDelCheckout.EnPago, Guid.NewGuid(), [Envio("ayacucho", 60m)]);
+        var anterior = Guardado(EstadoDelCheckout.PagoPendiente, Guid.NewGuid(), null);
+
+        Assert.Equal(((decimal?)null, (decimal?)null), (enEdicion.EnvioCongelado, enEdicion.TotalCongelado));
+        Assert.Null(enEdicion.EnviosCongelados);
+        Assert.Equal([("ayacucho", 60m)], Importes(enPago.EnviosCongelados));
+        Assert.Equal(60m, anterior.EnvioCongelado);
+        Assert.Null(anterior.EnviosCongelados);
+        Assert.Throws<ArgumentException>(() => Guardado(EstadoDelCheckout.EnPago, Guid.NewGuid(), [Envio("ayacucho", 59m)]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-21")]
+    public async Task La_instantanea_lleva_el_envio_de_cada_sucursal_y_en_el_pago_se_muestra_lo_congelado_aunque_cambien_las_tarifas()
+    {
+        var (e, _, _, _) = await ConDosSucursales();
+        e.Tarifas.Propias[Sucursal.Cusco] = CostoDeEnvio.Crear(0m);
+        var mostrado = (await Elegir(e, TipoDeEntregaDeCompra.Domicilio)).Total;
+
+        var preparado = (await Pagar(e, mostrado)).Valor;
+        e.Tarifas.Propias[Sucursal.Cusco] = CostoDeEnvio.Crear(500m);
+        e.Tarifas.Propias[Sucursal.Principal] = CostoDeEnvio.Crear(1m);
+        var vista = (await new ObtenerCheckout(e.ServiciosDelCheckout()).Ejecutar(new ObtenerCheckoutEntrada())).Valor;
+
+        Assert.Equal(
+            [("cusco", "Cusco", 0m), (Sucursal.Principal, "Sede central", 30m)],
+            preparado.Instantanea!.EnviosPorSucursal!.Select(x => (x.CodigoDeSucursal, x.NombreDeSucursal!, x.Importe)));
+        Assert.Equal(30m, preparado.Instantanea.Envio);
+        Assert.Equal([("cusco", 0m), (Sucursal.Principal, 30m)], vista.DesgloseDelEnvio!.Select(x => (x.CodigoDeSucursal, x.Importe)));
+        Assert.Equal((30m, mostrado), (vista.Envio, vista.Total));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-21")]
+    public async Task Un_recojo_no_lleva_envio_por_sucursal_en_su_instantanea()
+    {
+        var (e, checkout, _, _) = await ConDosSucursales();
+        await Elegir(e, TipoDeEntregaDeCompra.Recojo);
+
+        var preparado = (await Pagar(e, 1000m)).Valor;
+
+        Assert.Null(preparado.Instantanea!.EnviosPorSucursal);
+        Assert.Null(checkout.EnviosCongelados);
     }
 
     // ---------- Compras anteriores ----------

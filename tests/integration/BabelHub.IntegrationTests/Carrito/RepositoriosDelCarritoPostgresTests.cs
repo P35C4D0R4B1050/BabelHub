@@ -332,6 +332,39 @@ public sealed class RepositoriosDelCarritoPostgresTests(PostgresDelCarritoFixtur
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAR-21")]
+    public async Task El_envio_de_cada_sucursal_se_guarda_con_su_importe_se_relee_igual_y_se_borra_al_volver_a_edicion()
+    {
+        var cuenta = Guid.NewGuid();
+        var carrito = CarritoDeCuenta(cuenta, (Guid.NewGuid(), false, 1));
+        Assert.True(carrito.Agregar(Guid.NewGuid(), Guid.NewGuid(), false, "cusco", 1, Inicio).EsExito);
+        var checkout = ElCheckout(carrito, aDomicilio: true);
+        await bd.Unidad.Ejecutar(async token => { await bd.Carritos.Agregar(carrito, token); await bd.Checkouts.Agregar(checkout, token); return 0; });
+        var pedido = Guid.NewGuid();
+        checkout.PrepararPasoAlPago(
+            pedido,
+            [new EnvioDeSucursal("cusco", CostoDeEnvio.Crear(0m)), new EnvioDeSucursal(AtajosDeCarrito.Sucursal, CostoDeEnvio.Crear(18.50m))],
+            s => Hex(s),
+            s => "v1:" + Hex(s),
+            carrito,
+            Inicio.AddMinutes(2));
+        await bd.Unidad.Ejecutar(async token => { await bd.Checkouts.Guardar(checkout, token); return 0; });
+
+        var leido = await bd.Unidad.Ejecutar(token => bd.Checkouts.ObtenerPorPedido(pedido, conBloqueo: false, token));
+        var guardado = await bd.Consultar<string>($"SELECT envios_congelados::text FROM carrito.checkouts WHERE cuenta_id = '{cuenta}'");
+
+        Assert.Equal([("cusco", 0m), (AtajosDeCarrito.Sucursal, 18.50m)], leido!.EnviosCongelados!.Select(e => (e.CodigoDeSucursal, e.Costo.Valor)));
+        Assert.Equal(18.50m, leido.EnvioCongelado);
+        // Solo el código y el importe: el nombre de la sucursal no se guarda.
+        Assert.Equal("""[{"importe": 0.00, "sucursal": "cusco"}, {"importe": 18.50, "sucursal": "sede-central"}]""", guardado);
+
+        leido.AbortarPasoAlPago(EstadoDelCheckout.Reservando, pedido, leido.GeneracionDeReserva, carrito, Inicio.AddMinutes(3));
+        await bd.Unidad.Ejecutar(async token => { await bd.Checkouts.Guardar(leido, token); return 0; });
+
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM carrito.checkouts WHERE cuenta_id = '{cuenta}' AND envios_congelados IS NULL AND envio_congelado IS NULL AND total_congelado IS NULL"));
+    }
+
+    [Fact]
     public async Task La_liberacion_pendiente_se_busca_y_se_direcciona_por_pedido_a_liberar_aunque_el_checkout_tenga_ya_otro_pedido_vivo()
     {
         var cuenta = Guid.NewGuid();

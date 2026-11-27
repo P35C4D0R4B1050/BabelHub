@@ -24,6 +24,19 @@ internal static class AtajosDeCarrito
         entorno.Carritos.Todos.SelectMany(c => c.Lineas).FirstOrDefault(l => l.EdicionId == edicionId)?.LineaId ?? edicionId;
 }
 
+/// <summary>Atajos de las pruebas que dan un solo importe de envío: se carga a la primera sucursal que atiende y las demás van en cero.</summary>
+internal static class AtajosDeEnvio
+{
+    private static IReadOnlyList<EnvioDeSucursal> Repartir(Checkout checkout, CostoDeEnvio envio) =>
+        [.. checkout.SucursalesQueAtienden.Select((sucursal, i) => new EnvioDeSucursal(sucursal, i == 0 ? envio : CostoDeEnvio.Cero))];
+
+    public static TotalDeCompra CalcularTotal(this Checkout checkout, CostoDeEnvio envio) =>
+        checkout.CalcularTotal([new EnvioDeSucursal(Sucursal.Principal, envio)]);
+
+    public static ResultadoDeCheckout PrepararPasoAlPago(this Checkout checkout, Guid pedidoIdNuevo, CostoDeEnvio envio, Func<string, string> reserva, Func<string, string> instantanea, CarritoDeDominio carrito, DateTimeOffset ahora) =>
+        checkout.PrepararPasoAlPago(pedidoIdNuevo, Repartir(checkout, envio), reserva, instantanea, carrito, ahora);
+}
+
 /// <summary>La lista de sucursales que alimenta la ficha y la validación de la sucursal de una línea.</summary>
 internal sealed class SucursalesDeCarritoFalsas : IPreferenciaDeSucursal
 {

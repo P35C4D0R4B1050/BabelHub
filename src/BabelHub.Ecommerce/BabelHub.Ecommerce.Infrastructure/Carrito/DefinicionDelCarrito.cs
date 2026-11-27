@@ -117,6 +117,7 @@ public static class DefinicionDelCarrito
             contacto_telefono text CHECK (contacto_telefono ~ '^[0-9]{9}$'),
             envio_congelado numeric(12, 2) CHECK (envio_congelado >= 0),
             total_congelado numeric(12, 2) CHECK (total_congelado >= 0),
+            envios_congelados jsonb,
             pedido_id uuid,
             reservando_desde timestamptz,
             huella_de_reserva text CHECK (huella_de_reserva ~ '^[0-9a-f]{64}$'),
@@ -145,6 +146,8 @@ public static class DefinicionDelCarrito
             CONSTRAINT checkouts_aceptacion_con_fecha_privacidad CHECK ((privacidad_version IS NULL) = (privacidad_aceptado_en IS NULL)),
             CONSTRAINT checkouts_aceptacion_con_fecha_reembolso CHECK ((reembolso_digital_version IS NULL) = (reembolso_digital_aceptado_en IS NULL))
         );
+        -- Sobre una base anterior: lo que cobró cada sucursal se guarda junto a la suma (nulo en lo anterior). Repetible.
+        ALTER TABLE carrito.checkouts ADD COLUMN IF NOT EXISTS envios_congelados jsonb;
         CREATE UNIQUE INDEX IF NOT EXISTS checkouts_uno_vivo_por_cuenta ON carrito.checkouts (cuenta_id) WHERE estado IN ('en_edicion', 'reservando', 'en_pago', 'pago_pendiente');
         CREATE UNIQUE INDEX IF NOT EXISTS checkouts_pedido_unico ON carrito.checkouts (pedido_id) WHERE pedido_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS checkouts_por_cuenta ON carrito.checkouts (cuenta_id);
@@ -226,7 +229,7 @@ public static class DefinicionDelCarrito
         GRANT UPDATE (visto_en) ON carrito.avisos_de_carrito TO rol_carrito;
         GRANT SELECT, INSERT, DELETE ON carrito.checkouts TO rol_carrito;
         GRANT UPDATE (
-            estado, paso, version, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, direccion, contacto_nombre, contacto_telefono, envio_congelado, total_congelado, pedido_id, reservando_desde,
+            estado, paso, version, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, direccion, contacto_nombre, contacto_telefono, envio_congelado, total_congelado, envios_congelados, pedido_id, reservando_desde,
             huella_de_reserva, generacion_de_reserva, huella_de_instantanea, reserva_expira_en, pedido_descartado, reserva_a_liberar_desde, pedido_a_liberar, limite_pendiente_en, pago_pendiente_desde,
             terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, modificado_en
         ) ON carrito.checkouts TO rol_carrito;

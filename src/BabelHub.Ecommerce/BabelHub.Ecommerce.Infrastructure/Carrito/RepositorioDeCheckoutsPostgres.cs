@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using BabelHub.Ecommerce.Application.Carrito.Interno;
 using BabelHub.Ecommerce.Domain.Carrito;
 using Npgsql;
@@ -20,7 +22,7 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
     private const string Columnas =
         "id, cuenta_id, carrito_id, estado, paso, version, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, direccion, contacto_nombre, contacto_telefono, envio_congelado, total_congelado, "
         + "pedido_id, reservando_desde, huella_de_reserva, generacion_de_reserva, huella_de_instantanea, reserva_expira_en, pedido_descartado, reserva_a_liberar_desde, pedido_a_liberar, limite_pendiente_en, "
-        + "pago_pendiente_desde, terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, creado_en, modificado_en";
+        + "pago_pendiente_desde, terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, creado_en, modificado_en, envios_congelados";
 
     private static readonly string[] RestriccionesDelVivo = ["checkouts_uno_vivo_por_cuenta", "checkouts_pkey", "checkouts_pedido_unico"];
 
@@ -85,7 +87,7 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
                 {
                     await using (var comando = new NpgsqlCommand(
                         $"INSERT INTO carrito.checkouts ({Columnas}) VALUES (@id, @cuenta, @carrito, @estado, @paso, @version, @tipo, @sucursal, @region, @direccion, @nombre, @telefono, @envio, @total, @pedido, @reservando, "
-                        + "@huellaReserva, @generacion, @huellaInstantanea, @expira, @descartado, @liberarDesde, @liberar, @limite, @pendienteDesde, @terminosVersion, @terminosEn, @privacidadVersion, @privacidadEn, @reembolsoVersion, @reembolsoEn, @creado, @modificado)",
+                        + "@huellaReserva, @generacion, @huellaInstantanea, @expira, @descartado, @liberarDesde, @liberar, @limite, @pendienteDesde, @terminosVersion, @terminosEn, @privacidadVersion, @privacidadEn, @reembolsoVersion, @reembolsoEn, @creado, @modificado, @envios)",
                         conexion,
                         transaccion))
                     {
@@ -114,7 +116,7 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
                     """
                     UPDATE carrito.checkouts SET
                         estado = @estado, paso = @paso, version = @version, tipo_de_entrega = @tipo, codigo_de_sucursal_de_recojo = @sucursal, region_de_entrega = @region, direccion = @direccion,
-                        contacto_nombre = @nombre, contacto_telefono = @telefono, envio_congelado = @envio, total_congelado = @total, pedido_id = @pedido, reservando_desde = @reservando,
+                        contacto_nombre = @nombre, contacto_telefono = @telefono, envio_congelado = @envio, total_congelado = @total, envios_congelados = @envios, pedido_id = @pedido, reservando_desde = @reservando,
                         huella_de_reserva = @huellaReserva, generacion_de_reserva = @generacion, huella_de_instantanea = @huellaInstantanea, reserva_expira_en = @expira, pedido_descartado = @descartado,
                         reserva_a_liberar_desde = @liberarDesde, pedido_a_liberar = @liberar, limite_pendiente_en = @limite, pago_pendiente_desde = @pendienteDesde,
                         terminos_version = @terminosVersion, terminos_aceptado_en = @terminosEn, privacidad_version = @privacidadVersion, privacidad_aceptado_en = @privacidadEn,
@@ -305,7 +307,8 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
             AccesoAlEsquemaDelCarrito.LeerInstante(f, 24),
             aceptaciones,
             AccesoAlEsquemaDelCarrito.LeerInstante(f, 31)!.Value,
-            AccesoAlEsquemaDelCarrito.LeerInstante(f, 32)!.Value);
+            AccesoAlEsquemaDelCarrito.LeerInstante(f, 32)!.Value,
+            DeTextoDeEnvios(AccesoAlEsquemaDelCarrito.LeerTexto(f, 33)));
     }
 
     private static void Agregar(List<AceptacionDeTexto> aceptaciones, TextoLegal texto, NpgsqlDataReader f, int version, int fecha)
@@ -397,6 +400,7 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
         p.AddWithValue("telefono", NpgsqlDbType.Text, AccesoAlEsquemaDelCarrito.ONulo(c.Contacto?.Telefono.Valor));
         p.AddWithValue("envio", NpgsqlDbType.Numeric, AccesoAlEsquemaDelCarrito.ONulo(c.EnvioCongelado));
         p.AddWithValue("total", NpgsqlDbType.Numeric, AccesoAlEsquemaDelCarrito.ONulo(c.TotalCongelado));
+        p.AddWithValue("envios", NpgsqlDbType.Jsonb, AccesoAlEsquemaDelCarrito.ONulo(EnviosATexto(c.EnviosCongelados)));
         p.AddWithValue("pedido", NpgsqlDbType.Uuid, AccesoAlEsquemaDelCarrito.ONulo(c.PedidoId));
         p.AddWithValue("reservando", NpgsqlDbType.TimestampTz, AccesoAlEsquemaDelCarrito.UtcONulo(c.ReservandoDesde));
         p.AddWithValue("huellaReserva", NpgsqlDbType.Text, AccesoAlEsquemaDelCarrito.ONulo(c.HuellaDeReserva));
@@ -445,6 +449,17 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
         _ => throw new InvalidOperationException("El checkout guardado tiene un estado desconocido."),
     };
 
+    /// <summary>Lo congelado de cada sucursal tal como se guarda en <c>envios_congelados</c>: solo el código y el importe, nunca el nombre.</summary>
+    private sealed record EnvioGuardado([property: JsonPropertyName("sucursal")] string Sucursal, [property: JsonPropertyName("importe")] decimal Importe);
+
+    private static string? EnviosATexto(IReadOnlyList<EnvioDeSucursal>? envios) =>
+        envios is null ? null : JsonSerializer.Serialize(envios.Select(e => new EnvioGuardado(e.CodigoDeSucursal, e.Costo.Valor)));
+
+    private static List<EnvioDeSucursal>? DeTextoDeEnvios(string? texto) =>
+        texto is null
+            ? null
+            : [.. (JsonSerializer.Deserialize<List<EnvioGuardado>>(texto) ?? throw new InvalidOperationException("El checkout guardado tiene un envío por sucursal vacío.")).Select(e => new EnvioDeSucursal(e.Sucursal, CostoDeEnvio.Crear(e.Importe)))];
+
     private static string ATipo(Tipo tipo) => tipo switch
     {
         Tipo.Recojo => "recojo",
@@ -489,7 +504,8 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
         DateTimeOffset? PagoPendienteDesde,
         IReadOnlyList<AceptacionDeTexto> Aceptaciones,
         DateTimeOffset CreadoEn,
-        DateTimeOffset Modificado)
+        DateTimeOffset Modificado,
+        IReadOnlyList<EnvioDeSucursal>? Envios)
     {
         public DatosGuardadosDelCheckout ConLineas(IReadOnlyList<LineaDelCheckout> lineas) => new()
         {
@@ -511,6 +527,7 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
             ContactoDireccion = Direccion,
             EnvioCongelado = Envio,
             TotalCongelado = Total,
+            EnviosCongelados = Envios,
             PedidoId = PedidoId,
             PedidoDescartado = PedidoDescartado,
             ReservandoDesde = ReservandoDesde,

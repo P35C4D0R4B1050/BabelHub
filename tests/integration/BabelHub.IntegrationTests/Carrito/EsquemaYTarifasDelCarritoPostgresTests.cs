@@ -102,6 +102,8 @@ public sealed class EsquemaYTarifasDelCarritoPostgresTests(PostgresDelCarritoFix
         var repetida = await Assert.ThrowsAsync<PostgresException>(() => Ejecutar($"INSERT INTO carrito.lineas_de_carrito (carrito_id, linea_id, edicion_id, posicion, cantidad, es_digital, agregada_en) VALUES ('{carrito}', gen_random_uuid(), '{digital}', 3, 1, true, now())"));
         Assert.Equal(PostgresErrorCodes.UniqueViolation, repetida.SqlState);
         Assert.Empty(await Filas("SELECT codigo_de_sucursal FROM carrito.tarifas_de_envio"));
+        // La compra anterior queda sin el envío por sucursal.
+        Assert.Equal(["sin"], await Filas("SELECT coalesce(envios_congelados::text, 'sin') FROM carrito.checkouts"));
     }
 
     // ---------- Permisos y restricciones ----------
@@ -138,6 +140,11 @@ public sealed class EsquemaYTarifasDelCarritoPostgresTests(PostgresDelCarritoFix
     [Trait("Criterio", "AC-CAR-39")]
     public async Task El_rol_del_carrito_no_cambia_la_identidad_ni_la_sucursal_de_una_linea_ni_borra_tarifas(string sql) =>
         Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, await ComoElRolDelCarrito(sql));
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-39")]
+    public async Task El_rol_del_carrito_puede_escribir_el_envio_congelado_de_cada_sucursal() =>
+        Assert.Null(await ComoElRolDelCarrito("UPDATE carrito.checkouts SET envios_congelados = NULL"));
 
     [Theory]
     [InlineData("INSERT INTO carrito.tarifas_de_envio VALUES ('cusco', -0.01, now())")]
@@ -258,6 +265,9 @@ public sealed class EsquemaYTarifasDelCarritoPostgresTests(PostgresDelCarritoFix
 
         Assert.True(conElNuevo.EsExito, conElNuevo.Error?.Clave);
         Assert.Equal(18.50m, await bd.Consultar<decimal>($"SELECT envio_congelado FROM carrito.checkouts WHERE cuenta_id = '{cuenta}'"));
+        Assert.Equal(18.50m, await bd.Consultar<decimal>($"SELECT (envios_congelados -> 0 ->> 'importe')::numeric FROM carrito.checkouts WHERE cuenta_id = '{cuenta}'"));
+        var enviado = Assert.Single(_e.Pagos.UltimaInstantanea!.EnviosPorSucursal!);
+        Assert.Equal((AtajosDeCarrito.Sucursal, 18.50m), (enviado.CodigoDeSucursal, enviado.Importe));
     }
 
     [Fact]

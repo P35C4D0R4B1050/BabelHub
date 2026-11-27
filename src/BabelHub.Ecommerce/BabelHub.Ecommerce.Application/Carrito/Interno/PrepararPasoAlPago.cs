@@ -238,20 +238,18 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             }
         }
 
-        // El envío que se congela: en edición se leen las tarifas una sola vez, aquí, y el total que resulta se compara con el que la persona vio (CAR-46, CAR-49); reservando o en pago rige lo congelado.
-        IReadOnlyList<EnvioDeSucursal>? desglose = null;
-        var envio = CostoDeEnvio.Crear(checkout.EnvioCongelado ?? 0m);
+        // El envío que se congela: en edición se leen las tarifas una sola vez, aquí, se calcula de esa lectura lo de cada sucursal y el total, y se compara con el que la persona vio (CAR-46, CAR-49); reservando o en pago rige lo congelado.
+        IReadOnlyList<EnvioDeSucursal> envios = checkout.EnviosCongelados ?? [];
         if (checkout.Estado == EstadoDelCheckout.EnEdicion)
         {
-            desglose = checkout.TipoDeEntrega == Tipo.Domicilio ? await servicios.DesgloseDelEnvio(checkout, cancelacion).ConfigureAwait(false) : null;
-            envio = desglose is null ? CostoDeEnvio.Cero : EnvioPorSucursales.Suma(desglose);
-            if (ComprobarElTotal(checkout.CalcularTotal(envio).Total, entrada.TotalVisto) is { } cambio)
+            envios = checkout.TipoDeEntrega == Tipo.Domicilio ? await servicios.DesgloseDelEnvio(checkout, cancelacion).ConfigureAwait(false) : [];
+            if (ComprobarElTotal(checkout.CalcularTotal(envios).Total, entrada.TotalVisto) is { } cambio)
             {
                 throw new RechazoDePasarAlPagoException(cambio);
             }
         }
 
-        var efecto = checkout.PrepararPasoAlPago(carrito.Identificadores.NuevoId(), envio, HuellaDeLaReserva, servicios.HuellaDeLaInstantanea, delCarrito, ahora);
+        var efecto = checkout.PrepararPasoAlPago(carrito.Identificadores.NuevoId(), envios, HuellaDeLaReserva, servicios.HuellaDeLaInstantanea, delCarrito, ahora);
         if (!efecto.EsExito)
         {
             throw new RechazoDePasarAlPagoException(DeRechazo(efecto.Rechazo));
@@ -263,7 +261,7 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
         }
 
         var desenlace = efecto.Efecto == EfectoDeTransicion.Aplicada ? DesenlaceDePrepararPaso.Preparado : DesenlaceDePrepararPaso.YaPreparado;
-        return ConstruirPreparado(desenlace, cuenta, checkout, delCarrito, new DatosDeEnvio(nombres, desglose));
+        return ConstruirPreparado(desenlace, cuenta, checkout, delCarrito, new DatosDeEnvio(nombres, null));
     }
 
     private async Task GuardarTodo(Guid cuenta, Checkout checkout, CarritoDeDominio delCarrito, IReadOnlyList<EdicionRetirada> quitadas, CancellationToken cancelacion)
@@ -463,12 +461,12 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             checkout.Estado,
             entrega,
             impresas,
-            ConstruirLaInstantanea(cuenta, checkout),
+            ConstruirLaInstantanea(cuenta, checkout, datos.Nombres),
             checkout.ReservaExpiraEn,
             servicios.Vista(checkout, delCarrito, null, datos));
     }
 
-    private InstantaneaDeCompra ConstruirLaInstantanea(Guid cuenta, Checkout checkout)
+    private InstantaneaDeCompra ConstruirLaInstantanea(Guid cuenta, Checkout checkout, IReadOnlyDictionary<string, string> nombres)
     {
         var subtotal = Soles.Redondear(checkout.Lineas.Sum(l => l.Importe));
         var envio = checkout.EnvioCongelado ?? 0m;
@@ -487,7 +485,10 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             contacto,
             [.. checkout.Aceptaciones.Aceptadas.Select(a => new AceptacionDeCompra(ServiciosDelCheckout.DeTexto(a.Texto), a.Version, a.AceptadoEn))],
             [.. checkout.Lineas.Select(l => new LineaDeInstantanea(l.LineaId, l.EdicionId, l.EsDigital, l.Titulo, l.Isbn, l.Cantidad.Valor, l.PrecioUnitario, l.Importe, l.CodigoDeFuenteInformado, l.RequiereTrasladoInformado, l.PlazoInformadoDias))],
-            checkout.HuellaDeInstantanea!);
+            checkout.HuellaDeInstantanea!,
+            checkout.EnviosCongelados is { } congelados
+                ? [.. congelados.Select(e => new EnvioDeSucursalDeCompra(e.CodigoDeSucursal, nombres.GetValueOrDefault(e.CodigoDeSucursal), e.Costo.Valor))]
+                : null);
     }
 }
 
