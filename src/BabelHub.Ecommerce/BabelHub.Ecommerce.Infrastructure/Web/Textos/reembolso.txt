@@ -1,6 +1,5 @@
-PROVISIONAL
 TITULO: Cambios y devoluciones
-RESUMEN: Cuándo y cómo puedes devolver un libro impreso o digital y cuándo te devolvemos el dinero, con los plazos y los estados de una devolución. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
+RESUMEN: Cuándo y cómo puedes devolver un libro impreso o digital y cuándo te devolvemos el dinero, con los plazos y los estados de una devolución.
 ## 1. Cambios
 BabelHub no hace cambios directos de un libro por otro. Si prefieres otro libro, devuelves el que compraste según esta política y compras el que quieras.
 ## 2. Libros impresos

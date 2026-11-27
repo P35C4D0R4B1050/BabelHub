@@ -3,7 +3,7 @@ using BabelHub.Ecommerce.Infrastructure.Web;
 
 namespace BabelHub.IntegrationTests.Web;
 
-/// <summary>El cuerpo de los textos legales como recursos de la web (WEB-29, T26): título, resumen, secciones y la marca de texto provisional.</summary>
+/// <summary>El cuerpo de los textos legales como recursos de la web (WEB-29, T26): título, resumen y secciones (la marca de texto provisional la admite el analizador, pero los textos publicados ya no la llevan).</summary>
 public sealed class ContenidoDeTextosTests
 {
     [Theory]
@@ -11,7 +11,7 @@ public sealed class ContenidoDeTextosTests
     [InlineData(TipoDeTextoLegal.Privacidad, "Política de privacidad")]
     [InlineData(TipoDeTextoLegal.Reembolso, "Cambios y devoluciones")]
     [Trait("Criterio", "AC-WEB-24")]
-    public async Task Los_tres_textos_existen_con_titulo_resumen_secciones_y_marca_de_provisional(TipoDeTextoLegal tipo, string titulo)
+    public async Task Los_tres_textos_existen_con_titulo_resumen_y_secciones_y_ya_no_se_marcan_como_provisionales(TipoDeTextoLegal tipo, string titulo)
     {
         var cuerpo = await new ContenidoDeTextosEmbebido().Obtener(tipo);
 
@@ -20,7 +20,7 @@ public sealed class ContenidoDeTextosTests
         Assert.False(string.IsNullOrWhiteSpace(cuerpo.Resumen));
         Assert.NotEmpty(cuerpo.Secciones);
         Assert.All(cuerpo.Secciones, s => Assert.NotEmpty(s.Parrafos));
-        Assert.True(cuerpo.Provisional, "Hasta que la persona responsable redacte los textos definitivos, todos son provisionales y así se marcan.");
+        Assert.False(cuerpo.Provisional, "La persona responsable aprobó los textos el 2026-11-26 (DD-115): no deben volver a publicarse marcados como provisionales.");
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class ContenidoDeTextosTests
         var cuerpo = await new ContenidoDeTextosEmbebido().Obtener(TipoDeTextoLegal.Privacidad);
 
         var texto = string.Join('\n', cuerpo!.Secciones.SelectMany(s => s.Parrafos));
-        foreach (var cookie in new[] { "__Host-bh-tienda", "__Host-bh-gestion", "__Host-bh-desafio", "__Host-bh-dispositivo", "bh-tema", "bh-sucursal" })
+        foreach (var cookie in new[] { "__Host-bh-tienda", "__Host-bh-gestion", "__Host-bh-desafio", "__Host-bh-dispositivo", "__Host-bh-carrito", "bh-tema", "bh-sucursal" })
         {
             Assert.Contains(cookie, texto, StringComparison.Ordinal);
         }

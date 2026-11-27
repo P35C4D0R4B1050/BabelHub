@@ -18,5 +18,5 @@
 
 ## Pendiente / siguiente
 - Persona: cambiar `simulador` por `ninguna` en `ecommerce.env` y `ecommerce-gestion.env` ya generados y redesplegar (guía 08 §15.1); publicar `90351a0d` si quiere la corrección.
-- Persona: textos legales definitivos (DD-114); T38 (prueba contra Culqi real) cuando lleguen las llaves.
+- Persona: T38 (prueba contra Culqi real) cuando lleguen las llaves. Los textos legales definitivos (DD-115) ya están en `main`; de DD-114 quedan los EPUB de muestra y los ISBN provisionales del catálogo.
 - Menores abiertos de la puerta en `progress/hallazgos.md` (2026-11-26).

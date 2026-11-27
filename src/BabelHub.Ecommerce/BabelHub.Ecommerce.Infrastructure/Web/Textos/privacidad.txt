@@ -1,6 +1,5 @@
-PROVISIONAL
 TITULO: Política de privacidad
-RESUMEN: Qué datos tuyos trata BabelHub, para qué, por cuánto tiempo y qué cookies usa el sitio, conforme a la Ley N.° 29733. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
+RESUMEN: Qué datos tuyos trata BabelHub, para qué, por cuánto tiempo y qué cookies usa el sitio, conforme a la Ley N.° 29733.
 ## 1. Quién trata tus datos
 BabelHub es el comercio que trata tus datos personales. Los datos de contacto del comercio (teléfono, correo y dirección) están en el pie de cada página y en la página de Contacto.
 ## 2. Qué datos tratamos
@@ -18,8 +17,11 @@ Todas las cookies llevan la marca de seguridad y ninguna contiene datos personal
 - __Host-bh-dispositivo: una marca para reconocer tus dispositivos y avisarte de cambios de correo inusuales. Dura 180 días y se elimina al cancelar tu cuenta.
 - Cookie de protección de formularios (empieza con __Host-): evita solicitudes falsificadas. Es necesaria. Dura lo que dure tu sesión.
 - bh-tema: recuerda si prefieres el tema claro o el oscuro. Dura un año.
+- __Host-bh-carrito: guarda tu carrito mientras compras sin haber ingresado. Es necesaria. Dura 30 días.
 - bh-sucursal: recuerda tu sucursal preferida. Dura un año.
-## 7. Ley aplicable
+## 7. Proveedores y dónde se guardan tus datos
+Para operar la tienda usamos proveedores que tratan datos solo para prestarnos su servicio: Oracle Cloud (servidores y almacenamiento, en su región de Santiago de Chile), Cloudflare (red de acceso a la web y copias de respaldo, que se guardan cifradas fuera del Perú) y Google (envío de los correos de tu cuenta). Esto supone transferir datos fuera del Perú. Cuando se habilite el pago en línea, la pasarela recibirá el importe, una referencia de la compra y, si lo exige, tu correo.
+## 8. Ley aplicable
 Esta política se rige por las leyes del Perú, en especial la Ley N.° 29733, de Protección de Datos Personales, y la Ley N.° 29571, Código de Protección y Defensa del Consumidor. Si no estás conforme con nuestra respuesta, puedes acudir al Indecopi.
-## 8. Cambios en esta política
+## 9. Cambios en esta política
 Si cambiamos esta política publicaremos una nueva versión con su fecha de vigencia y te pediremos aceptarla.

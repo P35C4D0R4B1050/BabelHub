@@ -9,8 +9,13 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - `ecommerce-pagos` reabierta y reaprobada, spec y plan (delegado; PAG-50 a PAG-52, D26, T48 a T52; DD-110 a DD-113 ratificadas por la persona).
 
 ### Pendiente
-- Persona: cambiar la línea en los secretos ya generados y redesplegar; textos legales definitivos (DD-114); T38.
+- Persona: cambiar la línea en los secretos ya generados y redesplegar; T38. Los textos legales definitivos llegaron aparte (DD-115).
 - Menores de la puerta en `hallazgos.md`; sin revisión visual ni E2E del modo sin pasarela.
+
+## 2026-11-26 — Textos legales definitivos
+
+### Cubierto
+- Términos, privacidad y «Cambios y devoluciones» sin la marca «provisional», con nueva versión de referencia y siembra `1.0` (DD-115, aprobados por la persona).
 
 ## 2026-11-25 (noche) — Respaldos comprimidos en Cloudflare R2 (carril `dos-vms-y-r2`, entrega 2)
 
