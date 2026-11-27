@@ -1,7 +1,10 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
+using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.IntegrationTests.Imagenes;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BabelHub.IntegrationTests.Despliegue;
 
@@ -879,6 +882,52 @@ public sealed class DesplegarShTests : IDisposable
 
         Assert.True(codigo == 0, salida + errores);
         Assert.Contains($"VM {vm} desplegada y sana.", salida, StringComparison.Ordinal);
+    }
+
+    // Lo que solo puede dar un tercero, con valores de prueba que tienen la forma que cada uno exige (dominios reservados; nada real).
+    private static string ValorDeTercero(string clave) => clave switch
+    {
+        "BABELHUB__Contacto__Telefono" => "+51 987 654 321",
+        "BABELHUB__Contacto__Correo" => "atencion@tienda.example",
+        "BABELHUB__Contacto__Direccion" => "Jr. Ejemplo 123, Ayacucho (prueba)",
+        "BABELHUB__Correo__Smtp__Servidor" => "smtp.example.org",
+        "BABELHUB__Correo__Smtp__Cuenta" or "BABELHUB__Correo__Smtp__Remitente" => "avisos@example.org",
+        "BABELHUB__Web__OrigenDelAlmacen" => "https://almacen.example.org",
+        _ when clave.EndsWith("__Endpoint", StringComparison.Ordinal) => "https://almacen.example.org/",
+        _ => Aleatorio(40),
+    };
+
+    [Theory]
+    [InlineData("ventas", "ecommerce", "ecommerce.env")]
+    [InlineData("inventario", "ecommerce-gestion", "ecommerce-gestion.env")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public async Task LaConfiguracionGeneradaDeCadaReplicaDelEcommerce_PasaLaValidacionDelArranque(string vm, string servicio, string archivo)
+    {
+        var destino = Path.Combine(_carpeta, "generados-arranque");
+        var (codigoDeGenerar, salidaDeGenerar, erroresDeGenerar) = Generar(destino);
+        Assert.True(codigoDeGenerar == 0, salidaDeGenerar + erroresDeGenerar);
+        var carpeta = Path.Combine(destino, vm);
+        var ruta = Path.Combine(carpeta, archivo);
+        File.WriteAllLines(ruta, File.ReadAllLines(ruta).Select(l => l.EndsWith("=CAMBIAR", StringComparison.Ordinal) ? l[..^"CAMBIAR".Length] + "\"" + ValorDeTercero(l[..^"=CAMBIAR".Length]) + "\"" : l));
+
+        // El entorno del contenedor tal como lo arma Compose: el archivo de secretos más lo que fija el propio Compose, que manda.
+        using var documento = System.Text.Json.JsonDocument.Parse(ComposeDeVms.ComposeResuelto(vm, carpeta));
+        var entorno = documento.RootElement.GetProperty("services").GetProperty(servicio).GetProperty("environment").EnumerateObject().ToDictionary(v => v.Name, v => v.Value.GetString(), StringComparer.Ordinal);
+        var configuracion = entorno
+            .Where(v => v.Key.StartsWith("BABELHUB__", StringComparison.Ordinal))
+            .ToDictionary(v => v.Key["BABELHUB__".Length..].Replace("__", ":", StringComparison.Ordinal), v => v.Value, StringComparer.OrdinalIgnoreCase);
+        var constructor = BabelHub.IntegrationTests.Api.AnfitrionDelEcommerceTests.Constructor(configuracion, entorno["ASPNETCORE_ENVIRONMENT"]!);
+        constructor.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Normal);
+
+        constructor.AgregarEcommerce(ModoDeArranque.Normal);
+        await using var app = constructor.Build();
+        ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, esProduccion: true, app.Services.GetServices<IAdaptadorSaliente>());
+        app.UsarEcommerce();
+        app.ExigirComposicionDeProduccion();
+
+        // Solo la tienda envía avisos (corre en la VM de n8n); la réplica de gestión valida la misma configuración, pero no corre el trabajo de envío.
+        var envia = app.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>().Any(h => h is BabelHub.Ecommerce.Infrastructure.Notificaciones.ServicioDeTrabajosDeNotificaciones);
+        Assert.Equal(servicio == "ecommerce", envia);
     }
 
     [Fact]
