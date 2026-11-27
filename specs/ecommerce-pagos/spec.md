@@ -2,13 +2,13 @@
 id: ecommerce-pagos
 titulo: Pagos con Yape y tarjeta
 estado: Planned
-aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-26
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-26
+plan_aprobado_en: 2026-11-27
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-27
 servicio: E-commerce
 prefijo: PAG
-origen: [RF05, RF07, NN02, NN15]
+origen: [RF05, RF07, RF04, NN02, NN15]
 calidad: [AC01, AC03, AC04, RNF06, RNF07, RNF08, RNF16, RNF21]
 depende: [ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria]
 ---
@@ -84,6 +84,8 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | PAG-50 | Estado | Mientras la tienda no tiene ninguna pasarela, el sistema deberá permitir la compra hasta el paso de pago y mostrar en el pago, y en el estado de una compra por pagar, que el pago en línea estará disponible pronto y que no se cobró nada, con la vuelta al carrito y al catálogo y sin formulario, sin campo del medio de pago y sin acción de pagar. | RF05, RNF06 |
 | PAG-51 | No deseado | Si la tienda no tiene ninguna pasarela y recibe una solicitud de cobro con sesión y bien formada, entonces el sistema deberá rechazarla como servicio no disponible, sin emitir claves de intento, registrar un intento, crear un pedido, extender ni confirmar una reserva ni llamar a una pasarela. | RF05, AC01 |
 | PAG-52 | No deseado | Si el servicio arranca para atender (no en ensayo ni en restauración, que nunca llaman a una pasarela) sin ninguna pasarela fuera de desarrollo, pruebas y revisión, o sin ninguna pasarela y con una llave de pasarela, entonces el sistema deberá negarse a arrancar. | RF05, RNF06 |
+| PAG-53 | Evento | Cuando una compra a domicilio trae el envío de cada sucursal, el sistema deberá conservarlo con la intención de pago y entregarlo sin recalcularlo con la compra aprobada para que el pedido lo guarde. | RF05, RF04 |
+| PAG-54 | No deseado | Si el envío por sucursal falta en una compra a domicilio o figura en otra, está vacío, repite o escribe mal un código, tiene un importe negativo o con más de dos decimales o no suma el envío cobrado, entonces el sistema deberá no crear la intención de pago. | RF05, AC01 |
 
 
 ## 4. Criterios de aceptación
@@ -133,6 +135,9 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | AC-PAG-41 | PAG-48 | **Dado** un cliente, una cuenta de personal y un administrador desactivado, **cuando** la persona responsable pide crear el primer administrador con el correo de cada uno, con un correo sin formato válido o en el entorno de desarrollo o de pruebas, **entonces** se niega cada vez sin tocar nada: nadie asciende, se reactiva ni se crea una cuenta nueva. |
 | AC-PAG-42 | PAG-50 | **Dado** el entorno de revisión sin ninguna pasarela y un cliente con libros en su carrito, **cuando** completa el checkout, pasa al pago y después abre el estado de ese pago, **entonces** se crea la intención de pago y se separan sus impresos como con cualquier pasarela (CAR-10), llega a la pantalla del pago y en ella y en el estado ve que el pago en línea estará disponible pronto y que no se cobró nada, con la vuelta al carrito (que deja la compra y libera su reserva, CAR-19) y al catálogo, sin formulario, sin campo del medio de pago y sin acción de pagar; y una compra cuyo pago ya no está por pagar conserva su estado, sin invitar a reintentar. |
 | AC-PAG-43 | PAG-51 | **Dado** la tienda sin ninguna pasarela, **cuando** un cliente con sesión envía directamente una solicitud de cobro bien formada, también con la clave de un intento emitida cuando había una pasarela, **entonces** se rechaza como servicio no disponible, no se emiten claves de intento, no queda ningún intento ni pedido, no se toca la reserva y no se llama a ninguna pasarela. |
+| AC-PAG-44 | PAG-53, PAG-26 | **Dado** una compra a domicilio con S/ 30,00 de Ayacucho y S/ 18,50 de Cusco, otra de recojo y una base anterior, **cuando** el esquema se actualiza dos veces, las tarifas cambian y ambas se aprueban, **entonces** la primera llega al pedido con esos dos importes y la segunda sin ninguno; y al cancelar la cuenta las intenciones dejan de conservar el detalle. |
+| AC-PAG-45 | PAG-54 | **Dado** compras a domicilio sin detalle, con la lista vacía, un código mal escrito o repetido, un importe negativo, uno con tres decimales o una suma distinta del envío, y un recojo con detalle, **cuando** se pide la intención de pago de cada una, **entonces** ninguna se crea ni se cobra. |
+| AC-PAG-46 | PAG-10 | **Dado** un pedido pagado con S/ 48,50 de envío, **cuando** se reembolsan una línea y S/ 18,50 de envío, **entonces** se pide a la pasarela ese monto y queda la trazabilidad; y un reembolso posterior que lleve el envío acumulado por encima de S/ 48,50 se rechaza. |
 
 ## 5. Reglas e invariantes
 
@@ -155,7 +160,7 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 ## 6. Casos límite y errores
 
 - Un pago aprobado cuya confirmación de reserva falla se reembolsa automáticamente y se avisa al cliente (PAG-20).
-- Un reembolso de un pedido a domicilio incluye el envío solo si se anula o cancela todo antes de que salga (`ecommerce-pedidos`).
+- Un reembolso de un pedido a domicilio incluye todo el envío si se anula o cancela antes de que salga; si alguna sucursal ya envió, solo lo que cobró cada sucursal que no llegó a enviar nada (`ecommerce-pedidos` PED-45). Pagos no decide cuánto: solo impide devolver más envío del cobrado.
 - Un pago pendiente de confirmación prolonga la reserva una sola vez, hasta 30 minutos desde el inicio del pago; pasado ese plazo, la reserva expira aunque la pasarela no haya respondido (PAG-15).
 - Los avisos del estado del pago salen por todos los medios disponibles; el correo es transaccional y el de WhatsApp exige consentimiento.
 - Un reembolso parcial no puede superar el monto cobrado de esa línea.
@@ -163,6 +168,7 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 
 ## 7. Preguntas abiertas
 
+- [x] ¿Se devuelve el envío de una sucursal que no llegó a enviar? Resuelto el 2026-11-27 (decisión de la persona responsable, DD-136): sí; Pagos conserva el envío por sucursal para entregarlo al pedido (PAG-53, PAG-54).
 - [x] ¿Cuánto se espera la respuesta de la pasarela antes de pasar a «pendiente de confirmación»? Resuelto el 2026-10-16 (confirmado por el responsable): 10 segundos, igual que el tiempo máximo de SEG-14.
 - [x] ¿La tienda que revisa la pasarela muestra una pasarela simulada? Resuelto el 2026-11-26 (decisión de la persona responsable): no; se revisa sin ninguna pasarela y la simulada se conserva para las pruebas con personas (PAG-50 a PAG-52; DD-110 a DD-113, ratificadas por la persona).
 - Nota para el plan: confirmar con la documentación de Culqi si admite una clave de idempotencia propia y cómo informa los reembolsos de Yape (bloqueo B05); no cambia el comportamiento.

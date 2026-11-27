@@ -64,3 +64,10 @@ Formato de cada línea: `- [ ] T01 [Capa · Nivel] Descripción (cubre: AC-XXX-0
 - [x] T50 [Web · C] El pago y el estado sin ninguna pasarela: «El pago en línea estará disponible pronto», «Volver al carrito» y el enlace al catálogo, sin formulario ni acción de pagar, y la traducción de `ECO-PAGO-NO-DISPONIBLE` a pantalla y a `application/problem+json`, con la prueba de que sin pasarela la compra con Carrito real llega al paso de pago (cubre: AC-PAG-42, AC-PAG-43, PAG-50)
 - [x] T51 [Infra · C] El despliegue: `generar-secretos.sh` escribe `ninguna` por defecto en `staging` (opción `--pasarela`), `desplegar.sh` admite `Staging` con `ninguna` o `simulador` y el ensayo local prueba `ninguna` con la imagen real (cubre: AC-PAG-30, AC-PAG-43)
 - [x] T52 [Docs · B] La guía del primer despliegue (cómo alternar entre `ninguna` y `simulador`), `docs/05-seguridad/07-operacion-segura.md`, el modelo de amenazas (AM43) y `docs/02-arquitectura-de-software/05-despliegue.md` (cubre: AC-PAG-30, AC-PAG-42)
+## Envío por sucursal (v0.1.3)
+
+Plan §11. Carril «Pedidos, pagos y devoluciones», en este orden; requiere T50 de `ecommerce-carrito-checkout` para compilar.
+
+- [ ] T53 [Dominio · C] La instantánea con el envío por sucursal y sus rechazos, y el tope de envío acumulado con una parte (cubre: AC-PAG-45, AC-PAG-46, PAG-54)
+- [ ] T54 [Aplicación · C] Conservación en la intención sin recalcular la huella recibida, reemplazo que sobrescribe la lista, entrega en `CompraAprobada` y eliminación al desvincular (cubre: AC-PAG-44, PAG-53)
+- [ ] T55 [Infra · C] Columna `envios_por_sucursal` repetible sobre una base anterior, su permiso y el repositorio, con PostgreSQL (cubre: AC-PAG-44, AC-PAG-46)
