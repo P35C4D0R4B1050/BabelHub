@@ -571,18 +571,22 @@ scp -r ventas     babelhub-ventas:/tmp/secretos-ventas
 
 **Nunca** copies la carpeta `~/babelhub-secretos` entera ni `custodia/`: `desplegar.sh` se niega a desplegar si ve una clave privada ajena en la carpeta de la VM. En cada VM, deja los secretos fuera del repositorio y solo legibles por root:
 
-**[VM-X]** (cambia `inventario` por `ventas`)
+**[VM-X]** Cambia la **primera línea** según la VM (VM-INVENTARIO: `VM=inventario; IP=10.0.0.20`; VM-VENTAS: `VM=ventas; IP=10.0.0.10`) y pega el bloque entero. **Antes de reemplazar nada comprueba en qué máquina estás**: copiar la carpeta de una VM en la otra es fácil (los dos accesos SSH se parecen) y borraría los secretos buenos.
 
 ```bash
-sudo mkdir -p /etc/babelhub
-sudo rm -rf /etc/babelhub/secretos
-sudo mv /tmp/secretos-inventario /etc/babelhub/secretos
-sudo chown -R root:root /etc/babelhub/secretos
-sudo chmod 700 /etc/babelhub/secretos && sudo chmod 600 /etc/babelhub/secretos/*
-sudo ls -l /etc/babelhub/secretos
+VM=inventario; IP=10.0.0.20
+hostname; hostname -I
+if hostname -I | grep -qw "$IP" && test -d "/tmp/secretos-$VM"; then
+  sudo mkdir -p /etc/babelhub && sudo rm -rf /etc/babelhub/secretos \
+    && sudo mv "/tmp/secretos-$VM" /etc/babelhub/secretos \
+    && sudo sh -c 'chown -R root:root /etc/babelhub/secretos && chmod 700 /etc/babelhub/secretos && chmod 600 /etc/babelhub/secretos/*' \
+    && sudo ls -l /etc/babelhub/secretos
+else
+  echo "PARA: esta máquina no es la de «$VM» o no está /tmp/secretos-$VM. No se ha tocado nada."
+fi
 ```
 
-**Debes ver** todos los archivos `-rw-------  root root`.
+**Debes ver** el nombre de la máquina (el que le diste en §7.3), su dirección privada y todos los archivos `-rw-------  root root`. Si dice «PARA», estás en la VM equivocada o falta copiar la carpeta: no sigas. (Los permisos se cambian con `sudo sh -c` porque, con la carpeta en `700`, tu usuario no puede expandir el comodín `*`.)
 
 **Cómo deshacer / rotar:** vuelve a generar en una carpeta **nueva** (el script nunca pisa) y repite; para rotar credenciales de una VM en marcha: `scripts/rotar-credenciales.sh` (ver su cabecera).
 
@@ -625,10 +629,12 @@ sudo docker ps --format 'table {{.Names}}\t{{.Status}}'                         
 sudo docker logs --tail 20 babelhub-inventario-postgres-1                                # sin FATAL
 sudo docker exec babelhub-inventario-postgres-1 pg_isready -d postgres                   # «accepting connections»
 # El Inventario por HTTPS, validando el certificado con tu CA privada:
-sudo docker run --rm --network babelhub-inventario_default -v /etc/babelhub/secretos/tls-ca.pem:/ca.pem:ro \
+sudo docker run --rm --user 0 --network babelhub-inventario_default -v /etc/babelhub/secretos/tls-ca.pem:/ca.pem:ro \
   curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93 \
   -sS --cacert /ca.pem https://inventario:8443/health/ready
 ```
+
+(`--user 0`: el certificado de la CA quedó `600` y de `root`; sin esa opción `curl` no puede leerlo. El contenedor se borra al terminar.)
 
 **Debes ver** `{"estado":"listo","componentes":[{"nombre":"base-de-datos","estado":"ok"}]}`. En los registros de PostgreSQL **no** debe haber errores de `respaldos:`; si los hay, revisa las claves de R2 en `postgres.env` (mientras falle, los cambios se acumulan en la VM hasta unos 4 GB y recibirás avisos del espacio reservado).
 
@@ -765,8 +771,8 @@ sudo iptables -S DOCKER-USER      # debe aparecer la regla que descarta 10.0.0.2
 ```bash
 curl -s  https://babel-hub.shop/health              # «ok» (lo responde Nginx)
 curl -s  https://babel-hub.shop/health/live          # respuesta del E-commerce
-curl -sI https://babel-hub.shop/ | head -3          # «HTTP/2 200» (E-commerce en Staging); sin errores de certificado
-curl -sI https://gestion.babel-hub.shop/ | head -3  # redirige a la pantalla de Cloudflare Access (no a la app)
+curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/   # «200» (E-commerce en Staging); sin errores de certificado. Con GET: la portada responde 405 a «curl -I» (HEAD)
+curl -s -o /dev/null -D - https://gestion.babel-hub.shop/ | head -3  # redirige a la pantalla de Cloudflare Access (no a la app)
 curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 0 con la pasarela «ninguna» (no debe haber avisos); 1 con «simulador»
 ```
 
@@ -776,7 +782,7 @@ Y la redirección a HTTPS (sin `-k`: no debe haber errores de certificado):
 
 ```bash
 curl -sI http://babel-hub.shop/       | head -3     # 301 → https://babel-hub.shop/
-curl -sI https://babel-hub.shop/      | grep -i strict-transport-security
+curl -s -o /dev/null -D - https://babel-hub.shop/ | grep -i strict-transport-security   # GET (no HEAD)
 curl -sI https://www.babel-hub.shop/  | head -3     # 301 → https://babel-hub.shop/
 ```
 
