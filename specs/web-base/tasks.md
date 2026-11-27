@@ -53,4 +53,4 @@ Formato de cada línea: `- [ ] T01 [Capa · Nivel] Descripción (cubre: AC-XXX-0
 
 Plan §11. La ejecuta el carril «Carrito y tienda», junto con T46 de `ecommerce-carrito-checkout`.
 
-- [ ] T40 [Web/C] Quitar el selector de sucursal de la cabecera, su ruta y «En tu sucursal»; la preferencia se escribe al agregar un impreso y solo preselecciona en la ficha (cubre: AC-WEB-12, WEB-16)
+- [x] T40 [Web/C] Quitar el selector de sucursal de la cabecera, su ruta y «En tu sucursal»; la preferencia se escribe al agregar un impreso y solo preselecciona en la ficha (cubre: AC-WEB-12, WEB-16)
