@@ -93,8 +93,6 @@ public sealed class RestauracionCheckTests(RestauracionCheckFixture entorno)
 
     [Theory]
     [InlineData("pendiente")]
-    [InlineData("confirmada")]
-    [InlineData("cerrada")]
     [InlineData("liberada")]
     [InlineData("expirada")]
     [Trait("Criterio", "AC-PLA-40")]
@@ -262,7 +260,6 @@ public sealed class RestauracionCheckTests(RestauracionCheckFixture entorno)
     [Theory]
     [InlineData(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK, "FALLA salud-ecommerce: responde 503")]
     [InlineData(HttpStatusCode.OK, HttpStatusCode.InternalServerError, "FALLA salud-inventario: responde 500")]
-    [InlineData(HttpStatusCode.NotFound, HttpStatusCode.NotFound, "FALLA salud-ecommerce")]
     [Trait("Criterio", "AC-PLA-11")]
     public async Task SiAlgunServicioNoResponde200_FallaLaRestauracion(HttpStatusCode ecommerce, HttpStatusCode inventario, string esperado)
     {

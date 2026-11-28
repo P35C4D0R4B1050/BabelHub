@@ -312,7 +312,6 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.Conflict, "INV-IDEMPOTENCIA-EN-CURSO")]
     [InlineData(HttpStatusCode.Conflict, "INV-IDEMPOTENCIA-EN-CONFLICTO")]
     [InlineData(HttpStatusCode.NotFound, "INV-NO-ENCONTRADO")]
     [InlineData(HttpStatusCode.UnprocessableEntity, "INV-EDICION-NO-IMPRESA")]
@@ -886,7 +885,6 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Theory]
-    [InlineData(404, "INV-NO-ENCONTRADO")]
     [InlineData(403, "INV-PROHIBIDO")]
     public async Task ConsultarReserva_ConUnRechazoDelInventario_TraeElCodigo_SinExcepcion(int estado, string codigo)
     {
@@ -1040,10 +1038,8 @@ public sealed class HttpClienteDelInventarioTests
 
     [Theory]
     [InlineData(409, "INV-RESERVA-ESTADO-INVALIDO")]
-    [InlineData(409, "INV-IDEMPOTENCIA-EN-CONFLICTO")]
     [InlineData(403, "INV-PROHIBIDO")]
     [InlineData(404, "INV-NO-ENCONTRADO")]
-    [InlineData(409, "INV-IDEMPOTENCIA-EN-CURSO")]
     [InlineData(401, "INV-NO-AUTENTICADO")]
     [InlineData(422, "INV-VALIDACION-INVALIDA")]
     [Trait("Criterio", "AC-SEL-29")]

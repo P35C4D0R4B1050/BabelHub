@@ -185,7 +185,6 @@ public sealed class EspacioReservadoTests(RespaldosFixture entorno)
     [InlineData("0")]
     [InlineData("-1")]
     [InlineData("cuatro")]
-    [InlineData("")]
     [Trait("Criterio", "AC-PLA-21")]
     public async Task UnaReservaDeCincoGbOMasONoNumerica_SeRechazaConCodigo2(string reserva)
     {

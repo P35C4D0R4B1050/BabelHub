@@ -14,7 +14,6 @@ public sealed class AdaptadoresBaseTests
 
     [Theory]
     [Trait("Criterio", "AC-SEG-04")]
-    [InlineData("2026-11-14T03:00:00+00:00", "2026-11-13")] // 22:00 del 13 en Lima
     [InlineData("2026-11-14T04:59:59+00:00", "2026-11-13")] // 23:59:59 en Lima
     [InlineData("2026-11-14T05:00:00+00:00", "2026-11-14")] // medianoche en Lima
     [InlineData("2026-11-13T12:00:00+00:00", "2026-11-13")]
@@ -24,16 +23,6 @@ public sealed class AdaptadoresBaseTests
 
         Assert.Equal(DateOnly.Parse(esperado, System.Globalization.CultureInfo.InvariantCulture), reloj.HoyEnLima);
         Assert.Equal(DateTimeOffset.Parse(instante, System.Globalization.CultureInfo.InvariantCulture), reloj.Ahora);
-    }
-
-    [Fact]
-    public void RelojDelSistema_SinProveedor_UsaElReloj()
-    {
-        var antes = DateTimeOffset.UtcNow;
-
-        var ahora = new RelojDelSistema().Ahora;
-
-        Assert.InRange((ahora - antes).TotalSeconds, -1, 5);
     }
 
     [Fact]

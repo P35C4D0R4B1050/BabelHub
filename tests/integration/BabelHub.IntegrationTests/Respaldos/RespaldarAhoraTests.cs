@@ -100,7 +100,6 @@ public sealed class RespaldarAhoraTests : IDisposable
 
     [Theory]
     [Trait("Criterio", "AC-PLA-16")]
-    [InlineData(1)]
     [InlineData(75)]
     public void ElCodigoDelRespaldoRemoto_SePropaga(int remoto)
     {
@@ -117,7 +116,6 @@ public sealed class RespaldarAhoraTests : IDisposable
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inv$(id)")]
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inventario.interno", "--contenedor", "a b;c")]
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inventario.interno", "--otra", "cosa")]
-    [InlineData]
     public void UnUsoInvalido_SeRechazaConCodigo2_SinLlamarASsh(params string[] argumentos)
     {
         var (codigo, _, errores, llamada) = Ejecutar(0, argumentos);

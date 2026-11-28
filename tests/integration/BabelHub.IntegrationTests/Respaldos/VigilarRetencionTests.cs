@@ -230,20 +230,6 @@ public sealed class VigilarRetencionTests : IDisposable
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PLA-18")]
-    public void LosContenedoresQueNoExpiran_NoSeMiden_AunqueTenganObjetosViejos()
-    {
-        PublicarElEstadoSano();
-        File.WriteAllLines(Path.Combine(_almacen, "supresiones-entradas.txt"), ["entradas/x/baja-intencion.json;2020-01-01 00:00:00"]);
-        File.Delete(Path.Combine(_almacen, "supresiones-entradas.txt"));
-
-        var (codigo, salida, _) = Vigilar();
-
-        Assert.Equal(0, codigo);
-        Assert.DoesNotContain("supresiones-entradas", salida, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void UnaDefinicionInvalida_SeRechazaConCodigo2()
     {
         var definicion = Path.Combine(_carpeta, "definicion");

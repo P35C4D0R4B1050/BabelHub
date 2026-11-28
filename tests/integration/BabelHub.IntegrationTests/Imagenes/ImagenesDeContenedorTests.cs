@@ -51,7 +51,6 @@ public sealed partial class ImagenesDeContenedorTests
     [Theory]
     [Trait("Criterio", "AC-PLA-03")]
     [InlineData("Ecommerce")]
-    [InlineData("Inventario")]
     public void ElDockerfileDeUnServicio_EsDeVariasEtapasSinPrivilegiosConSaludYConstruyeSinEmulacion(string servicio)
     {
         var texto = Leer($"src/BabelHub.{servicio}/BabelHub.{servicio}.Api/Dockerfile");

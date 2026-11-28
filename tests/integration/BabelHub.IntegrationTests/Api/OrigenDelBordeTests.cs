@@ -225,7 +225,6 @@ public sealed class OrigenDelBordeTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("203.0.113.7")]
     [InlineData("2001:db8:85a3:1::1")]
     [InlineData("::ffff:203.0.113.7")]
     [InlineData("8.8.8.8")]

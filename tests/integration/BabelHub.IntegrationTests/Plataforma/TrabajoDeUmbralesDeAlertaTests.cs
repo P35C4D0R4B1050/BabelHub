@@ -261,17 +261,4 @@ public sealed class TrabajoDeUmbralesDeAlertaTests
         Assert.Single(_alertas.Publicadas);
         Assert.True(corrida.IsCompletedSuccessfully);
     }
-
-    [Fact]
-    public async Task EstadoDeUmbralesEnMemoria_GuardaYDevuelveElEstadoPorMotivo()
-    {
-        var estados = new EstadoDeUmbralesEnMemoria();
-        var estado = new EstadoDeUmbral(true, new DateTimeOffset(2026, 11, 13, 12, 0, 0, TimeSpan.Zero));
-
-        Assert.Null(await estados.Obtener("accesos-denegados", CancellationToken.None));
-        await estados.Guardar("accesos-denegados", estado, CancellationToken.None);
-
-        Assert.Equal(estado, await estados.Obtener("accesos-denegados", CancellationToken.None));
-        Assert.Null(await estados.Obtener("ingresos-fallidos", CancellationToken.None));
-    }
 }

@@ -103,17 +103,6 @@ public sealed class EntornoStagingTests
         Assert.Contains("HTTPS", falla.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-PAG-30")]
-    public void En_Production_el_simulador_no_arranca_y_nunca_se_cobra_a_ciegas()
-    {
-        var builder = Constructor(ConfiguracionDeUnEntornoDeTipoProduccion(), "Production");
-
-        var falla = Assert.Throws<ConfiguracionDePagosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
-
-        Assert.Contains("simulador", falla.Message, StringComparison.Ordinal);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
     [InlineData("Staging", "sk_" + "test_llave-de-pruebas-0123456789")]

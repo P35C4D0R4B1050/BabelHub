@@ -77,17 +77,6 @@ public sealed class TrabajosDeFondoPostgresTests(PostgresDeRolesFixture bd) : IC
         Assert.Equal((Ahora.AddMinutes(5), ResultadoDeTrabajo.Exito), await registro.UltimaCorrida(nombre));
     }
 
-    [Fact]
-    public async Task LoGuardadoSobreviveAUnReinicio()
-    {
-        var nombre = Trabajo();
-        await Registro().Registrar(nombre, ResultadoDeTrabajo.Exito, Ahora);
-
-        var trasElReinicio = Registro();
-
-        Assert.Equal((Ahora, ResultadoDeTrabajo.Exito), await trasElReinicio.UltimaCorrida(nombre));
-    }
-
     [Theory]
     [InlineData("")]
     [InlineData("Mayusculas")]

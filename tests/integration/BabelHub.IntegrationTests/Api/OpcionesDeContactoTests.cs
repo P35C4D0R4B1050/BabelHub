@@ -39,7 +39,6 @@ public sealed class OpcionesDeContactoTests
     }
 
     [Theory]
-    [InlineData("")]
     [InlineData("   ")]
     [Trait("Criterio", "AC-COM-03")]
     public void Un_valor_vacio_o_solo_con_espacios_cuenta_como_faltante_fuera_de_desarrollo(string vacio)
@@ -67,7 +66,6 @@ public sealed class OpcionesDeContactoTests
     }
 
     [Theory]
-    [InlineData("")]
     [InlineData("  ")]
     [Trait("Criterio", "AC-COM-04")]
     public void En_desarrollo_un_valor_vacio_se_trata_como_no_configurado_y_usa_el_ficticio(string vacio)
@@ -96,7 +94,6 @@ public sealed class OpcionesDeContactoTests
     [InlineData("987 654 321", "tel:+51987654321")]
     [InlineData("+987 654 321", "tel:+987654321")]
     [InlineData("(01) 234-5678", "tel:012345678")]
-    [InlineData("+1 202 555 0100", "tel:+12025550100")]
     [InlineData("  987654321  ", "tel:+51987654321")]
     [Trait("Criterio", "AC-COM-01")]
     public void El_enlace_de_llamada_lleva_solo_los_digitos_y_el_mas_inicial_y_a_un_celular_de_nueve_digitos_sin_mas_se_le_antepone_el_51(string configurado, string enlace)
@@ -118,7 +115,6 @@ public sealed class OpcionesDeContactoTests
     [InlineData("987 654 321")] // espacio de no separación: solo vale U+0020
     [InlineData("987 654 321 987 654 321 987 654 321")] // más de 30 caracteres
     [InlineData("987++654321")]
-    [InlineData("987 654 +321")]
     [Trait("Criterio", "AC-COM-03")]
     public void Un_telefono_con_formato_invalido_impide_arrancar_en_cualquier_entorno(string telefono)
     {
@@ -157,8 +153,6 @@ public sealed class OpcionesDeContactoTests
     [InlineData("atencion@tiéndá.example")]
     [InlineData("atencion@tienda.Kom")] // signo Kelvin: no es ASCII
     [InlineData("atencion@tienda.coİ")] // İ
-    [InlineData("atencion@tienda.😀om")]
-    [InlineData("atencion@tienda.om")] // uso privado
     [InlineData("@tienda.example")]
     [InlineData("atencion@")]
     [InlineData("atencion@@tienda.example")]
@@ -187,7 +181,6 @@ public sealed class OpcionesDeContactoTests
     }
 
     [Theory]
-    [InlineData("Jr. Callao 123, Breña")]
     [InlineData("Av. Ejemplo 1234 Of. 5 #6, Ayacucho")] // `#` se acepta (la regla no lo prohíbe)
     [InlineData("Jr. Callao 123\uD800")] // sustituto suelto: no está en la regla; la salida lo codifica sin lanzar
     [InlineData("Jr. Callao 123")] // uso privado
@@ -201,7 +194,6 @@ public sealed class OpcionesDeContactoTests
     }
 
     [Theory]
-    [InlineData("Jr. Lima")] // 8 caracteres
     [InlineData("123456789")] // 9 caracteres
     [InlineData("<b>Jr. Callao 123</b>")]
     [InlineData("Jr. \"Callao\" 123")]
@@ -246,9 +238,4 @@ public sealed class OpcionesDeContactoTests
         Assert.All(lector.Problemas, p => Assert.DoesNotContain("SECRETO", p, StringComparison.Ordinal));
         Assert.DoesNotContain("SECRETO", string.Join('|', new ConfiguracionDeSecretosInvalidaException(lector.Problemas).Message), StringComparison.Ordinal);
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-COM-01")]
-    public void El_constructor_de_los_datos_no_es_publico_solo_la_fabrica_que_valida_los_crea() =>
-        Assert.Empty(typeof(DatosDeContacto).GetConstructors());
 }

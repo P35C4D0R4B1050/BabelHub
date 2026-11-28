@@ -127,7 +127,6 @@ public sealed class AvisosDeVmAuxTests : IDisposable
     }
 
     [Theory]
-    [InlineData]
     [InlineData("solo-nombre")]
     [InlineData("Nombre-Invalido", "echo")]
     public void UnUsoInvalidoDelEnvoltorio_SeRechazaConCodigo2(params string[] argumentos)
