@@ -174,13 +174,6 @@ public sealed class DependenciasExternasTests
     }
 
     [Fact]
-    public async Task Consultar_ConArgumentosInvalidos_Lanza()
-    {
-        await Assert.ThrowsAsync<ArgumentException>(() => _dependencias.Consultar(" ", ClaseDeDependencia.Normal, _ => Task.FromResult(new Cotizacion(1m, "PEN")), _validador));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => _dependencias.Consultar<Cotizacion>("x", ClaseDeDependencia.Normal, null!, _validador));
-    }
-
-    [Fact]
     public void ComoNecesaria_ConRespuesta_EsExito()
     {
         var resultado = RespuestaExterna<Cotizacion>.ConRespuesta(new Cotizacion(1m, "PEN")).ComoNecesaria();

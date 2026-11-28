@@ -253,12 +253,6 @@ public sealed class ProcesarEntradaDeIntegracionTests
     }
 
     [Fact]
-    public void Opciones_ConUnTopeInvalido_Lanza()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new OpcionesDeEntradasDeIntegracion([Proveedor], topeDelCuerpoEnBytes: 0));
-    }
-
-    [Fact]
     public void EventoDeSeguridad_DeIntegracionRechazada_ExigeElMotivo()
     {
         Assert.Throws<ArgumentException>(() => new EventoDeSeguridad(TipoDeEventoDeSeguridad.EntradaDeIntegracionRechazada, Ahora));

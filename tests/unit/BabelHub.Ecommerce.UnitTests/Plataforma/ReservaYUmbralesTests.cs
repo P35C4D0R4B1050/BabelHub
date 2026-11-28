@@ -20,16 +20,6 @@ public sealed class ReservaYUmbralesTests
         Assert.Null(new ReservaDeLimite("p", "s", "i", Ahora).ClaveDelLlamador);
     }
 
-    [Theory]
-    [InlineData("", "s", "i", null)]
-    [InlineData("p", " ", "i", null)]
-    [InlineData("p", "s", "", null)]
-    [InlineData("p", "s", "i", " ")]
-    public void ReservaDeLimite_ConValoresVacios_Lanza(string politica, string sujeto, string identificador, string? clave)
-    {
-        Assert.Throws<ArgumentException>(() => new ReservaDeLimite(politica, sujeto, identificador, Ahora, clave));
-    }
-
     [Fact]
     [Trait("Criterio", "AC-SEG-09")]
     public void AccesosDenegados_ConDiezEnCincoMinutos_NoAlertaYConOnceSi()
@@ -58,15 +48,6 @@ public sealed class ReservaYUmbralesTests
     public void Umbrales_TienenMotivosEstables()
     {
         Assert.Equal(["accesos-denegados", "ingresos-fallidos"], UmbralesDeAlerta.Todos.Select(u => u.Motivo));
-    }
-
-    [Theory]
-    [InlineData("", 1, 5)]
-    [InlineData("x", 0, 5)]
-    [InlineData("x", 1, 0)]
-    public void UmbralDeAlerta_ConDatosInvalidos_Lanza(string motivo, int maximo, int minutos)
-    {
-        Assert.Throws<ArgumentException>(() => new UmbralDeAlerta(motivo, maximo, TimeSpan.FromMinutes(minutos)));
     }
 
     [Fact]

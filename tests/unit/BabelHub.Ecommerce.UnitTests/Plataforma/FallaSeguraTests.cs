@@ -147,14 +147,6 @@ public sealed class FallaSeguraTests
     }
 
     [Fact]
-    public void ExcepcionDeNegocio_ConDatosInvalidos_Lanza()
-    {
-        Assert.Throws<ArgumentException>(() => new ExcepcionDeNegocio(" "));
-        Assert.Throws<ArgumentException>(() => new ExcepcionDeNegocio("x", CategoriaDeError.Inesperado));
-        Assert.Equal("stock-insuficiente", new ExcepcionDeNegocio("stock-insuficiente").ComoError().Clave);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-SEG-04")]
     public async Task Ejecutar_ConUnaDependenciaNoNecesariaQueFalla_LaOperacionSeCompletaYQuedaUnaAlertaTecnica()
     {

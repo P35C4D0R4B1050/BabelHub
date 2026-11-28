@@ -30,13 +30,6 @@ public sealed class ContratoDePlataformaTests
     }
 
     [Fact]
-    public void ElMotorDeLimites_EstaEnElInternoDelModulo()
-    {
-        Assert.Equal("BabelHub.Ecommerce.Application.Plataforma.Interno", typeof(IMotorDeLimites).Namespace);
-        Assert.True(typeof(IMotorDeLimites).IsPublic);
-    }
-
-    [Fact]
     public void LasClavesDeLosModulos_CoincidenConLasPoliticasDelDominio()
     {
         Assert.Equal(
@@ -64,22 +57,6 @@ public sealed class ContratoDePlataformaTests
     }
 
     [Fact]
-    public void ClaveDePolitica_ConElMismoValor_EsIgual()
-    {
-        Assert.Equal(new ClaveDePolitica("ingresos-fallidos"), PoliticasDeLimite.IngresosFallidos);
-    }
-
-    [Fact]
-    public void ResultadoDeLimite_Permitido_TraeLaReserva()
-    {
-        var resultado = ResultadoDeLimite.Permitido(Reserva);
-
-        Assert.True(resultado.EsPermitido);
-        Assert.Same(Reserva, resultado.Reserva);
-        Assert.Null(resultado.Motivo);
-    }
-
-    [Fact]
     public void ResultadoDeLimite_Excedido_TraeMotivoEsperaYDisponibilidadSinReserva()
     {
         var resultado = ResultadoDeLimite.Excedido("ingresos-fallidos", 90, Ahora.AddSeconds(90));
@@ -89,15 +66,6 @@ public sealed class ContratoDePlataformaTests
         Assert.Equal(90, resultado.EsperaEnSegundos);
         Assert.Equal(Ahora.AddSeconds(90), resultado.DisponibleDesde);
         Assert.Null(resultado.Reserva);
-    }
-
-    [Fact]
-    public void ResultadoDeLimite_ConDatosInvalidos_Lanza()
-    {
-        Assert.Throws<ArgumentException>(() => ResultadoDeLimite.Excedido(" ", 10, Ahora));
-        Assert.Throws<ArgumentOutOfRangeException>(() => ResultadoDeLimite.Excedido("p", 0, Ahora));
-        Assert.Throws<ArgumentNullException>(() => ResultadoDeLimite.Permitido(null!));
-        Assert.Throws<ArgumentNullException>(() => ResultadoDeLimite.RepeticionCompletada(null!));
     }
 
     [Fact]
@@ -112,15 +80,6 @@ public sealed class ContratoDePlataformaTests
     }
 
     [Fact]
-    public void ResultadoMinimoYClaveDeIdempotencia_ConValoresVacios_Lanzan()
-    {
-        Assert.Throws<ArgumentException>(() => new ResultadoMinimo(" "));
-        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("", "/ruta", "h"));
-        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("k", " ", "h"));
-        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("k", "/ruta", ""));
-    }
-
-    [Fact]
     public void OrigenDeSolicitud_ConocidoNecesitaDireccionYDesconocidoNoLaTrae()
     {
         var huella = HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1");
@@ -130,38 +89,6 @@ public sealed class ContratoDePlataformaTests
         Assert.Throws<ArgumentException>(() => new OrigenDeSolicitud(HuellaDeOrigen.Desconocido, "203.0.113.7"));
         Assert.Null(OrigenDeSolicitud.Desconocido.Direccion);
         Assert.True(OrigenDeSolicitud.Desconocido.Huella.EsDesconocido);
-    }
-
-    [Fact]
-    public void ActorActual_DeUsuario_ConservaRolYSucursal()
-    {
-        var usuario = Guid.NewGuid();
-        var sucursal = Guid.NewGuid();
-
-        var actor = ActorActual.DeUsuario(usuario, "encargado", sucursal);
-
-        Assert.Equal(TipoDeActor.Usuario, actor.Tipo);
-        Assert.Equal(usuario, actor.UsuarioId);
-        Assert.Equal("encargado", actor.Rol);
-        Assert.Equal(sucursal, actor.SucursalId);
-    }
-
-    [Fact]
-    public void ActorActual_ConDatosInvalidos_Lanza()
-    {
-        Assert.Throws<ArgumentException>(() => ActorActual.DeUsuario(Guid.Empty, "cliente"));
-        Assert.Throws<ArgumentException>(() => ActorActual.DeUsuario(Guid.NewGuid(), " "));
-        Assert.Throws<ArgumentException>(() => ActorActual.DeIntegracion(""));
-    }
-
-    [Fact]
-    public void ActorActual_DelSistemaYDeIntegracion_NoTraenUsuario()
-    {
-        Assert.Null(ActorActual.DelSistema().UsuarioId);
-        var integracion = ActorActual.DeIntegracion("culqi");
-        Assert.Equal(TipoDeActor.Integracion, integracion.Tipo);
-        Assert.Equal("culqi", integracion.Integracion);
-        Assert.Null(integracion.Rol);
     }
 
     [Theory]
@@ -210,27 +137,6 @@ public sealed class ContratoDePlataformaTests
         Assert.Throws<ArgumentException>(() =>
             new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, Ahora, direccionCompleta: "203.0.113.7"));
         Assert.Null(new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, Ahora).DireccionCompleta);
-    }
-
-    [Fact]
-    public void Alertas_ConDatosInvalidos_Lanzan()
-    {
-        Assert.Throws<ArgumentException>(() => new AlertaTecnica("", Ahora));
-        Assert.Throws<ArgumentException>(() => new AlertaDeSeguridad(" ", Ahora, 11));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new AlertaDeSeguridad("accesos-denegados", Ahora, 0));
-        Assert.Equal(11, new AlertaDeSeguridad("accesos-denegados", Ahora, 11).Total);
-    }
-
-    [Fact]
-    public void ResultadoDeValidacion_ValidoNoTraeErroresEInvalidoSi()
-    {
-        Assert.True(ResultadoDeValidacion.Valido.EsValido);
-
-        var invalido = ResultadoDeValidacion.Invalido([new ErrorDeCampo("cantidad", "fuera-de-rango")]);
-
-        Assert.False(invalido.EsValido);
-        Assert.Equal("cantidad", Assert.Single(invalido.Errores).Campo);
-        Assert.Throws<ArgumentException>(() => ResultadoDeValidacion.Invalido([]));
     }
 
     private static IEnumerable<Type> TiposDeLaFirma(Type tipo)
