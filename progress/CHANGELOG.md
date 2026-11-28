@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — Integración para la versión 0.1.3
+
+### Cubierto
+- Venta por sucursal (Inventario, carrito y tienda, pagos, pedidos y devoluciones), accesos pendientes y evidencias integrados; suite completa en verde antes del recorte (9 060 de integración, 4 omitidas).
+- Recorte de pruebas por valor, cobertura solo referencial (decisión de la persona) y las pruebas de guiones y lanzamiento fuera de cada cambio (DD-154): la integración local pasa de 45 min a unos 5 sin otras cargas y la corrida de cada cambio dura unos 9 min.
+- Aviso al anular solo parte de un pedido; tres pruebas inestables y un recorrido de la biblioteca corregidos; guía de actualización de `v0.1.2` a `v0.1.3` y mitigaciones de seguridad de la venta por sucursal.
+
+### Pendiente
+- Verificar las specs reabiertas (`spec-verify`); ratificar DD-130 a DD-138, DD-140 a DD-145, DD-152 y DD-153; publicar `v0.1.3`.
+
 ## 2026-11-27 — Venta por sucursal: specs y planes aprobados (sin código)
 
 ### Cubierto

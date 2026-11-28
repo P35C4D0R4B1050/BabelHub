@@ -1024,7 +1024,14 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 
 ### 15.5 Actualizar una tienda desplegada de `v0.1.2` a `v0.1.3`
 
-Qué trae: ayudas al escribir contraseñas, las diez letras de la política en las pantallas, el código QR del segundo factor, el enlace «Acceso del personal», la raíz de la gestión que lleva al ingreso, el regreso a la compra después de ingresar, los enlaces a «Mis devoluciones», «Mis hojas de reclamación» y los reportes de devoluciones, y la orden `restablecer-segundo-factor` (§15.1). No cambia la base de datos ni los secretos que ya tienes, salvo una línea nueva y opcional. Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5).
+Qué trae:
+
+- **Venta por sucursal:** cada libro impreso se pide a la sucursal que elige el cliente, el máximo es su stock, cada sucursal cobra su envío (S/ 30,00, configurable por la administración central en la gestión, «Costos de envío») y se devuelve el envío de la sucursal que no llegó a enviar.
+- **Acceso:** ayudas al escribir contraseñas, las diez letras de la política en las pantallas, el código QR del segundo factor, el enlace «Acceso del personal», la raíz de la gestión que lleva al ingreso, el regreso a la compra después de ingresar, los enlaces a «Mis devoluciones», «Mis hojas de reclamación» y los reportes de devoluciones, y la orden `restablecer-segundo-factor` (§15.1).
+
+**Cambia las bases de datos** (el despliegue las migra solo) y una línea de los secretos. Tras la primera compra por sucursal **no se vuelve a `v0.1.2`**: un problema se corrige hacia adelante. Los libros impresos que ya estén en un carrito deben quitarse y volver a agregarse eligiendo sucursal.
+
+Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5). Desde esta versión el lanzamiento corre además las pruebas de operación (unos 35 minutos) antes de pedirte la primera aprobación.
 
 **1. [Cada VM] Traer el código.** Mira primero que la VM no tenga cambios hechos a mano:
 
@@ -1038,17 +1045,47 @@ No debe salir ningún archivo. Si en VM-VENTAS aparece `infra/docker-compose.ven
 sudo git fetch --tags && sudo git checkout v0.1.3 && sudo git log -1 --format='%h %s'
 ```
 
-**2. [VM-VENTAS] Añadir la dirección del personal** (los secretos ya generados no la tienen; sin ella la tienda funciona igual, pero no muestra el enlace). El comando solo la agrega si falta y no imprime ningún secreto:
+**2. Respaldo bajo demanda** antes de tocar la base, y comprobar que subió (§14).
+
+**3. [VM-INVENTARIO] Comprobar que no haya compras en curso.** La orden solo lee:
 
 ```bash
-sudo sh -c 'f=/etc/babelhub/secretos/ecommerce.env; test -f "$f" || { echo "PARA: esta no es VM-VENTAS"; exit 1; }; grep -q "^BABELHUB__Web__DireccionDeGestion=" "$f" || printf "\nBABELHUB__Web__DireccionDeGestion=\"https://gestion.babel-hub.shop\"\n" >> "$f"; grep "^BABELHUB__Web__DireccionDeGestion=" "$f"'
+sudo docker exec babelhub-inventario-postgres-1 psql -U postgres -d ecommerce -Atc "select 'pedidos=' || (select count(*) from pedidos.pedidos) || ' pagos_sin_confirmar=' || (select count(*) from pagos.intentos where estado = 'pendiente_de_confirmacion') || ' anulaciones=' || (select count(*) from pedidos.anulaciones)"
 ```
 
-Debe mostrar `BABELHUB__Web__DireccionDeGestion="https://gestion.babel-hub.shop"`. Va solo en `ecommerce.env` (la tienda). Si la escribes mal (sin `https://`, con una ruta o con espacios), la tienda **no arranca** y el registro nombra esa variable.
+Debe mostrar tres ceros. Si alguno no es cero, **para y consulta** antes de desplegar.
 
-**3. Desplegar con los digests de `v0.1.3`:** primero VM-INVENTARIO con el comando de §11 y después VM-VENTAS con el de §13.1 (con `--sin evolution-api` mientras no tengas el número de WhatsApp).
+**4. Detener la tienda y la gestión** para que nada se escriba durante la migración. En **VM-VENTAS**:
 
-**4. Comprobar** desde tu equipo:
+```bash
+sudo docker ps -q --filter label=com.docker.compose.service=ecommerce | xargs -r sudo docker stop
+```
+
+En **VM-INVENTARIO**:
+
+```bash
+sudo docker ps -q --filter label=com.docker.compose.service=ecommerce-gestion | xargs -r sudo docker stop
+```
+
+Repite la orden del paso 3: deben seguir los tres ceros.
+
+**5. Costo de envío por sucursal y dirección del personal.** Los secretos ya generados conservan el costo anterior. En **VM-VENTAS**:
+
+```bash
+sudo sh -c 'f=/etc/babelhub/secretos/ecommerce.env; test -f "$f" || { echo "PARA: esta no es VM-VENTAS"; exit 1; }; sed -i "s/^BABELHUB__Carrito__CostoDeEnvio=.*/BABELHUB__Carrito__CostoDeEnvio=\"30.00\"/" "$f"; grep -q "^BABELHUB__Web__DireccionDeGestion=" "$f" || printf "\nBABELHUB__Web__DireccionDeGestion=\"https://gestion.babel-hub.shop\"\n" >> "$f"; grep -E "^BABELHUB__(Carrito__CostoDeEnvio|Web__DireccionDeGestion)=" "$f"'
+```
+
+En **VM-INVENTARIO**:
+
+```bash
+sudo sh -c 'f=/etc/babelhub/secretos/ecommerce-gestion.env; test -f "$f" || { echo "PARA: esta no es VM-INVENTARIO"; exit 1; }; sed -i "s/^BABELHUB__Carrito__CostoDeEnvio=.*/BABELHUB__Carrito__CostoDeEnvio=\"30.00\"/" "$f"; grep "^BABELHUB__Carrito__CostoDeEnvio=" "$f"'
+```
+
+Deben mostrar el costo `"30.00"` (y, en VM-VENTAS, la dirección del personal). La dirección va solo en `ecommerce.env`; si la escribes mal (sin `https://`, con una ruta o con espacios), la tienda **no arranca** y el registro nombra esa variable. Opcional en el Inventario: `BABELHUB__Inventario__MaximoApartadoParaAlertar` (100 si falta), las unidades de un libro apartadas en una sucursal a partir de las cuales se avisa.
+
+**6. Desplegar con los digests de `v0.1.3`**, uno enseguida del otro: primero VM-INVENTARIO con el comando de §11 (migra las bases del Inventario y del E-commerce y levanta el Inventario y la gestión) y después VM-VENTAS con el de §13.1 (con `--sin evolution-api` mientras no tengas el número de WhatsApp).
+
+**7. Comprobar** desde tu equipo:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
@@ -1058,9 +1095,9 @@ curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
 curl -s https://babel-hub.shop/ingreso | grep -c "data-bh-acceso-del-personal"
 ```
 
-La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: `https://gestion.babel-hub.shop/` (tras Access) muestra el ingreso del personal y no un error; en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR, que debe leer la cámara de su teléfono.
+La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: la ficha de un libro impreso deja elegir la sucursal y muestra su stock; una compra a domicilio de dos sucursales cobra S/ 60,00 de envío; `https://gestion.babel-hub.shop/` (tras Access) muestra el ingreso del personal y la administración ve «Costos de envío»; en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; quien aún no configuró su segundo factor ve el código QR, que debe leer la cámara de su teléfono. Los avisos de apartado alto quedan en el registro del Inventario: define quién los revisa.
 
-**Para volver atrás:** `sudo git checkout v0.1.2` y los digests de esa versión. La línea de la dirección del personal se puede quedar (esa versión la ignora).
+**Para volver atrás** solo antes de la primera compra por sucursal, restaurando el respaldo del paso 2 (se pierde lo escrito después). Con compras ya hechas, se corrige hacia adelante.
 
 ## 16. Si algo sale mal: tabla de rescate
 

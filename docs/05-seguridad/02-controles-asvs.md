@@ -13,7 +13,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | **CTL-01** | Toda entrada se valida en el servidor (tipo, longitud, formato, rango). | L1 | SEG-01 | Pruebas unitarias y de integración | Especificado |
 | **CTL-02** | Toda salida se codifica según su contexto; el contenido de usuario nunca se interpreta como código. | L1 | SEG-02, ASI-12 | Pruebas E2E y revisión estática | Especificado |
 | **CTL-03** | Las consultas a la base de datos usan parámetros; no se arma SQL con texto del usuario. | L1 | Plan de cada servicio | Revisión estática y pruebas | Pendiente |
-| **CTL-04** | Los flujos de negocio sensibles (reservas, descargas, pagos) tienen límites y son idempotentes. | L2 | RF28, SEL-09, PAG-04, BIB-15 | Pruebas de concurrencia y carga | Especificado |
+| **CTL-04** | Los flujos de negocio sensibles (reservas, descargas, pagos) tienen límites y son idempotentes. | L2 | RF28, SEL-09, PAG-04, BIB-15, CAR-49, PED-45 | Pruebas de concurrencia y carga | Especificado |
 
 ## 2. Frontend web
 
@@ -63,9 +63,9 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 
 | ID | Control | Nivel | Dónde se especifica | Verificación | Estado |
 | :--- | :--- | :---: | :--- | :--- | :---: |
-| **CTL-24** | El alcance por sucursal se comprueba en la Aplicación de cada caso de uso, no solo en el controlador. | L1 | RNF05, AUD-05 | Pruebas unitarias y de integración | Especificado |
-| **CTL-25** | Un recurso ajeno responde igual que uno inexistente cuando revelar su existencia sería una fuga. | L2 | Plan de cada servicio | Pruebas de integración | Pendiente |
-| **CTL-26** | Las funciones administrativas exigen rol y segundo factor. | L1 | IDE-20, WEB-02 | Pruebas de integración | Especificado. **Excepción acotada (DD-72, `transversal-carga-inicial`):** las órdenes de operación `cargar-catalogo` y `cargar-stock` actúan con la identidad de operación «carga inicial» (rol de administración central, sin sesión ni segundo factor); solo la construyen esas dos órdenes, que exigen el acceso a las cuentas de base del servicio, y las Api la rechazan si llega en una credencial. |
+| **CTL-24** | El alcance por sucursal se comprueba en la Aplicación de cada caso de uso, no solo en el controlador. | L1 | RNF05, AUD-05, CAR-48 | Pruebas unitarias y de integración | Especificado |
+| **CTL-25** | Un recurso ajeno responde igual que uno inexistente cuando revelar su existencia sería una fuga. | L2 | Plan de cada servicio, CAR-44 | Pruebas de integración | Pendiente |
+| **CTL-26** | Las funciones administrativas exigen rol y segundo factor. | L1 | IDE-20, WEB-02, CAR-48 | Pruebas de integración | Especificado. **Excepción acotada (DD-72, `transversal-carga-inicial`):** las órdenes de operación `cargar-catalogo` y `cargar-stock` actúan con la identidad de operación «carga inicial» (rol de administración central, sin sesión ni segundo factor); solo la construyen esas dos órdenes, que exigen el acceso a las cuentas de base del servicio, y las Api la rechazan si llega en una credencial. |
 
 ## 8. Criptografía y comunicación segura
 
