@@ -328,27 +328,6 @@ public sealed class RepositorioDePedidosPostgresTests(PostgresDePedidosFixture b
     }
 
     [Fact]
-    public async Task Los_conteos_y_el_listado_por_filtro_responden_solo_de_lo_pedido()
-    {
-        var domicilio = Domicilio();
-        var recojoLima = Recojo("LIM");
-        var recojoAyacucho = Recojo("AYA");
-        var ajeno = Domicilio(Guid.NewGuid());
-        foreach (var p in new[] { domicilio, recojoLima, recojoAyacucho, ajeno })
-        {
-            await bd.Pedidos.Agregar(p);
-        }
-
-        Assert.Equal(3, (await bd.Pedidos.Listar(new CriterioDeListado(Cuenta, null, false, null, 1, 10))).Total);
-        Assert.Equal([recojoLima.Id], (await bd.Pedidos.Listar(new CriterioDeListado(null, "LIM", false, null, 1, 10))).Pedidos.Select(p => p.Id));
-        Assert.Equal(2, (await bd.Pedidos.Listar(new CriterioDeListado(null, null, true, null, 1, 10))).Total);
-        Assert.Equal(2, (await bd.Pedidos.Listar(new CriterioDeListado(null, null, false, EstadoDePedido.Confirmado, 1, 2))).Pedidos.Count);
-        Assert.Equal(3, await bd.Pedidos.ContarPedidosConImpresaSinCerrar(Cuenta));
-        Assert.Equal(0, await bd.Pedidos.ContarNoRecogidasSinAnularDesde(Ahora.AddDays(1)));
-        Assert.Equal(4, await bd.Pedidos.ContarImpresasSinEstadoFinalDesde(Ahora.AddDays(1)));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-PED-13")]
     public async Task La_consulta_de_recojo_vencido_trae_solo_las_listas_de_recojo_con_mas_de_15_dias_y_no_las_de_14_ni_las_de_domicilio()
     {

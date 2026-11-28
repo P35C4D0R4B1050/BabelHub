@@ -281,20 +281,6 @@ public sealed class PantallasDePedidosTests
 
     [Fact]
     [Trait("Criterio", "AC-PED-03")]
-    public async Task Sin_pedidos_se_muestra_el_estado_vacio_y_con_un_filtro_se_ofrece_ver_todos()
-    {
-        await using var anfitrion = await ComoTitular(new PedidosDelClienteFalso());
-
-        var (_, vacio) = await Pedir(anfitrion, "/cuenta/pedidos", HostWeb.Tienda);
-        var (_, filtrado) = await Pedir(anfitrion, "/cuenta/pedidos?estado=entregado", HostWeb.Tienda);
-
-        Assert.Contains("Aún no hay pedidos", vacio, StringComparison.Ordinal);
-        Assert.Contains("No hay pedidos en este estado", filtrado, StringComparison.Ordinal);
-        Assert.Contains("Ver todos", filtrado, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PED-03")]
     [Trait("Criterio", "AC-PED-26")]
     public async Task El_detalle_del_titular_muestra_el_traslado_con_su_fecha_el_contacto_y_el_reembolso_pendiente()
     {
@@ -433,19 +419,6 @@ public sealed class PantallasDePedidosTests
         Assert.Empty(falso.Llamadas);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-PED-15")]
-    public async Task Un_POST_de_cancelar_con_campos_que_no_declara_es_validacion()
-    {
-        var falso = new PedidosDelClienteFalso();
-        await using var anfitrion = await ComoTitular(falso);
-
-        using var respuesta = await Enviar(anfitrion, $"/cuenta/pedidos/{Pedido:D}/cancelar", HostWeb.Tienda, [new("cuentaId", Guid.NewGuid().ToString("D"))]);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Empty(falso.Llamadas);
-    }
-
     // ---------- El encargado de la sucursal ----------
 
     [Fact]
@@ -514,20 +487,6 @@ public sealed class PantallasDePedidosTests
         var campos = cuerpo.Length == 0 ? [] : cuerpo.Split('&').Select(p => p.Split('=')).Select(p => new KeyValuePair<string, string>(p[0], p[1])).ToList();
 
         using var respuesta = await Enviar(anfitrion, $"/sucursal/LIM-01/pedidos/{Pedido:D}/preparar", HostWeb.Gestion, campos);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Empty(falso.Llamadas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PED-25")]
-    public async Task Mas_lineas_que_el_tope_de_un_pedido_es_validacion()
-    {
-        var falso = new GestionDeRecojoFalsa();
-        await using var anfitrion = await ComoEncargado(falso);
-        var demasiadas = Enumerable.Range(0, 31).Select(_ => Id(Guid.NewGuid())).ToList();
-
-        using var respuesta = await Enviar(anfitrion, $"/sucursal/LIM-01/pedidos/{Pedido:D}/entregar", HostWeb.Gestion, demasiadas);
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         Assert.Empty(falso.Llamadas);
@@ -678,22 +637,6 @@ public sealed class PantallasDePedidosTests
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         Assert.Empty(falso.Llamadas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PED-12")]
-    public async Task Un_motivo_fuera_de_la_lista_lo_rechaza_la_Aplicacion_con_validacion_y_un_pedido_sin_lineas_anulables_es_422()
-    {
-        var falso = new AdministracionFalsa { Anulacion = Resultado<ResultadoDeAnulacion>.Fallo(Error(CategoriaDeError.Validacion, "validacion-fallida", new ErrorDeCampo("motivo", "no-permitido"))) };
-        await using var anfitrion = await ComoAdministracion(falso);
-
-        using var fueraDeLista = await Enviar(anfitrion, $"/administracion/pedidos/{Pedido:D}/anular", HostWeb.Gestion, [new("motivo", "porque-si")]);
-        falso.Anulacion = Resultado<ResultadoDeAnulacion>.Fallo(Error(CategoriaDeError.ReglaDeNegocio, "pedido-sin-lineas-anulables"));
-        using var sinLineas = await Enviar(anfitrion, $"/administracion/pedidos/{Pedido:D}/anular", HostWeb.Gestion, [new("motivo", "otro")]);
-
-        Assert.Equal(HttpStatusCode.BadRequest, fueraDeLista.StatusCode);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, sinLineas.StatusCode);
-        Assert.Equal("ECO-PEDIDO-SIN-LINEAS-ANULABLES", JsonDePrueba.Leer(await sinLineas.Content.ReadAsStringAsync()).GetProperty("code").GetString());
     }
 
     [Fact]

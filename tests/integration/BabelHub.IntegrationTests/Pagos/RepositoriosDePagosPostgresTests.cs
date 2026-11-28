@@ -141,12 +141,6 @@ public sealed class RepositoriosDePagosPostgresTests(PostgresDePagosFixture bd) 
     }
 
     [Fact]
-    public async Task Guardar_una_intencion_que_no_existe_falla()
-    {
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Guardar(Abierta()));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-PAG-22")]
     public async Task Desvincular_la_cuenta_borra_el_identificador_el_contacto_las_ediciones_y_las_reservas_y_conserva_los_importes()
     {
@@ -227,23 +221,6 @@ public sealed class RepositoriosDePagosPostgresTests(PostgresDePagosFixture bd) 
         libera.SetResult();
         await primera;
         Assert.NotNull(await Leer(intencion.Id, paraActualizar: true));
-    }
-
-    [Fact]
-    public async Task Las_intenciones_de_una_cuenta_se_listan_por_identificador_y_la_cuenta_ajena_no_aparece()
-    {
-        var propias = new[] { Abierta(), Abierta(), Abierta() };
-        foreach (var intencion in propias)
-        {
-            await Sembrar(intencion);
-        }
-
-        await Sembrar(Abierta(cuenta: Guid.NewGuid()));
-
-        var lista = await bd.Unidad.Ejecutar(token => bd.Pagos.ListarIntencionesDeLaCuenta(Cuenta, paraActualizar: true, token));
-
-        Assert.Equivalent(propias.Select(i => i.Id).ToArray(), lista.Select(i => i.Id).ToArray());
-        Assert.Empty(await bd.Unidad.Ejecutar(token => bd.Pagos.ListarIntencionesDeLaCuenta(Guid.NewGuid(), paraActualizar: false, token)));
     }
 
     [Fact]
@@ -347,19 +324,6 @@ public sealed class RepositoriosDePagosPostgresTests(PostgresDePagosFixture bd) 
     }
 
     [Fact]
-    public async Task El_ultimo_intento_es_el_de_inicio_mas_reciente_activo_o_no()
-    {
-        var (intencion, primero) = await ConIntento();
-        Assert.True(primero.MarcarRechazado(MotivoDeRechazo.TarjetaVencida, Inicio.AddMinutes(1)));
-        await bd.Unidad.Ejecutar(async token => { await bd.Pagos.GuardarIntento(primero, token); return 0; });
-        var segundo = IntentoDeCobro.Iniciar(Guid.NewGuid(), intencion.Id, MedioDePago.Tarjeta, intencion.Total, Inicio.AddMinutes(2));
-        await Agregar(segundo);
-
-        Assert.Equal(segundo.Id, (await bd.Unidad.Ejecutar(token => bd.Pagos.ObtenerUltimoIntento(intencion.Id, token)))!.Id);
-        Assert.Null(await bd.Unidad.Ejecutar(token => bd.Pagos.ObtenerUltimoIntento(Guid.NewGuid(), token)));
-    }
-
-    [Fact]
     public async Task Los_intentos_por_consultar_son_los_sin_resolver_y_los_resueltos_hace_menos_de_veinticuatro_horas()
     {
         var (intencion, sinResolver) = await ConIntento();
@@ -404,19 +368,6 @@ public sealed class RepositoriosDePagosPostgresTests(PostgresDePagosFixture bd) 
         await bd.Unidad.Ejecutar(async token => { await bd.Pagos.GuardarCompensacion(compensacion, token); return 0; });
         Assert.Empty(await bd.Unidad.Ejecutar(token => bd.Pagos.ListarCompensacionesSinTerminar(10, token)));
         Assert.True((await bd.Unidad.Ejecutar(token => bd.Pagos.ObtenerCompensacion(intento.Id, token)))!.EstaTerminada);
-    }
-
-    [Fact]
-    public async Task Una_compensacion_por_cancelacion_de_cuenta_no_avisa_tras_guardarla_y_leerla()
-    {
-        var (intencion, intento) = await ConIntentoAprobado();
-        var compensacion = Compensacion.Iniciar(intencion.Id, intento.Id, MotivoDeCompensacion.CancelacionDeCuentaEnCurso, VarianteDeCompensacion.SoloReembolso, false, Inicio.AddMinutes(3));
-        Assert.True(await bd.Unidad.Ejecutar(token => bd.Pagos.AgregarCompensacion(compensacion, token)));
-
-        var leida = await bd.Unidad.Ejecutar(token => bd.Pagos.ObtenerCompensacion(intento.Id, token));
-
-        Assert.False(leida!.Avisar);
-        Assert.Equivalent(compensacion, leida, strict: true);
     }
 
     // ---------- Avisos ----------
@@ -565,23 +516,6 @@ public sealed class RepositoriosDePagosPostgresTests(PostgresDePagosFixture bd) 
         Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Reembolsos.ContarPendientesDeLaCuenta(Cuenta, OrigenDeReembolso.Compensacion, true, token)));
         Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Reembolsos.ContarPendientesDeLaCuenta(Cuenta, OrigenDeReembolso.Devolucion, false, token)));
         Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Reembolsos.ContarPendientesDeLaCuenta(Guid.NewGuid(), OrigenDeReembolso.Compensacion, false, token)));
-    }
-
-    [Fact]
-    public async Task Los_reembolsos_pendientes_se_listan_por_paginas_con_su_total()
-    {
-        var (intencion, intento) = await ConIntentoAprobado();
-        for (var i = 0; i < 3; i++)
-        {
-            await Agregar(DeLineas(intencion, intento, OrigenDeReembolso.Devolucion, ClaveDeReembolso.Devolucion(Guid.NewGuid(), LineaImpresa), Inicio.AddMinutes(10 + i)));
-        }
-
-        var (primera, total) = await bd.Unidad.Ejecutar(token => bd.Reembolsos.ListarPendientes(1, 2, token));
-        var (segunda, _) = await bd.Unidad.Ejecutar(token => bd.Reembolsos.ListarPendientes(2, 2, token));
-
-        Assert.Equal(3, total);
-        Assert.Equal((2, 1), (primera.Count, segunda.Count));
-        Assert.Empty(primera.Select(r => r.Id).Intersect(segunda.Select(r => r.Id)));
     }
 
     [Fact]

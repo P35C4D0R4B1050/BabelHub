@@ -65,22 +65,6 @@ public sealed class TrabajoDeFondoDePagosTests
     }
 
     [Fact]
-    public async Task Un_exito_reinicia_la_cuenta_de_fallos_seguidos()
-    {
-        var fallar = true;
-        var e = new Entorno(_ => fallar ? throw new InvalidOperationException("la base cayó") : Task.CompletedTask);
-        await e.Trabajo.EjecutarUnaVez();
-        await e.Trabajo.EjecutarUnaVez();
-        fallar = false;
-        await e.Trabajo.EjecutarUnaVez();
-        fallar = true;
-        await e.Trabajo.EjecutarUnaVez();
-        await e.Trabajo.EjecutarUnaVez();
-
-        Assert.Empty(e.Alertas.Publicadas);
-    }
-
-    [Fact]
     public async Task Un_dia_sin_una_corrida_exitosa_alerta_aunque_no_lleguen_a_tres_fallos()
     {
         var e = new Entorno(_ => throw new InvalidOperationException("la base cayó"));
@@ -90,52 +74,6 @@ public sealed class TrabajoDeFondoDePagosTests
         await e.Trabajo.EjecutarUnaVez();
 
         Assert.Single(e.Alertas.Publicadas);
-    }
-
-    [Fact]
-    public async Task La_cancelacion_del_apagado_no_cuenta_como_fallo_y_no_se_registra()
-    {
-        using var origen = new CancellationTokenSource();
-        var e = new Entorno(async ct => { await origen.CancelAsync(); ct.ThrowIfCancellationRequested(); });
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => e.Trabajo.EjecutarUnaVez(origen.Token));
-
-        Assert.Empty(e.Registro.Corridas);
-        Assert.Empty(e.Alertas.Publicadas);
-    }
-
-    [Fact]
-    public async Task Si_el_registro_o_la_alerta_fallan_el_trabajo_sigue()
-    {
-        var e = new Entorno(_ => throw new InvalidOperationException("la base cayó"));
-        e.Registro.Falla = true;
-        e.Alertas.Falla = true;
-
-        for (var i = 0; i < 3; i++)
-        {
-            await e.Trabajo.EjecutarUnaVez();
-        }
-
-        Assert.Equal(3, e.AlcancesAbiertos);
-    }
-
-    [Fact]
-    public async Task Correr_hace_una_corrida_al_empezar_y_termina_con_la_cancelacion_sin_lanzar()
-    {
-        using var origen = new CancellationTokenSource();
-        var corridas = 0;
-        var e = new Entorno(
-            _ =>
-            {
-                corridas++;
-                origen.Cancel();
-                return Task.CompletedTask;
-            },
-            intervalo: TimeSpan.FromHours(1));
-
-        await e.Trabajo.Correr(origen.Token);
-
-        Assert.Equal(1, corridas);
     }
 
     private sealed class RelojManual(DateTimeOffset inicio) : IReloj

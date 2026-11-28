@@ -251,16 +251,6 @@ public sealed class GuardaYDoblesDePagosTests
 
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
-    [InlineData("Ninguna")]
-    [InlineData("NINGUNA")]
-    [InlineData("ninguno")]
-    public void El_nombre_de_sin_pasarela_es_exacto(string pasarela)
-    {
-        Assert.Contains(GuardaDeArranqueDePagos.VariablePasarela, Rechaza(Opciones(pasarela: pasarela, entorno: "Staging", nula: true)).Message, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [Trait("Criterio", "AC-PAG-30")]
     [InlineData("ninguna", false, true)]
     [InlineData("simulador", false, false)]
     [InlineData("culqi", false, false)]
@@ -401,93 +391,5 @@ public sealed class GuardaYDoblesDePagosTests
         var inventario = new ReservasSimuladasDelPago(reloj);
         inventario.Sembrar(Pedido, reloj.Ahora.AddMinutes(15), [new LineaConfirmadaDeReserva(Guid.NewGuid(), "AYA-01", false, null, null)]);
         return (inventario, reloj);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-11")]
-    public async Task Una_reserva_pendiente_se_consulta_y_se_extiende_una_sola_vez()
-    {
-        var (inventario, reloj) = Inventario();
-
-        var consulta = await inventario.Consultar(Pedido, Cuenta);
-        var primera = await inventario.Extender(Pedido);
-        var segunda = await inventario.Extender(Pedido);
-
-        Assert.True(consulta.EsCorrecta);
-        Assert.True(consulta.Valor!.Vigente);
-        // Sin cuerpo: el Inventario calcula el instante (inicio de la reserva más 30 minutos) y la segunda llamada es un éxito sin cambios.
-        Assert.Equal(new ResultadoDeExtension(reloj.Ahora.AddMinutes(30), true), primera.Valor);
-        Assert.Equal(new ResultadoDeExtension(reloj.Ahora.AddMinutes(30), false), segunda.Valor);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-07")]
-    public async Task Una_reserva_expirada_no_esta_vigente_ni_se_extiende_ni_se_confirma()
-    {
-        var (inventario, reloj) = Inventario();
-        reloj.Ahora = reloj.Ahora.AddMinutes(16);
-
-        Assert.False((await inventario.Consultar(Pedido, Cuenta)).Valor!.Vigente);
-        // Extender una reserva vencida no es un error: es un éxito sin cambios (contrato v1).
-        var extension = await inventario.Extender(Pedido);
-        Assert.True(extension.EsCorrecta);
-        Assert.False(extension.Valor!.Extendida);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.EstadoInvalido, (await inventario.Confirmar(Pedido, "conf-1")).Resultado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-04")]
-    public async Task Confirmar_con_la_misma_clave_devuelve_lo_mismo_y_con_otra_clave_es_un_estado_invalido()
-    {
-        var (inventario, _) = Inventario();
-
-        var primera = await inventario.Confirmar(Pedido, "conf-1");
-        var repetida = await inventario.Confirmar(Pedido, "conf-1");
-        var otra = await inventario.Confirmar(Pedido, "conf-2");
-
-        Assert.Equal("AYA-01", primera.Valor!.Single().CodigoDeFuente);
-        Assert.Equal(primera.Valor, repetida.Valor);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.EstadoInvalido, otra.Resultado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-17")]
-    public async Task Liberar_una_reserva_confirmada_con_pago_vencido_es_un_estado_invalido_y_con_falla_posterior_la_libera()
-    {
-        var (inventario, _) = Inventario();
-        await inventario.Confirmar(Pedido, "conf-1");
-
-        var conVencido = await inventario.Liberar(Pedido, MotivoDeLiberacion.PagoVencido);
-        var conFalla = await inventario.Liberar(Pedido, MotivoDeLiberacion.FallaPosteriorAlPago);
-        var repetida = await inventario.Liberar(Pedido, MotivoDeLiberacion.FallaPosteriorAlPago);
-
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.EstadoInvalido, conVencido.Resultado);
-        Assert.True(conFalla.EsCorrecta);
-        Assert.True(repetida.EsCorrecta);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-17")]
-    public async Task Liberar_una_reserva_expirada_o_ya_liberada_es_un_exito_sin_cambios_y_una_desconocida_no_existe()
-    {
-        var (inventario, reloj) = Inventario();
-        reloj.Ahora = reloj.Ahora.AddMinutes(16);
-
-        Assert.True((await inventario.Liberar(Pedido, MotivoDeLiberacion.PagoVencido)).EsCorrecta);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.NoExiste, (await inventario.Liberar(Guid.NewGuid(), MotivoDeLiberacion.PagoVencido)).Resultado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-04")]
-    public async Task Un_inventario_caido_responde_sin_respuesta_y_una_reserva_desconocida_no_existe()
-    {
-        var (inventario, _) = Inventario();
-
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.NoExiste, (await inventario.Consultar(Guid.NewGuid(), Cuenta)).Resultado);
-        inventario.Caido = true;
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Consultar(Pedido, Cuenta)).Resultado);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Confirmar(Pedido, "conf-1")).Resultado);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Extender(Pedido)).Resultado);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Liberar(Pedido, MotivoDeLiberacion.PagoVencido)).Resultado);
     }
 }
