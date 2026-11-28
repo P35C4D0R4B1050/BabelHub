@@ -89,7 +89,7 @@ public sealed class CoberturaTests : IDisposable
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PLA-14")]
+    [Trait("Criterio", "AC-PLA-45")]
     public void UnModuloSinClasificarSeExigeComoCritico()
     {
         var incumplimientos = Verificar(Modulo("Ecommerce/Pagos", 100, 100), Modulo("Ecommerce/Regalos", 84, 100), Reservas);
@@ -100,7 +100,7 @@ public sealed class CoberturaTests : IDisposable
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PLA-14")]
+    [Trait("Criterio", "AC-PLA-45")]
     public void UnArchivoCuyaRutaNoPasaPorSuEnsambladoSeExigeComoCritico()
     {
         var incumplimientos = Verificar(
@@ -110,7 +110,7 @@ public sealed class CoberturaTests : IDisposable
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PLA-14")]
+    [Trait("Criterio", "AC-PLA-45")]
     public void UnModuloCriticoSinDatos_Falla()
     {
         var incumplimientos = Verificar(Modulo("Ecommerce/Catalogo", 100, 100), Reservas);
@@ -119,7 +119,7 @@ public sealed class CoberturaTests : IDisposable
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PLA-14")]
+    [Trait("Criterio", "AC-PLA-45")]
     public void UnServicioEsperadoSinDatosDeDominioYAplicacion_Falla()
     {
         var incumplimientos = Verificar(
@@ -258,7 +258,7 @@ public sealed class CoberturaTests : IDisposable
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PLA-14")]
+    [Trait("Criterio", "AC-PLA-45")]
     public void CadaModuloDelCodigoEstaClasificado()
     {
         // Un módulo nuevo se exige como crítico hasta que se clasifique; esta prueba obliga a clasificarlo a la vista.

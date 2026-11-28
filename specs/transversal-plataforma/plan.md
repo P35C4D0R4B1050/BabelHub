@@ -5,14 +5,14 @@ estado: Draft
 
 # Plan — Calidad de la plataforma y operación
 
-> **Cómo se construye.** Parte de la spec **Approved** `transversal-plataforma` (43 requisitos, 38 criterios). Casi todo es verificación automática, imágenes, scripts de operación y configuración. El único código de negocio es el módulo `Plataforma` del E-commerce, reducido a lo que esta spec exige: el **registro de supresiones** y su reaplicación al restaurar. El correo, las cuotas y las alertas pertenecen a `identidad-seguridad` (IDE-77 a IDE-83) y a `transversal-auditoria`. No agrega comportamiento nuevo.
+> **Cómo se construye.** Parte de la spec **Approved** `transversal-plataforma` (44 requisitos, 39 criterios). Casi todo es verificación automática, imágenes, scripts de operación y configuración. El único código de negocio es el módulo `Plataforma` del E-commerce, reducido a lo que esta spec exige: el **registro de supresiones** y su reaplicación al restaurar. El correo, las cuotas y las alertas pertenecen a `identidad-seguridad` (IDE-77 a IDE-83) y a `transversal-auditoria`. No agrega comportamiento nuevo.
 
 ## 1. Resumen técnico
 
 Seis bloques, ordenados por riesgo (lo incierto primero, D01). **Topología vigente (2026-11-25, DD-100 a DD-104):** dos VMs, con la entrada dentro de VM-VENTAS y **VM-AUX aplazada**; lo que depende de VM-AUX queda sin cumplir hasta que exista (spec §5; `docs/02-arquitectura-de-software/05-despliegue.md` §6.2). Los respaldos están en Cloudflare R2 (D25 a D28, provisional).
 
 1. **Comprobaciones previas («spikes»)** de lo que decide el diseño: restauración de una copia física hecha en ARM, políticas y retención del almacén de objetos de Oracle (hoy, libros y registro de supresiones; el comportamiento de R2 para los respaldos se comprueba en la cuenta, T47), cuota gratuita, recursos de VM-INVENTARIO con respaldo en curso y un volumen cifrado efímero para el ensayo (T01 a T05). Cada decisión de este plan trae su alternativa si el spike falla.
-2. **Puertas de calidad en CI** (PLA-01, 02, 13, 14, 23, 26, 28, 31): se endurece `SpecCheck`, la prueba de arquitectura y `ci.yml`, con acciones fijadas por SHA, bloqueo de paquetes y escáner de secretos (D02 a D05).
+2. **Puertas de calidad en CI** (PLA-01, 02, 13, 14, 23, 26, 28, 31, 45): se endurece `SpecCheck`, la prueba de arquitectura y `ci.yml`, con acciones fijadas por SHA, bloqueo de paquetes y escáner de secretos (D02 a D05).
 3. **Imágenes y despliegue** (PLA-03, 04, 26, 27, 33): `Dockerfile` por `Api`, `docker-compose.<vm>.yml` por VM con `digest` fijos y `scripts/desplegar.sh` (D06).
 4. **Respaldo, archivado y retención** (PLA-09, 15 a 18, 20, 21, 35, 38, 44): copia consistente del clúster con `pg_basebackup` y archivado de WAL **comprimidos con `zstd` y después cifrados** con `age` (clave pública), en **Cloudflare R2** (provisional, D26) con una credencial limitada a los contenedores de respaldos, **retención por reglas del propio almacén** (bloqueo de retención y ciclo de vida), comprobaciones y alertas desde VM-AUX (aplazada) (D07 a D11 y D25 a D28). Libros, portadas y registro de supresiones siguen en Oracle.
 5. **Restauración, ensayo y puerta de despliegue** (PLA-10, 11, 19, 22, 36, 39 a 43): herramienta operativa `tools/RestauracionCheck` fuera de los servicios, ensayo aislado en la máquina de la persona responsable con un volumen cifrado efímero y puerta de despliegue que exige un ensayo vigente (D12 a D14).
@@ -101,7 +101,8 @@ Mecanismo de nombrado: toda prueba C# lleva `[Trait("Criterio", "AC-PLA-NN")]`. 
 | AC-PLA-19, AC-PLA-37, AC-PLA-43 | Unitaria del verificador del registro y de los sellos; integración con concurrencia, intención sin cierre, cierre sin intención rechazado, la vía de excepción del sello, rotación al restaurar y orden de apertura (cola restaurada con una cuenta suprimida: sin envío antes de abrir); prueba negativa de que `supresiones-registro` no escribe en `sellos/` | `tests/unit/...` y `tests/integration/.../Supresiones/` |
 | AC-PLA-12 | Contrato: pruebas de `v1` y `v2` hasta la fecha de retiro (tabla en `docs/03/04-modulos-y-contratos.md` §6.1, ≥ 30 días) | `tests/integration/.../Contratos/` |
 | AC-PLA-13 | Arquitectura (los cinco casos, más que ningún servicio referencie `tools/RestauracionCheck`) | `tests/architecture/` |
-| AC-PLA-14 | Unitaria del script de umbrales con números de prueba | `tests/tools/` |
+| AC-PLA-14 | Unitaria de `tools/CoverageCheck` con informes de prueba de módulos críticos y no críticos, de la política declarada, y el programa con sus códigos de salida | `tests/tools/` |
+| AC-PLA-45 | Unitaria de `tools/CoverageCheck` con módulos sin clasificar o sin datos, y de que cada módulo del código esté clasificado | `tests/tools/` |
 
 ## 9. Riesgos
 
