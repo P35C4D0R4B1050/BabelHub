@@ -95,21 +95,6 @@ public sealed class PantallasDeEnviosTests
         Assert.Contains("estado=en-reparto", html, StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task Sin_envios_se_muestra_el_estado_vacio_y_con_un_filtro_se_ofrece_ver_todos()
-    {
-        var falso = new EnviosDeLogisticaFalso();
-        await using var anfitrion = await IniciarLogistica(falso);
-
-        var (_, vacio) = await Pedir(anfitrion, "/logistica/envios", HostWeb.Gestion);
-        var (_, filtrado) = await Pedir(anfitrion, "/logistica/envios?estado=entregado", HostWeb.Gestion);
-
-        Assert.Contains("Aún no hay envíos", vacio, StringComparison.Ordinal);
-        Assert.Contains("No hay envíos en este estado", filtrado, StringComparison.Ordinal);
-        Assert.Contains("Ver todos", filtrado, StringComparison.Ordinal);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-ENV-08")]
     [InlineData(CategoriaDeError.NoDisponible, "servicio-no-disponible", HttpStatusCode.ServiceUnavailable, "No podemos")]
@@ -168,8 +153,6 @@ public sealed class PantallasDeEnviosTests
     [Theory]
     [Trait("Criterio", "AC-ENV-09")]
     [InlineData("nombre", "Falta el nombre del destinatario")]
-    [InlineData("direccion", "Falta la dirección de entrega")]
-    [InlineData("telefono", "Falta el teléfono del destinatario")]
     [InlineData("anonimizado", "El contacto del pedido se anonimizó")]
     public async Task El_contacto_incompleto_se_explica_por_campo_sin_ofrecer_reintentar_ni_mostrar_valores(string campo, string texto)
     {

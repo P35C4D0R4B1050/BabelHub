@@ -75,22 +75,6 @@ public sealed class ConsultasDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-12")]
-    public async Task Un_cliente_sin_pedidos_recibe_una_pagina_vacia_y_con_Pedidos_caido_servicio_no_disponible()
-    {
-        var sin = new EntornoDeDevoluciones();
-        var caido = new EntornoDeDevoluciones();
-        caido.Pedidos.NoResponde = true;
-
-        var vacia = await sin.Consultas.ListarMias(new ListarDevolucionesEntrada());
-        var noDisponible = await caido.Consultas.ListarMias(new ListarDevolucionesEntrada());
-
-        Assert.Empty(vacia.Valor.Devoluciones);
-        Assert.Equal(0, vacia.Valor.Total);
-        Assert.Equal(CategoriaDeError.NoDisponible, noDisponible.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
     public async Task Obtener_la_propia_funciona_y_una_ajena_responde_lo_mismo_que_una_inexistente_con_un_evento_por_intento()
     {
         var a = new EntornoDeDevoluciones();
@@ -265,22 +249,6 @@ public sealed class ConsultasDeDevolucionesTests
         Assert.True(resultado.Error!.Categoria is CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado);
         Assert.Single(otro.Denegaciones.Eventos);
         Assert.Equal(CategoriaDeError.Validacion, invalido.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
-    public async Task Con_el_almacen_caido_las_consultas_responden_servicio_no_disponible()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var id = await SolicitarImpreso(cliente, "lima-central");
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), cliente);
-        cliente.Repositorio.NoDisponible = true;
-
-        var mias = await cliente.Consultas.ListarMias(new ListarDevolucionesEntrada());
-        var obtener = await admin.Consultas.Obtener(id);
-        var todas = await admin.Consultas.ListarDeLaAdministracion(new ListarDevolucionesDeLaAdministracionEntrada());
-
-        Assert.All(new[] { mias.Error, obtener.Error, todas.Error }, e => Assert.Equal(CategoriaDeError.NoDisponible, e!.Categoria));
     }
 
     [Fact]

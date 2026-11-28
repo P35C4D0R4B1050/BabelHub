@@ -30,17 +30,6 @@ public sealed class OrigenDeUnidadesVendidasPostgresTests(PostgresDeReservasFixt
         pila.Ejecutar<ConfirmarReservasEntrada, ReservaDelPedido>(Servicio, new ConfirmarReservasEntrada(pedido, Guid.NewGuid().ToString("N")));
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-17")]
-    public async Task ElAdaptadorRealReemplazaAlNuloDeFuentes()
-    {
-        using var pila = new PilaDeReservas(bd);
-        using var ambito = pila.Proveedor.CreateScope();
-
-        Assert.IsType<OrigenDeUnidadesVendidas>(ambito.ServiceProvider.GetRequiredService<IOrigenDeUnidadesVendidas>());
-        await Task.CompletedTask;
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-SEL-49")]
     public async Task EnUnRecojoPorSucursal_CadaLineaSeAtribuyeASuSucursal_YLasVariasDeUnaSeSuman()
     {

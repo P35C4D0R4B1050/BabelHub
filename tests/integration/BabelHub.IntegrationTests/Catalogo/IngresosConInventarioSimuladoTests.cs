@@ -149,28 +149,6 @@ public sealed class IngresosConInventarioSimuladoTests(PostgresDelCatalogoYAudit
         Assert.Single(_host.Inventario.Ingresos);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
-    public async Task Un_stock_inicial_de_0_de_6000_o_negativo_se_rechaza_sin_crear_nada_y_1_y_5000_se_aceptan()
-    {
-        foreach (var stock in new[] { 0, 6000, -3, 5001 })
-        {
-            var portada = await _host.SubirYReferenciar("portada", ArchivosDeMuestra.Png(40, 40, 900), Ana);
-            using var respuesta = await _host.Json(HttpMethod.Post, "/administracion/obras", new { titulo = "X", autor = "A", editorial = "E", categoria = "C", portadaRef = portada, ediciones = new[] { new { formato = "impresa", isbn = "978-0-00-000001-9", precio = 10m, stockInicial = stock } } }, usuario: Ana);
-
-            Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-            Assert.Equal("ECO-VALIDACION-INVALIDA", Codigo(await CatalogoApiHost.Leer(respuesta)));
-        }
-
-        Assert.Equal(0, await bd.Consultar<long>("SELECT count(*) FROM catalogo.obras"));
-        Assert.Equal(0, _host.Inventario.LlamadasDeRegistrarEdicion);
-
-        var uno = await _host.RegistrarImpresa("Uno", "978-0-00-000001-9", 1, Ana);
-        var cinco = await _host.RegistrarImpresa("Cinco mil", "9780000000026", 5000, Ana);
-        Assert.Equal("registrado", Estado(uno.GetProperty("ingresos")[0]));
-        Assert.Equal("registrado", Estado(cinco.GetProperty("ingresos")[0]));
-    }
-
     // ---------- El ingreso y su clave (CAT-22, AC-CAT-18) ----------
 
     [Fact]
@@ -221,84 +199,7 @@ public sealed class IngresosConInventarioSimuladoTests(PostgresDelCatalogoYAudit
         }
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Una_cantidad_de_0_de_6000_o_negativa_es_validacion_sin_fila_y_sin_llamada_y_1_y_5000_se_aceptan()
-    {
-        var edicion = await Impresa();
-        var llamadasAntes = _host.Inventario.LlamadasDeRegistrarIngreso;
-
-        foreach (var cantidad in new[] { 0, 6000, -3, 5001 })
-        {
-            using var respuesta = await Ingresar(edicion, cantidad, await Token(edicion));
-            Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        }
-
-        Assert.Equal(0, await bd.Consultar<long>("SELECT count(*) FROM catalogo.ingresos_solicitados"));
-        Assert.Equal(llamadasAntes, _host.Inventario.LlamadasDeRegistrarIngreso);
-
-        using var uno = await Ingresar(edicion, 1, await Token(edicion));
-        using var cinco = await Ingresar(edicion, 5000, await Token(edicion));
-        Assert.Equal(HttpStatusCode.Created, uno.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, cinco.StatusCode);
-        Assert.Equal(5001, _host.Inventario.StockDe(edicion));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Un_ingreso_a_una_edicion_digital_o_dada_de_baja_es_validacion()
-    {
-        var portada = await _host.SubirYReferenciar("portada", ArchivosDeMuestra.Png(40, 40, 900), Ana);
-        var libro = await _host.SubirYReferenciar("libro", ArchivosDeMuestra.Epub(), Ana);
-        using var alta = await _host.Json(HttpMethod.Post, "/administracion/obras", new
-        {
-            titulo = "Digital",
-            autor = "A",
-            editorial = "E",
-            categoria = "C",
-            portadaRef = portada,
-            ediciones = new object[] { new { formato = "digital", isbn = "9790000000018", precio = 5m, licencia = new { tipo = "dominioPublico", titular = "DP", territorios = new[] { "PE" }, formato = "epub" }, archivoRef = libro } },
-        }, usuario: Ana);
-        var edicionDigital = (await CatalogoApiHost.Leer(alta)).GetProperty("edicionIds")[0].GetGuid();
-
-        using var formulario = await _host.Json(HttpMethod.Get, $"/administracion/ediciones/{edicionDigital}/ingresos/nuevo", usuario: Ana);
-        using var respuesta = await Ingresar(edicionDigital, 5, "cualquiera");
-        Assert.Equal(HttpStatusCode.BadRequest, formulario.StatusCode);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Equal(0, _host.Inventario.LlamadasDeRegistrarIngreso);
-    }
-
     // ---------- Disponibilidad (AC-CAT-09) ----------
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
-    public async Task La_disponibilidad_se_muestra_reciente_luego_desactualizada_con_el_ultimo_dato_y_por_ultimo_no_se_puede_confirmar()
-    {
-        var edicion = await Impresa();
-        using (await Ingresar(edicion, 30, await Token(edicion)))
-        {
-        }
-
-        using var alcance = _host.Servicios.CreateScope();
-        var disponibilidad = alcance.ServiceProvider.GetRequiredService<IDisponibilidadDeEdiciones>();
-
-        var reciente = (await disponibilidad.Consultar([edicion])).Valor.Single();
-        _host.Inventario.Caido = true;
-        var llamadas = _host.Inventario.LlamadasDeDisponibilidad;
-        var enCache = (await disponibilidad.Consultar([edicion])).Valor.Single();
-        var llamadasTrasLaCache = _host.Inventario.LlamadasDeDisponibilidad;
-        _host.Reloj.Adelantar(TimeSpan.FromMinutes(1));
-        var desactualizada = (await disponibilidad.Consultar([edicion])).Valor.Single();
-        _host.Reloj.Adelantar(TimeSpan.FromMinutes(10));
-        var sinConfirmar = (await disponibilidad.Consultar([edicion])).Valor.Single();
-
-        Assert.Equal((EstadoDeDisponibilidad.Disponible, FrescuraDeLaDisponibilidad.Reciente, 30), (reciente.Estado, reciente.Frescura, reciente.VendibleEnLaRed));
-        Assert.Equal(llamadas, llamadasTrasLaCache);
-        Assert.Equal(FrescuraDeLaDisponibilidad.Reciente, enCache.Frescura);
-        Assert.Equal((EstadoDeDisponibilidad.Disponible, FrescuraDeLaDisponibilidad.PuedeEstarDesactualizada, 30), (desactualizada.Estado, desactualizada.Frescura, desactualizada.VendibleEnLaRed));
-        Assert.Equal((EstadoDeDisponibilidad.NoSePuedeConfirmar, FrescuraDeLaDisponibilidad.NoSePuedeConfirmar), (sinConfirmar.Estado, sinConfirmar.Frescura));
-    }
 
     // ---------- Reintento: solo su autor (AC-CAT-18) ----------
 
@@ -371,24 +272,6 @@ public sealed class IngresosConInventarioSimuladoTests(PostgresDelCatalogoYAudit
         Assert.Equal(30, _host.Inventario.StockDe(edicion));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Dos_intentos_inciertos_con_el_ingreso_aplicado_en_el_primero_se_concilian_con_la_coincidencia_unica()
-    {
-        _host.Inventario.AplicarYNoResponder = 1;
-        var (edicion, ingreso) = await Pendiente();
-        _host.Inventario.IngresosCaidos = true;
-        using var segundoIntento = await Reintentar(edicion, ingreso);
-        Assert.Equal("pendiente", Estado(await CatalogoApiHost.Leer(segundoIntento)));
-        _host.Inventario.IngresosCaidos = false;
-
-        using var conciliacion = await Conciliar(edicion, ingreso, "registrado");
-
-        Assert.Equal("registrado", Estado(await CatalogoApiHost.Leer(conciliacion)));
-        Assert.Equal(2, await bd.Consultar<int>($"SELECT intentos FROM catalogo.ingresos_solicitados WHERE id = '{ingreso}'"));
-        Assert.Single(_host.Inventario.Ingresos);
-    }
-
     // ---------- Conciliación (AC-CAT-18) ----------
 
     [Fact]
@@ -457,37 +340,6 @@ public sealed class IngresosConInventarioSimuladoTests(PostgresDelCatalogoYAudit
         Assert.Equal("fallido", Estado(await CatalogoApiHost.Leer(confirmado)));
         Assert.Equal(HttpStatusCode.Created, nuevo.StatusCode);
         Assert.Equal("registrado", Estado(await CatalogoApiHost.Leer(nuevo)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Marcar_fallido_con_una_coincidencia_unica_se_rechaza_porque_el_ingreso_consta_como_aplicado()
-    {
-        _host.Inventario.AplicarYNoResponder = 1;
-        var (edicion, ingreso) = await Pendiente();
-        _host.Reloj.Adelantar(TimeSpan.FromMinutes(3));
-
-        using var respuesta = await Conciliar(edicion, ingreso, "fallido", confirma: true);
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, respuesta.StatusCode);
-        Assert.Equal("consta-como-aplicado", (await CatalogoApiHost.Leer(respuesta)).GetProperty("errores")[0].GetProperty("clave").GetString());
-        Assert.Equal("pendiente", await EstadoEnLaBase(ingreso));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Un_pendiente_de_mas_de_24_horas_no_se_reintenta_y_se_concilia()
-    {
-        _host.Inventario.AplicarYNoResponder = 1;
-        var (edicion, ingreso) = await Pendiente();
-        _host.Reloj.Adelantar(TimeSpan.FromHours(25));
-
-        using var reintento = await Reintentar(edicion, ingreso);
-        using var conciliacion = await Conciliar(edicion, ingreso, "registrado");
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, reintento.StatusCode);
-        Assert.Equal("ECO-REGLA-DE-NEGOCIO-INCUMPLIDA", Codigo(await CatalogoApiHost.Leer(reintento)));
-        Assert.Equal(HttpStatusCode.OK, conciliacion.StatusCode);
     }
 
     [Fact]

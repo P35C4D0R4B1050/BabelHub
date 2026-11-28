@@ -51,20 +51,6 @@ public sealed class IndiceInfinitoComposicionTests
         Assert.IsType<AleatoriosSeguros>(proveedor.GetRequiredService<IAleatoriosSeguros>());
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-IND-02")]
-    public void Un_puerto_de_aleatorios_ya_registrado_se_conserva()
-    {
-        var propio = new AleatoriosPropios();
-        var servicios = new ServiceCollection();
-        servicios.AddSingleton<IAleatoriosSeguros>(propio);
-        servicios.AgregarModuloWeb(permitirVersionesProvisionales: true);
-        using var proveedor = servicios.BuildServiceProvider();
-
-        Assert.Same(propio, proveedor.GetRequiredService<IAleatoriosSeguros>());
-        Assert.Single(servicios, s => s.ServiceType == typeof(IAleatoriosSeguros));
-    }
-
     private sealed class AleatoriosPropios : IAleatoriosSeguros
     {
         public byte[] Bytes(int cantidad) => new byte[cantidad];

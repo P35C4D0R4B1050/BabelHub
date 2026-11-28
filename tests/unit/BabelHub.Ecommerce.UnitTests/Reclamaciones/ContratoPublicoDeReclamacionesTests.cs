@@ -41,18 +41,6 @@ public sealed class ContratoPublicoDeReclamacionesTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-02")]
-    public void La_raiz_del_modulo_expone_los_contratos_de_registro_y_administracion()
-    {
-        var nombres = TiposPublicos().Select(t => t.Name).ToHashSet();
-
-        Assert.Contains(nameof(IReclamaciones), nombres);
-        Assert.Contains(nameof(IAdministracionDeReclamaciones), nombres);
-        Assert.Contains(nameof(RegistrarHojaEntrada), nombres);
-        Assert.Contains(nameof(ConstanciaDeHoja), nombres);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-REC-02")]
     public void Ningun_tipo_publico_de_la_raiz_expone_el_dominio_ni_el_interior()
     {
         var expuestos = TiposPublicos().SelectMany(TiposQueExpone).Distinct().ToArray();

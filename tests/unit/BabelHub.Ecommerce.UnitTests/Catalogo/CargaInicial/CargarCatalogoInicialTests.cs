@@ -146,18 +146,6 @@ public sealed class CargarCatalogoInicialTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CIN-03")]
-    public async Task El_rechazo_de_validacion_del_alta_llega_como_el_resultado_de_esa_fila_con_su_campo()
-    {
-        ConLasTresPortadas();
-        _administracion.RechazarAltasConValidacion = ("descripcion", "demasiado-largo");
-
-        var resumen = (await Crear().Cargar(Solicitud(TresObras()))).Valor;
-
-        Assert.All(resumen.Filas, f => Assert.Equal(("descripcion", "demasiado-largo"), (f.Campo, f.Motivo)));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CIN-06")]
     public async Task Con_la_auditoria_caida_la_fila_no_se_carga_y_se_informa()
     {

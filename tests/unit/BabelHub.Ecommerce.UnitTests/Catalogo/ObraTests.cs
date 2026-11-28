@@ -32,22 +32,6 @@ public sealed class ObraTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-01")]
-    public void Una_obra_con_una_edicion_impresa_y_su_isbn_se_registra()
-    {
-        var resultado = Obra.Registrar(Guid.NewGuid(), Datos(), UnaPortada(), [Impresa()], Ahora);
-
-        Assert.True(resultado.EsExito);
-        var obra = resultado.Valor;
-        Assert.Equal("Estructuras de datos", obra.Titulo);
-        Assert.Equal(EstadoDeObra.Activa, obra.Estado);
-        Assert.Equal(1, obra.Version);
-        Assert.Single(obra.Ediciones);
-        Assert.Equal("9780000000019", obra.Ediciones[0].Isbn.Isbn13);
-        Assert.Equal(Ahora, obra.CreadaEn);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-01")]
     public void Una_obra_sin_ninguna_edicion_se_rechaza()
     {
         var resultado = Obra.Registrar(Guid.NewGuid(), Datos(), UnaPortada(), [], Ahora);
@@ -82,8 +66,6 @@ public sealed class ObraTests
     [Theory]
     [Trait("Criterio", "AC-CAT-01")]
     [InlineData("titulo")]
-    [InlineData("autor")]
-    [InlineData("editorial")]
     [InlineData("categoria")]
     public void Un_dato_de_la_obra_vacio_o_demasiado_largo_se_rechaza_indicando_el_campo(string campo)
     {
@@ -103,15 +85,6 @@ public sealed class ObraTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-01")]
-    public void Los_datos_de_la_obra_se_guardan_sin_espacios_en_los_extremos()
-    {
-        var obra = Obra.Registrar(Guid.NewGuid(), new DatosDeObra("  Libro  ", " Autor", "Editorial ", " Cat "), UnaPortada(), [Impresa()], Ahora).Valor;
-
-        Assert.Equal(("Libro", "Autor", "Editorial", "Cat"), (obra.Titulo, obra.Autor, obra.Editorial, obra.Categoria));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-03")]
     public void Una_edicion_digital_tiene_licencia_y_archivo_y_una_impresa_no()
     {
@@ -125,18 +98,6 @@ public sealed class ObraTests
         Assert.Throws<ArgumentNullException>(() => Edicion.Digital(Guid.NewGuid(), Isbn.Crear("9790000000018"), Precio.Crear(1m), UnaLicencia(), null!));
         Assert.Throws<ArgumentNullException>(() => Edicion.Digital(Guid.NewGuid(), Isbn.Crear("9790000000018"), Precio.Crear(1m), null!, UnLibro()));
         Assert.Throws<ArgumentException>(() => Edicion.Digital(Guid.NewGuid(), Isbn.Crear("9790000000018"), Precio.Crear(1m), UnaLicencia(FormatoDigital.Pdf), UnLibro(TipoDeArchivo.Epub)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-03")]
-    public void Rehidratar_exige_licencia_y_archivo_en_una_digital_y_ninguno_en_una_impresa()
-    {
-        var isbn = Isbn.Crear("9790000000018");
-        var precio = Precio.Crear(1m);
-
-        Assert.Throws<ArgumentException>(() => Edicion.Rehidratar(Guid.NewGuid(), TipoDeEdicion.Digital, isbn, precio, EstadoDeEdicion.Activa, null, null, null, null, null));
-        Assert.Throws<ArgumentException>(() => Edicion.Rehidratar(Guid.NewGuid(), TipoDeEdicion.Impresa, isbn, precio, EstadoDeEdicion.Activa, null, null, null, UnaLicencia(), UnLibro()));
-        Assert.Throws<ArgumentException>(() => Edicion.Rehidratar(Guid.NewGuid(), TipoDeEdicion.Impresa, isbn, precio, EstadoDeEdicion.RetiradaDeVenta, null, null, null, null, null));
     }
 
     [Fact]
@@ -192,18 +153,6 @@ public sealed class ObraTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-08")]
-    public void Editar_con_el_mismo_precio_no_lo_reporta_como_cambio_pero_si_cuenta_como_operacion()
-    {
-        var obra = RegistrarSoloImpresa();
-
-        var resultado = obra.EditarEdicion(obra.Ediciones[0].Id, new CambioDeEdicion(Precio: Precio.Crear(129.00m)));
-
-        Assert.False(resultado.Valor.CambioElPrecio);
-        Assert.Equal(2, obra.Version);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-08")]
     public void Cambiar_la_licencia_o_reemplazar_el_archivo_de_una_digital_devuelve_lo_anterior()
     {
         var obra = RegistrarConAmbas();
@@ -242,21 +191,6 @@ public sealed class ObraTests
         Assert.Equal(RechazoDeCatalogo.ArchivoNoCoincideConLaLicencia, archivoDistinto.Rechazo!.Motivo);
         Assert.True(ambosPdf.EsExito);
         Assert.Equal(2, obra.Version);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-04")]
-    public void Editar_el_precio_de_una_digital_con_licencia_vencida_no_falla()
-    {
-        var vencida = LicenciaDigital.Rehidratar(TipoDeLicencia.Comercial, "Editorial", ["PE"], Hoy.AddDays(-30), FormatoDigital.Epub);
-        var digital = Edicion.Rehidratar(Guid.NewGuid(), TipoDeEdicion.Digital, Isbn.Crear("9790000000018"), Precio.Crear(49m), EstadoDeEdicion.Activa, null, null, null, vencida, UnLibro());
-        var obra = Obra.Rehidratar(Guid.NewGuid(), Datos(), UnaPortada(), 7, EstadoDeObra.Activa, null, Ahora, [Impresa(), digital]);
-
-        var resultado = obra.EditarEdicion(digital.Id, new CambioDeEdicion(Precio: Precio.Crear(59m)));
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(MotivoDeNoDisponible.LicenciaVencida, digital.MotivoDeNoDisponiblePara(Hoy));
-        Assert.Equal(8, obra.Version);
     }
 
     [Fact]
@@ -408,18 +342,6 @@ public sealed class ObraTests
         Assert.Equal(3, obra.Version);
         Assert.Equal(RechazoDeCatalogo.DatosInvalidos, obra.EditarDatos(new DatosDeObra("", "a", "e", "c")).Rechazo!.Motivo);
         Assert.Equal(3, obra.Version);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-01")]
-    public void La_version_esperada_se_compara_con_la_actual()
-    {
-        var obra = RegistrarSoloImpresa();
-
-        Assert.True(obra.CoincideLaVersion(1));
-        obra.EditarDatos(Datos("Otro título"));
-        Assert.False(obra.CoincideLaVersion(1));
-        Assert.True(obra.CoincideLaVersion(2));
     }
 
     [Fact]

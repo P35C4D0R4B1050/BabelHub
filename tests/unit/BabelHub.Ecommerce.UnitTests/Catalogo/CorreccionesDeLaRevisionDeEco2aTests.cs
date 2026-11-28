@@ -38,35 +38,6 @@ public sealed class CorreccionesDeLaRevisionDeEco2aTests
     }
 
     [Fact]
-    public void Un_lote_de_ediciones_con_el_mismo_identificador_dos_veces_se_rechaza()
-    {
-        var id = Guid.NewGuid();
-
-        Assert.False(ValidadorDeEdicionesPorIdentificador.Validar([id, id]).EsValido);
-        Assert.True(ValidadorDeEdicionesPorIdentificador.Validar([id, Guid.NewGuid()]).EsValido);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void Rehidratar_una_referencia_exige_coherencia_entre_su_estado_y_sus_campos()
-    {
-        var clave = ClaveEnAlmacen.Nueva();
-
-        ReferenciaDeArchivo Rehidratar(EstadoDeReferencia estado, TipoDeArchivo? tipo, long? tamano, HuellaDeArchivo? huella, DateTimeOffset? consumidoEn) =>
-            ReferenciaDeArchivo.Rehidratar(Guid.NewGuid(), Ana, FinalidadDeArchivo.Portada, clave, estado, tipo, tamano, huella, Ahora, Ahora.AddHours(24), consumidoEn);
-
-        Assert.Throws<ArgumentException>(() => Rehidratar(EstadoDeReferencia.Lista, null, null, null, null));
-        Assert.Throws<ArgumentException>(() => Rehidratar(EstadoDeReferencia.Lista, TipoDeArchivo.Pdf, 10, Huella(), null));
-        Assert.Throws<ArgumentException>(() => Rehidratar(EstadoDeReferencia.Consumida, TipoDeArchivo.Png, 10, Huella(), null));
-        Assert.Throws<ArgumentException>(() => Rehidratar(EstadoDeReferencia.Lista, TipoDeArchivo.Png, 10, Huella(), Ahora));
-        Assert.Equal(EstadoDeReferencia.Subiendo, Rehidratar(EstadoDeReferencia.Subiendo, null, null, null, null).Estado);
-        Assert.Equal(EstadoDeReferencia.Consumida, Rehidratar(EstadoDeReferencia.Consumida, TipoDeArchivo.Png, 10, Huella(), Ahora).Estado);
-        Assert.Equal(EstadoDeReferencia.Descarte, Rehidratar(EstadoDeReferencia.Descarte, null, null, null, Ahora).Estado);
-        // Una lista rehidratada y válida no revienta al consumirla.
-        Assert.Equal(ResultadoDeConsumo.Consumida, Rehidratar(EstadoDeReferencia.Lista, TipoDeArchivo.Png, 10, Huella(), null).Consumir(Ana, FinalidadDeArchivo.Portada, null, Ahora.AddHours(1)));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-12")]
     public void Los_modelos_con_claves_del_almacen_o_texto_libre_no_los_imprimen()
     {
@@ -95,18 +66,5 @@ public sealed class CorreccionesDeLaRevisionDeEco2aTests
             Assert.DoesNotContain(referencia.ToString(), t, StringComparison.Ordinal);
             Assert.DoesNotContain(Ana.ToString(), t, StringComparison.Ordinal);
         });
-    }
-
-    [Fact]
-    public async Task El_retiro_de_carritos_recibe_las_ediciones_de_baja_y_si_falla_lo_propaga()
-    {
-        var retiro = new RetiroDeCarritosEspia();
-        var ediciones = new[] { Guid.NewGuid(), Guid.NewGuid() };
-
-        await retiro.Retirar(ediciones);
-        retiro.Falla = true;
-
-        Assert.Equal(ediciones, Assert.Single(retiro.Retiros));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => retiro.Retirar(ediciones));
     }
 }

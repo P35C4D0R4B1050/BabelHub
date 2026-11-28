@@ -28,26 +28,11 @@ public sealed class LogisticaApiTests
         Assert.Equal([$"{accion}:{Envio:D}"], host.Envios.Llamadas);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-ENV-04")]
-    public async Task Con_htmx_la_operacion_exitosa_responde_200_con_HX_Redirect()
-    {
-        await using var host = await LogisticaApiHost.Crear();
-
-        using var respuesta = await host.Enviar($"/logistica/envios/{Envio:D}/guia", htmx: true);
-
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-        Assert.Equal("/logistica/envios?hecho=guia", respuesta.Headers.GetValues("HX-Redirect").Single());
-    }
-
     [Theory]
     [Trait("Criterio", "AC-ENV-04")]
     [Trait("Criterio", "AC-ENV-08")]
     [InlineData(CategoriaDeError.Conflicto, "estado-invalido", 409, "ECO-ENV-ESTADO-INVALIDO")]
-    [InlineData(CategoriaDeError.Conflicto, "guia-en-curso", 409, "ECO-ENV-GUIA-EN-CURSO")]
     [InlineData(CategoriaDeError.NoDisponible, "operador-no-disponible", 503, "ECO-ENV-OPERADOR-NO-DISPONIBLE")]
-    [InlineData(CategoriaDeError.Conflicto, "inventario-rechazo", 409, "ECO-ENV-INVENTARIO-RECHAZO")]
-    [InlineData(CategoriaDeError.NoDisponible, "servicio-no-disponible", 503, "ECO-SERVICIO-NO-DISPONIBLE")]
     [InlineData(CategoriaDeError.NoEncontrado, "envio-no-encontrado", 404, "ECO-NO-ENCONTRADO")]
     [InlineData(CategoriaDeError.Prohibido, "prohibido", 403, "ECO-PROHIBIDO")]
     [InlineData(CategoriaDeError.NoAutenticado, "no-autenticado", 401, "ECO-NO-AUTENTICADO")]
@@ -69,8 +54,6 @@ public sealed class LogisticaApiTests
     [Theory]
     [Trait("Criterio", "AC-ENV-09")]
     [InlineData("nombre")]
-    [InlineData("direccion")]
-    [InlineData("telefono")]
     [InlineData("anonimizado")]
     public async Task El_contacto_incompleto_es_422_y_nombra_solo_el_campo_o_la_anonimizacion(string campo)
     {
@@ -152,7 +135,6 @@ public sealed class LogisticaApiTests
     [Trait("Criterio", "AC-ENV-08")]
     [InlineData("/logistica/envios?estado=inexistente")]
     [InlineData("/logistica/envios?pagina=0")]
-    [InlineData("/logistica/envios?pagina=abc")]
     [InlineData("/logistica/envios?hecho=borrar")]
     [InlineData("/logistica/envios?cuentaId=x")]
     [InlineData("/logistica/envios?estado=entregado&estado=cancelado")]

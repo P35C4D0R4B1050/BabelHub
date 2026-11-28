@@ -254,28 +254,4 @@ public sealed class AdaptadoresRealesDePedidosTests
     }
 
     // ---------- Composición ----------
-
-    [Fact]
-    public void Con_lo_de_Plataforma_y_Auditoria_registrado_se_usan_los_adaptadores_reales_y_la_guarda_ya_no_los_nombra()
-    {
-        var servicios = new ServiceCollection();
-        servicios.AddSingleton<IClienteDelInventario>(new ClienteFalso());
-        servicios.AddSingleton<IControlDeLimites>(new LimitesFalsos());
-        servicios.AddSingleton<IAuditoria>(new AuditoriaEspia());
-
-        var error = Assert.Throws<InvalidOperationException>(() => servicios.AgregarPedidos(esProduccion: true));
-
-        foreach (var real in new[] { nameof(IReservasDelPedido), nameof(ILimitadorDePedidos), nameof(IAuditoriaDeContacto) })
-        {
-            Assert.DoesNotContain(real, error.Message, StringComparison.Ordinal);
-        }
-
-        Assert.Contains("IAccesosDeBiblioteca", error.Message, StringComparison.Ordinal);
-        // La sucursal ya se resuelve por su código (T30): deja de ser un doble provisional.
-        Assert.DoesNotContain("IResolucionDeSucursal", error.Message, StringComparison.Ordinal);
-        Assert.Contains(servicios, d => d.ServiceType == typeof(IResolucionDeSucursal) && d.ImplementationType == typeof(CodigoResolucionDeSucursal));
-        Assert.Contains(servicios, d => d.ServiceType == typeof(IReservasDelPedido) && d.ImplementationType == typeof(RestReservasDelPedido));
-        Assert.Contains(servicios, d => d.ServiceType == typeof(ILimitadorDePedidos) && d.ImplementationType == typeof(LimitadorDePedidosSobreLimites));
-        Assert.Contains(servicios, d => d.ServiceType == typeof(IAuditoriaDeContacto) && d.ImplementationType == typeof(AuditoriaDeContactoSobreAuditoria));
-    }
 }

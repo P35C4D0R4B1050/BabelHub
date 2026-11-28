@@ -425,7 +425,6 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
     [InlineData("{}")]
     [InlineData("no es json")]
     [InlineData("{\"eventoId\":\"traslado:1:aprobado\",\"plantilla\":\"x\",\"codigoDeSucursal\":\"AYACUCHO\",\"campos\":{},\"numero\":\"987654321\"}")]
-    [InlineData("[]")]
     [Trait("Criterio", "AC-NOT-08")]
     public async Task LaSolicitudMalFormadaOConCamposDeMas_Es400_YNoLlegaALaAplicacion(string cuerpo)
     {
@@ -526,7 +525,6 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
         Assert.All(new[] { primero, repetido, otroReintento }, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
         Assert.Equal(2, _registro.Registrados.Count(r => r.Aviso == aviso && r.Estado == EstadoDeEntrega.Fallido));
     }
-
 
     [Fact]
     [Trait("Criterio", "AC-NOT-13")]

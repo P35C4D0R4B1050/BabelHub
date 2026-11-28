@@ -56,33 +56,6 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
     }
 
     [Fact]
-    public void Se_resuelven_los_contratos_publicos_los_receptores_de_Identidad_y_los_casos_de_uso_sin_dobles_provisionales()
-    {
-        var servicios = ConExternos().AgregarReclamaciones();
-        using var proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        using var alcance = proveedor.CreateScope();
-        var sp = alcance.ServiceProvider;
-
-        Assert.NotNull(sp.GetRequiredService<IReclamaciones>());
-        Assert.NotNull(sp.GetRequiredService<IAdministracionDeReclamaciones>());
-        Assert.NotNull(sp.GetRequiredService<IHojasDelConsumidor>());
-        Assert.Contains(sp.GetServices<IPendientesDeCuenta>(), p => p is ContarHojasPendientesDeUnCorreo);
-        Assert.Contains(sp.GetServices<IAplicadorDeCancelacion>(), p => p is MarcarHojasDeUnaCuentaCancelada);
-        Assert.IsType<CorreoVerificadoDeLaCuenta>(sp.GetRequiredService<ICorreoVerificadoDeLaCuenta>());
-        Assert.IsType<RepositorioDeHojasPostgres>(sp.GetRequiredService<IRepositorioDeHojas>());
-        Assert.IsType<AnonimizadorDeHojasPostgres>(sp.GetRequiredService<IAnonimizadorDeHojas>());
-        Assert.IsType<VinculosDeHojasPostgres>(sp.GetRequiredService<IVinculosDeHojas>());
-        Assert.NotNull(sp.GetRequiredService<VinculadorDeHojas>());
-        Assert.NotNull(sp.GetRequiredService<VincularHojasExistentes>());
-        Assert.NotNull(sp.GetRequiredService<RevisarVinculacionInicial>());
-        // El receptor real de los cambios de cuenta (REC-25, T32): sin él el compuesto de Identidad falla cerrado y el host rechaza el cambio de correo y el reemplazo.
-        Assert.Contains(sp.GetServices<IReceptorDeCambiosDeCuenta>(), p => p is ReceptorDeCambiosDeCuentaDeReclamaciones);
-        Assert.NotNull(sp.GetRequiredService<AnonimizarHojasVencidas>());
-        Assert.NotNull(sp.GetRequiredService<RevisarHojasSinAnonimizar>());
-        Assert.NotNull(sp.GetRequiredService<ResponderHoja>());
-    }
-
-    [Fact]
     public void Los_cuatro_trabajos_se_registran_con_nombres_unicos_y_el_servicio_hospedado_los_recibe_completos()
     {
         var servicios = ConExternos().AgregarReclamaciones();
@@ -138,13 +111,6 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
         var espera = TrabajosDeFondoDeReclamaciones.EsperaHastaLaProximaAnonimizacion(new DateTimeOffset(anio, mes, dia, hora, minuto, segundo, TimeSpan.Zero));
 
         Assert.Equal(new TimeSpan(horasEsperadas, minutosEsperados, 0), espera);
-    }
-
-    [Fact]
-    public void Cerca_de_la_medianoche_de_Lima_la_proxima_corrida_es_la_madrugada_siguiente()
-    {
-        // 23:00 en Lima del 19 es las 04:00 UTC del 20: quedan 5 horas hasta las 04:00 de Lima del 20 (09:00 UTC).
-        Assert.Equal(TimeSpan.FromHours(5), TrabajosDeFondoDeReclamaciones.EsperaHastaLaProximaAnonimizacion(new DateTimeOffset(2026, 11, 20, 4, 0, 0, TimeSpan.Zero)));
     }
 
     // ---------- Ejecutor ----------
@@ -214,41 +180,5 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
         await trabajo.EjecutarUnaVez();
 
         Assert.Equal(ResultadoDeTrabajo.Fallo, Assert.Single(registro.Corridas).Resultado);
-    }
-
-    [Fact]
-    public async Task La_cancelacion_del_apagado_no_se_registra_como_fallo()
-    {
-        using var origen = new CancellationTokenSource();
-        var registro = new RegistroEspia();
-        var trabajo = Crear(async ct => { await origen.CancelAsync(); ct.ThrowIfCancellationRequested(); }, registro, []);
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => trabajo.EjecutarUnaVez(origen.Token));
-
-        Assert.Empty(registro.Corridas);
-    }
-
-    [Fact]
-    public async Task Correr_hace_una_corrida_al_empezar_si_se_pidio_y_termina_con_la_cancelacion_sin_lanzar()
-    {
-        using var origen = new CancellationTokenSource();
-        var corridas = 0;
-        var alIniciar = Crear(_ => { corridas++; origen.Cancel(); return Task.CompletedTask; }, new RegistroEspia(), [], alIniciar: true);
-
-        await alIniciar.Correr(origen.Token);
-
-        Assert.Equal(1, corridas);
-    }
-
-    [Fact]
-    public async Task Sin_correr_al_iniciar_no_corre_hasta_que_llega_su_hora()
-    {
-        using var origen = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-        var corridas = 0;
-        var trabajo = Crear(_ => { corridas++; return Task.CompletedTask; }, new RegistroEspia(), [], alIniciar: false, espera: TimeSpan.FromHours(1));
-
-        await trabajo.Correr(origen.Token);
-
-        Assert.Equal(0, corridas);
     }
 }

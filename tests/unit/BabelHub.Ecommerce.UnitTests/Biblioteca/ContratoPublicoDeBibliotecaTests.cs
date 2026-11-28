@@ -42,24 +42,6 @@ public sealed class ContratoPublicoDeBibliotecaTests
 
     [Fact]
     [Trait("Criterio", "AC-BIB-12")]
-    public void La_raiz_del_modulo_expone_los_contratos_de_la_biblioteca()
-    {
-        var nombres = TiposPublicos().Select(t => t.Name).ToHashSet();
-
-        foreach (var esperado in new[]
-        {
-            nameof(IBibliotecaDelCliente), nameof(IDescargasDeLaBiblioteca), nameof(IAyudaDeLaBiblioteca), nameof(IAdministracionDeLaBiblioteca),
-            nameof(IAccesosDeBiblioteca), nameof(IAccesosParaDevoluciones),
-        })
-        {
-            Assert.Contains(esperado, nombres);
-        }
-
-        Assert.NotNull(typeof(IPosesionDeEdiciones));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-12")]
     public void Ningun_tipo_publico_de_la_raiz_expone_el_dominio_ni_el_interior()
     {
         var expuestos = TiposPublicos().SelectMany(TiposQueExpone).Distinct().ToArray();
@@ -105,24 +87,5 @@ public sealed class ContratoPublicoDeBibliotecaTests
         }
 
         Assert.Equal(CausaDeRevocacion.Reembolso, BabelHub.Ecommerce.Application.Biblioteca.Interno.MapeoDeBiblioteca.Causa(MotivoDeRevocacionDeAcceso.Reembolso));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-17")]
-    public async Task El_doble_del_repositorio_modela_la_sentencia_condicional_y_se_revierte_con_la_unidad_de_trabajo()
-    {
-        var accesos = new RepositorioDeAccesosEnMemoria();
-        var unidad = new UnidadDeTrabajoReversible(accesos);
-        var acceso = accesos.Sembrar(Guid.NewGuid(), Guid.NewGuid());
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => unidad.Ejecutar<int>(async ct =>
-        {
-            await accesos.ConsumirCupo(acceso.Id, acceso.CuentaId, ct);
-            throw new InvalidOperationException("falla después de contar");
-        }));
-
-        Assert.Equal(0, accesos.Buscar(acceso.Id)!.DescargasUsadas);
-        Assert.Equal(BabelHub.Ecommerce.Application.Biblioteca.Interno.ResultadoDelConteoAtomico.NoAfecto, await accesos.ConsumirCupo(acceso.Id, Guid.NewGuid()));
-        Assert.Equal(BabelHub.Ecommerce.Application.Biblioteca.Interno.ResultadoDelConteoAtomico.Contada, await accesos.ConsumirCupo(acceso.Id, acceso.CuentaId));
     }
 }

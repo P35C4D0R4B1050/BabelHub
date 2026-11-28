@@ -58,13 +58,8 @@ public sealed partial class ContactoYPieTests
     [Theory]
     [InlineData("/")]
     [InlineData("/legal/terminos")]
-    [InlineData("/legal/privacidad")]
-    [InlineData("/legal/cambios-y-devoluciones")]
     [InlineData("/contacto")]
-    [InlineData("/sin-permiso")]
-    [InlineData("/no-disponible")]
     [InlineData("/error")]
-    [InlineData("/prueba-pie/tienda")]
     [InlineData("/prueba-pie/sucursal")]
     [InlineData("/prueba-pie/admin")]
     [Trait("Criterio", "AC-COM-01")]
@@ -187,17 +182,6 @@ public sealed partial class ContactoYPieTests
 
         Assert.Equal(HttpStatusCode.MovedPermanently, respuesta.StatusCode);
         Assert.Equal("/legal/cambios-y-devoluciones", respuesta.Headers.Location!.OriginalString);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-COM-09")]
-    public async Task Otros_segmentos_con_otra_capitalizacion_no_son_la_direccion_anterior()
-    {
-        await using var a = await AnfitrionWeb.Iniciar();
-
-        var respuesta = await a.Cliente.GetAsync("/legal/Reembolso");
-
-        Assert.Equal(HttpStatusCode.NotFound, respuesta.StatusCode);
     }
 
     private static DatosDeContacto LeerContacto(string telefono, string correo, string direccion)

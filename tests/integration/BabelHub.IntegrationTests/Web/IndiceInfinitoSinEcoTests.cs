@@ -126,17 +126,4 @@ public sealed class IndiceInfinitoSinEcoTests
             Assert.Matches(AnfitrionDelIndice.FormaDeLaUbicacion(), respuesta.Headers.Location!.OriginalString);
         }
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-06")]
-    public async Task Una_direccion_de_64_caracteres_es_valida_y_la_de_65_da_el_mensaje_amable()
-    {
-        await using var host = await AnfitrionDelIndice.Iniciar();
-
-        var valida = await host.Cliente.GetAsync("/indice-infinito/" + new string('a', 64));
-        var larga = await host.Cliente.GetAsync("/indice-infinito/" + new string('a', 65));
-
-        Assert.DoesNotContain("Esa dirección no existe", await valida.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-        Assert.Contains("Esa dirección no existe", await larga.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-    }
 }

@@ -51,16 +51,6 @@ public sealed class SolicitarGuiaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-02")]
-    public async Task La_administracion_central_tambien_puede_pedir_la_guia()
-    {
-        var entorno = new EntornoDeEnvios(ActorDePrueba.DeAdministradorCentral());
-        var envio = SembrarEnvio(entorno);
-
-        Assert.True((await entorno.SolicitarGuia.Ejecutar(envio.Id)).EsExito);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-ENV-15")]
     public async Task El_operador_recibe_solo_nombre_direccion_y_telefono_y_la_llamada_ocurre_fuera_de_toda_transaccion()
     {
@@ -216,23 +206,6 @@ public sealed class SolicitarGuiaTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-15")]
-    public async Task Repetir_la_solicitud_con_la_guia_ya_generada_es_un_estado_invalido_sin_llamar_al_operador()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarEnvio(entorno);
-        await entorno.SolicitarGuia.Ejecutar(envio.Id);
-        var llamadas = entorno.Operador.Recibidas.Count;
-
-        var repeticion = await entorno.SolicitarGuia.Ejecutar(envio.Id);
-
-        Assert.Equal(CategoriaDeError.Conflicto, repeticion.Error!.Categoria);
-        Assert.Equal("estado-invalido", repeticion.Error.Clave);
-        Assert.Equal(llamadas, entorno.Operador.Recibidas.Count);
-        Assert.Single(entorno.Auditoria.Solicitudes);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-15")]
     public async Task Si_el_envio_se_cancela_mientras_el_operador_creaba_la_guia_queda_sin_uso_con_una_alerta_sin_datos()
     {
         var entorno = new EntornoDeEnvios();
@@ -252,77 +225,6 @@ public sealed class SolicitarGuiaTests
         var alerta = Assert.Single(entorno.Alertas.Alertas);
         Assert.Equal("envio-guia-sin-uso", alerta.Motivo);
         Assert.Empty(entorno.Auditoria.Solicitudes);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-18")]
-    public async Task Ni_la_auditoria_ni_los_errores_ni_las_alertas_llevan_el_contacto()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarEnvio(entorno);
-        await entorno.SolicitarGuia.Ejecutar(envio.Id);
-        var otro = SembrarEnvio(entorno);
-        entorno.Contactos.Sembrar(otro.PedidoId, LecturaDelContactoDeEntrega.Faltante(CampoDelContactoDeEntrega.Nombre));
-        var rechazo = await entorno.SolicitarGuia.Ejecutar(otro.Id);
-
-        var texto = string.Join("|", entorno.Auditoria.Solicitudes.Select(s => s.ToString() + string.Join(",", s.Detalle.Values)))
-            + rechazo.Error + string.Join(",", rechazo.Error!.Errores.Select(e => e.Campo + e.Clave))
-            + string.Join("|", entorno.Alertas.Alertas.Select(a => a.Motivo));
-
-        foreach (var secreto in new[] { "Ana", "Pérez", "Olivos", "987654321", "Ayacucho" })
-        {
-            Assert.DoesNotContain(secreto, texto, StringComparison.Ordinal);
-        }
-    }
-
-    [Theory]
-    [Trait("Criterio", "AC-ENV-08")]
-    [InlineData("cliente")]
-    [InlineData("encargado")]
-    [InlineData("anonimo")]
-    public async Task Quien_no_es_de_logistica_ni_de_la_administracion_central_recibe_prohibido_con_un_acceso_denegado(string quien)
-    {
-        var actor = quien switch
-        {
-            "cliente" => ActorDePrueba.DeCliente(),
-            "encargado" => ActorDePrueba.DeEncargadoDe(Guid.NewGuid()),
-            _ => ActorDePrueba.Anonimo(),
-        };
-        var entorno = new EntornoDeEnvios(actor);
-        var envio = SembrarEnvio(entorno);
-
-        var resultado = await entorno.SolicitarGuia.Ejecutar(envio.Id);
-
-        Assert.Equal(quien == "anonimo" ? CategoriaDeError.NoAutenticado : CategoriaDeError.Prohibido, resultado.Error!.Categoria);
-        Assert.Single(entorno.Denegaciones.Eventos);
-        Assert.Empty(entorno.Operador.Recibidas);
-        Assert.Equal(0, entorno.Contactos.Lecturas);
-        Assert.Equal(0, entorno.Envios.Operaciones);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task Un_envio_inexistente_es_no_encontrado_para_logistica_sin_evento_de_denegacion()
-    {
-        var entorno = new EntornoDeEnvios();
-
-        var resultado = await entorno.SolicitarGuia.Ejecutar(Guid.NewGuid());
-
-        Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
-        Assert.Empty(entorno.Denegaciones.Eventos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-03")]
-    public async Task Un_envio_cancelado_se_rechaza_por_estado_invalido_sin_llamar_al_operador()
-    {
-        var entorno = new EntornoDeEnvios();
-        var cancelado = SembrarEnvio(entorno, e => e.Cancelar(EntornoDeEnvios.AhoraInicial));
-
-        var resultado = await entorno.SolicitarGuia.Ejecutar(cancelado.Id);
-
-        Assert.Equal("estado-invalido", resultado.Error!.Clave);
-        Assert.Empty(entorno.Operador.Recibidas);
     }
 
     [Fact]

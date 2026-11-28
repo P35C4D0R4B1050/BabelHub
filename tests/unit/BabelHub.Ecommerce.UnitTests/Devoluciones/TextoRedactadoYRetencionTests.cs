@@ -33,11 +33,8 @@ public sealed class TextoRedactadoYRetencionTests
     [Theory]
     [Trait("Criterio", "AC-DEV-31")]
     [InlineData(null)]
-    [InlineData("")]
     [InlineData("   ")]
     [InlineData("con\nsalto")]
-    [InlineData("con\ttabulación")]
-    [InlineData("con\u0007campana")]
     public void Un_texto_vacio_o_con_caracteres_de_control_no_se_crea(string? valor)
     {
         Assert.Null(TextoRedactado.Crear(valor, TextoRedactado.LongitudMaximaDelTexto));

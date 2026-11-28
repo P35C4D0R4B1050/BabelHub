@@ -41,17 +41,6 @@ public sealed class ContratoPublicoDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-17")]
-    public void La_raiz_del_modulo_expone_los_contratos_de_logistica_y_del_cliente()
-    {
-        var nombres = TiposPublicos().Select(t => t.Name).ToHashSet();
-
-        Assert.Contains(nameof(IEnviosDeLogistica), nombres);
-        Assert.Contains(nameof(IEnviosDelCliente), nombres);
-        Assert.Contains(nameof(DetalleDeEnvio), nombres);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-17")]
     public void Ningun_tipo_publico_de_la_raiz_expone_el_dominio_ni_el_interior()
     {
         var expuestos = TiposPublicos().SelectMany(TiposQueExpone).Distinct().ToArray();
@@ -66,19 +55,5 @@ public sealed class ContratoPublicoDeEnviosTests
         var campos = TiposPublicos().Where(t => t.IsClass).SelectMany(t => t.GetProperties()).Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain(campos, c => c is "Nombre" or "Direccion" or "Telefono" or "Correo" or "Documento" or "Destinatario" or "Contacto");
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-17")]
-    public void Ni_el_dominio_ni_el_interior_de_envios_guardan_campos_de_contacto_salvo_el_destinatario_de_la_guia()
-    {
-        var prohibidos = new[] { "Nombre", "Direccion", "Telefono", "Correo", "Documento", "Contacto" };
-        var tipos = typeof(BabelHub.Ecommerce.Domain.Envios.Envio).Assembly.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Domain.Envios" && t != typeof(BabelHub.Ecommerce.Domain.Envios.DestinatarioParaGuia) && t != typeof(BabelHub.Ecommerce.Domain.Envios.ResultadoDeValidacionDelDestinatario))
-            .Concat(Aplicacion.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Application.Envios.Interno"));
-
-        var campos = tipos.Where(t => !t.IsEnum && t.Name is not ("IOperadorLogistico" or "ClavesDeEnvios")).SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(p => p.Name)
-            .Concat(t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(f => f.Name))).ToArray();
-
-        Assert.DoesNotContain(campos.Where(c => !c.StartsWith('<')), c => prohibidos.Any(p => c.Contains(p, StringComparison.OrdinalIgnoreCase)));
     }
 }

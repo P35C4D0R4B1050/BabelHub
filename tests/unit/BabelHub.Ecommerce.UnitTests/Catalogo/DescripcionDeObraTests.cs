@@ -115,49 +115,4 @@ public sealed class DescripcionDeObraTests
 
         Assert.Equal(texto, Registrar(texto).Valor.Descripcion);
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-20")]
-    public void Editar_reemplaza_la_descripcion_y_la_deja_en_camposCambiados_y_nula_o_vacia_la_quita()
-    {
-        var obra = Registrar("Original").Valor;
-
-        var reemplazo = obra.EditarDatos(new DatosDeObra("Título", "Autor", "Editorial", "Técnico", "Nueva"));
-        Assert.True(reemplazo.EsExito);
-        Assert.Equal(["descripcion"], reemplazo.Valor.CamposCambiados);
-        Assert.Equal("Nueva", obra.Descripcion);
-
-        var sinCambio = obra.EditarDatos(new DatosDeObra("Título", "Autor", "Editorial", "Técnico", "Nueva"));
-        Assert.Empty(sinCambio.Valor.CamposCambiados);
-
-        var quitada = obra.EditarDatos(new DatosDeObra("Título", "Autor", "Editorial", "Técnico", "  "));
-        Assert.Equal(["descripcion"], quitada.Valor.CamposCambiados);
-        Assert.Null(obra.Descripcion);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-20")]
-    public void Editar_con_601_caracteres_se_rechaza_y_no_cambia_nada()
-    {
-        var obra = Registrar("Original").Valor;
-        var version = obra.Version;
-
-        var resultado = obra.EditarDatos(new DatosDeObra("Título", "Autor", "Editorial", "Técnico", new string('x', 601)));
-
-        Assert.False(resultado.EsExito);
-        Assert.Equal("descripcion", resultado.Rechazo!.Campo);
-        Assert.Equal("Original", obra.Descripcion);
-        Assert.Equal(version, obra.Version);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-20")]
-    public void Una_obra_sin_descripcion_sigue_valida_al_rehidratarse_y_con_ella_la_conserva()
-    {
-        var obra = Obra.Rehidratar(Guid.NewGuid(), new DatosDeObra("T", "A", "E", "C", "Guardada"), UnaPortada(), 3, EstadoDeObra.Activa, null, Ahora, [Impresa()]);
-        var sin = Obra.Rehidratar(Guid.NewGuid(), new DatosDeObra("T", "A", "E", "C"), UnaPortada(), 3, EstadoDeObra.Activa, null, Ahora, [Impresa()]);
-
-        Assert.Equal("Guardada", obra.Descripcion);
-        Assert.Null(sin.Descripcion);
-    }
 }

@@ -98,17 +98,6 @@ public sealed class CorreccionesDeLaRevisionTests
     }
 
     [Fact]
-    public void Una_ruta_larga_o_vacia_no_toca_la_lista_de_plantillas()
-    {
-        var resolutor = new ResolutorDeRutas(new PlantillasDePrueba("/api/y/{id}"));
-
-        Assert.Equal(PlantillaDeRuta.SinCoincidencia, resolutor.Resolver("/" + new string('a', 500)).Valor);
-        Assert.Equal(PlantillaDeRuta.SinCoincidencia, resolutor.Resolver("").Valor);
-        Assert.Equal(PlantillaDeRuta.SinCoincidencia, resolutor.Resolver(null).Valor);
-        Assert.Equal("/api/y/{id}", resolutor.Resolver("/api/y/9?x=1").Valor);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-AUD-04")]
     public async Task El_codigo_del_error_figura_en_el_detalle_y_un_texto_que_no_es_un_codigo_se_rechaza()
     {

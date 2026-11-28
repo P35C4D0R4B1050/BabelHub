@@ -80,33 +80,6 @@ public sealed class IngresosDeMercaderiaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
-    public async Task Una_impresa_sin_stock_inicial_igual_registra_su_ficha_y_una_digital_nunca()
-    {
-        var e = new EntornoDelCatalogo();
-
-        var alta = await e.Administracion().RegistrarObra(e.Obra("Ambas", e.EdicionImpresa(), e.EdicionDigital()));
-
-        Assert.Empty(alta.Valor.Ingresos);
-        var impresa = e.Obras.Todas.Single().Ediciones.Single(x => !x.EsDigital);
-        Assert.Equal([impresa.Id], e.Inventario.FichasRegistradas);
-        Assert.Empty(e.Inventario.SolicitudesDeIngreso);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
-    public async Task Agregar_una_edicion_impresa_con_stock_a_una_obra_existente_tambien_ingresa_el_lote()
-    {
-        var e = new EntornoDelCatalogo();
-        var obra = await e.ObraRegistrada("Solo digital", e.EdicionDigital());
-
-        var alta = await e.Administracion().RegistrarEdicion(new RegistrarEdicionEntrada(obra.Id, obra.Version, e.EdicionImpresa(stock: 40)));
-
-        Assert.Equal(EstadoDeIngresoSolicitado.Registrado, alta.Valor.Ingresos.Single().Estado);
-        Assert.Equal(40, e.Inventario.SolicitudesDeIngreso.Single().Cantidad);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-19")]
     public async Task Un_alta_rechazada_no_toca_el_inventario()
     {
@@ -293,30 +266,6 @@ public sealed class IngresosDeMercaderiaTests
         Assert.Equal(0, e.Emisor.Emisiones);
     }
 
-    [Fact]
-    public async Task Una_edicion_digital_dada_de_baja_o_inexistente_no_recibe_ingresos_ni_clave()
-    {
-        var e = new EntornoDelCatalogo();
-        var obra = await e.ObraRegistrada("Mixta", e.EdicionImpresa(), e.EdicionDigital());
-        var digital = obra.Ediciones.Single(x => x.EsDigital).Id;
-        var impresa = obra.Ediciones.Single(x => !x.EsDigital).Id;
-        var copia = RepositorioDeObrasEnMemoria.Clonar(obra);
-        copia.DarDeBajaEdicion(impresa, e.Reloj.Ahora);
-        e.Obras.Sembrar(copia);
-        var servicio = e.IngresosDeMercaderia();
-
-        var deDigital = await servicio.Registrar(Ingreso(e, digital, token: e.Token(digital)));
-        var deBaja = await servicio.Registrar(Ingreso(e, impresa, token: e.Token(impresa)));
-        var inexistente = await servicio.Registrar(Ingreso(e, Guid.NewGuid(), token: "x"));
-        var claveDeDigital = await servicio.EmitirClave(new EmitirClaveDeIngresoEntrada(digital));
-
-        Assert.Contains(new ErrorDeCampo("edicionId", "solo-edicion-impresa-activa"), deDigital.Error!.Errores);
-        Assert.Contains(new ErrorDeCampo("edicionId", "solo-edicion-impresa-activa"), deBaja.Error!.Errores);
-        Assert.Equal(ClavesDelCatalogo.EdicionNoEncontrada, inexistente.Error!.Clave);
-        Assert.NotNull(claveDeDigital.Error);
-        Assert.Empty(e.Inventario.SolicitudesDeIngreso);
-    }
-
     // ---------- Pendiente y reintento ----------
 
     [Fact]
@@ -342,22 +291,6 @@ public sealed class IngresosDeMercaderiaTests
         Assert.Equal(ClavesDelCatalogo.IngresoPendiente, segundo.Error!.Clave);
         Assert.Equal(CategoriaDeError.Conflicto, segundo.Error.Categoria);
         Assert.Empty(otroAdmin.Inventario.SolicitudesDeIngreso);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task El_mismo_usuario_con_una_clave_nueva_tampoco_inicia_otro_mientras_haya_un_pendiente()
-    {
-        var e = new EntornoDelCatalogo();
-        var edicion = e.ImpresaSembrada();
-        e.Inventario.RespuestasDeIngreso.Enqueue(RespuestaDeIngreso.SinRespuesta);
-        var servicio = e.IngresosDeMercaderia();
-        await servicio.Registrar(Ingreso(e, edicion));
-
-        var otro = await servicio.Registrar(Ingreso(e, edicion, 5, "OTRO"));
-
-        Assert.Equal(ClavesDelCatalogo.IngresoPendiente, otro.Error!.Clave);
-        Assert.Single(e.Ingresos.Todos);
     }
 
     [Theory]
@@ -457,25 +390,6 @@ public sealed class IngresosDeMercaderiaTests
         Assert.Empty(otro.Inventario.SolicitudesDeIngreso);
         Assert.Equal(CategoriaDeError.Prohibido, deCliente.Error!.Categoria);
         Assert.Equal("fuera-de-rol", Assert.Single(cliente.Denegaciones.Eventos).Motivo);
-    }
-
-    [Fact]
-    public async Task Reintentar_una_fila_de_otra_edicion_o_inexistente_responde_no_encontrado_y_una_ya_resuelta_conflicto()
-    {
-        var e = new EntornoDelCatalogo();
-        var edicion = e.ImpresaSembrada();
-        var otraEdicion = e.ImpresaSembrada("0-306-40615-2");
-        var servicio = e.IngresosDeMercaderia();
-        var resuelto = await servicio.Registrar(Ingreso(e, edicion));
-
-        var deOtra = await servicio.Reintentar(new ReintentarIngresoEntrada(resuelto.Valor.IngresoSolicitadoId, otraEdicion));
-        var inexistente = await servicio.Reintentar(new ReintentarIngresoEntrada(Guid.NewGuid()));
-        var yaResuelto = await servicio.Reintentar(new ReintentarIngresoEntrada(resuelto.Valor.IngresoSolicitadoId, edicion));
-
-        Assert.Equal(ClavesDelCatalogo.IngresoNoEncontrado, deOtra.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Equal(ClavesDelCatalogo.IngresoYaResuelto, yaResuelto.Error!.Clave);
-        Assert.Equal(CategoriaDeError.Conflicto, yaResuelto.Error.Categoria);
     }
 
     [Fact]

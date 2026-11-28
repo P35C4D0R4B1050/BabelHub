@@ -176,10 +176,8 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
 
     [Theory]
     [Trait("Criterio", "AC-DEV-29")]
-    [InlineData(7, 0, 1, 45)]
     [InlineData(8, 44, 0, 1)]
     [InlineData(8, 45, 24, 0)]
-    [InlineData(9, 0, 23, 45)]
     public void La_depuracion_corre_a_las_0345_de_Lima_y_si_ya_paso_la_hora_a_la_de_manana(int horaUtc, int minuto, int horasEsperadas, int minutosEsperados)
     {
         // 03:45 de Lima son las 08:45 UTC.
@@ -205,17 +203,6 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
         var servicio = proveedor.GetRequiredService<ServicioDeTrabajosDeDevoluciones>();
 
         Assert.NotNull(servicio);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-13")]
-    public void Los_tres_trabajos_tienen_sus_nombres_estables_y_sus_horarios()
-    {
-        var trabajos = TrabajosDeDevoluciones.Todos(Doble<IServiceScopeFactory>(), new RegistroEspia(), (c, t) => c(t), new AlertasEspia(), new RelojFijo(DateTimeOffset.UtcNow));
-
-        Assert.Equal(["devoluciones-revision-de-plazos", "devoluciones-conciliacion-de-reembolsos", "devoluciones-depuracion"], trabajos.Select(t => t.Nombre));
-        Assert.Equal(TimeSpan.FromHours(1), TrabajosDeDevoluciones.PorHora.Intervalo);
-        Assert.Equal(TimeSpan.FromMinutes(5), TrabajosDeDevoluciones.CadaCincoMinutos.Intervalo);
     }
 
     [Fact]

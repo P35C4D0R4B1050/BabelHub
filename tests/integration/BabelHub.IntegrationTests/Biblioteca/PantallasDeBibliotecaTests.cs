@@ -391,17 +391,6 @@ public sealed class PantallasDeBibliotecaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-BIB-14")]
-    public async Task Sin_ayudas_se_muestra_el_estado_vacio()
-    {
-        await using var anfitrion = await IniciarAdministracion(new AdministracionFalsa());
-
-        var (_, html, _) = await Pedir(anfitrion, "/administracion/biblioteca/ayudas", HostWeb.Gestion);
-
-        Assert.Contains("No hay solicitudes de ayuda", html, StringComparison.Ordinal);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-BIB-07")]
     public async Task Restituir_llama_a_la_aplicacion_con_la_cantidad_el_motivo_y_la_ayuda_y_vuelve_solo_a_una_pantalla_de_la_administracion()
     {

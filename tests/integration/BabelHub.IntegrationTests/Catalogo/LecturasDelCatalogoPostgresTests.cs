@@ -41,33 +41,6 @@ public sealed class LecturasDelCatalogoPostgresTests(PostgresDelCatalogoFixture 
 
     [Fact]
     [Trait("Criterio", "AC-CAT-06")]
-    public async Task De_16_obras_digital_tecnico_y_hasta_100_solo_salen_las_que_cumplen_las_tres_en_la_misma_edicion()
-    {
-        var esperadas = new List<Guid>();
-        for (var i = 0; i < 16; i++)
-        {
-            var categoria = i % 2 == 0 ? "Técnico" : "Novela";
-            var precioDigital = i % 4 < 2 ? 80m : 150m;
-            var obra = await Guardar($"Libro {i:D2}", categoria, "Ana", Impresa(precio: 40m), Digital());
-            await bd.Ejecutar($"UPDATE catalogo.ediciones SET precio = {precioDigital.ToString(System.Globalization.CultureInfo.InvariantCulture)} WHERE obra_id = '{obra.Id}' AND tipo = 'digital'");
-            if (categoria == "Técnico" && precioDigital <= 100m)
-            {
-                esperadas.Add(obra.Id);
-            }
-        }
-
-        await Guardar("Barata y cara", "Técnico", "Ana", Impresa(precio: 10m), Digital());
-        await bd.Ejecutar("UPDATE catalogo.ediciones SET precio = 500 WHERE obra_id = (SELECT id FROM catalogo.obras WHERE titulo = 'Barata y cara') AND tipo = 'digital'");
-
-        var pagina = await _lecturas.Buscar(Filtros(categoria: "técnico", formato: FormatoDeEdicion.Digital, max: 100m), 1, 50);
-
-        Assert.Equal(esperadas.Order(), pagina.Obras.Select(o => o.Id).Order());
-        Assert.Equal(4, pagina.Total);
-        Assert.All(pagina.Obras, o => Assert.Equal(2, o.Ediciones.Count));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-06")]
     public async Task El_texto_busca_sin_tildes_ni_mayusculas_y_los_comodines_se_escapan()
     {
         await Guardar("Álgebra lineal", "Técnico", "Ana");

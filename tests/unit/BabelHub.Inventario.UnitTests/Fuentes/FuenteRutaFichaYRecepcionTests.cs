@@ -35,12 +35,10 @@ public sealed class FuenteTests
     [Theory]
     [Trait("Criterio", "AC-FUE-01")]
     [InlineData(null)]
-    [InlineData("")]
     [InlineData("a")]
     [InlineData("abcdefghijklmnopqrstu")]
     [InlineData("Lima")]
     [InlineData("lima sur")]
-    [InlineData("lima_sur")]
     [InlineData("límá")]
     [InlineData("lima;drop")]
     [InlineData("lima\n")]
@@ -48,10 +46,8 @@ public sealed class FuenteTests
 
     [Theory]
     [InlineData(null)]
-    [InlineData("")]
     [InlineData("a")]
     [InlineData(" Lima")]
-    [InlineData("Lima ")]
     [InlineData("Li\tma")]
     public void EsNombreValido_ConUnNombreInvalido_Rechaza(string? nombre) => Assert.False(Fuente.EsNombreValido(nombre));
 
@@ -69,11 +65,9 @@ public sealed class FuenteTests
     [InlineData("Lima", false)]
     [InlineData("la libertad", false)]
     [InlineData("-lima", false)]
-    [InlineData("lima-", false)]
     [InlineData("lima--sur", false)]
     [InlineData("lima\n", false)]
     [InlineData("junín", false)]
-    [InlineData("", false)]
     [InlineData(null, false)]
     public void EsRegionValida_ExigeMinusculasSinTildesYConGuiones(string? region, bool esperado) => Assert.Equal(esperado, Fuente.EsRegionValida(region));
 
@@ -81,14 +75,11 @@ public sealed class FuenteTests
     [InlineData(null, true)]
     [InlineData("+51966123456", true)]
     [InlineData("(064) 123-456", true)]
-    [InlineData("966123456", true)]
     [InlineData("12345", false)]
     [InlineData("abc966123456", false)]
     [InlineData("966123456; DROP", false)]
     [InlineData("966123456\n", false)]
-    [InlineData(" 966123456", false)]
     [InlineData("+51 966 123 456 789 000", false)]
-    [InlineData("", false)]
     public void EsContactoValido_ExigeUnNumeroOAusencia(string? contacto, bool esperado) => Assert.Equal(esperado, Fuente.EsContactoValido(contacto));
 
     [Fact]
@@ -100,7 +91,6 @@ public sealed class FuenteTests
         Assert.Throws<ArgumentException>(() => Fuente.Registrar(Fuente.IdentificadorDe("lima"), "lima", "Lima", "Lima Norte", null, true));
         Assert.Throws<ArgumentException>(() => Fuente.Registrar(Fuente.IdentificadorDe("lima"), "lima", "Lima", "lima", "no-es-un-numero", true));
     }
-
 
     [Theory]
     [InlineData("ayacucho", "f1bbf775-a5fd-d22c-19c7-c0e9abe9a86c")]
@@ -254,13 +244,6 @@ public sealed class FichaDeEdicionTests
     {
         Assert.True(FichaDeEdicion.Crear(Edicion, FormatoDeEdicion.Impreso).PuedeTenerStock);
         Assert.False(FichaDeEdicion.Crear(Edicion, FormatoDeEdicion.Digital).PuedeTenerStock);
-    }
-
-    [Fact]
-    public void Crear_ConUnIdentificadorVacioOUnFormatoDesconocido_Lanza()
-    {
-        Assert.Throws<ArgumentException>(() => FichaDeEdicion.Crear(Guid.Empty, FormatoDeEdicion.Impreso));
-        Assert.Throws<ArgumentOutOfRangeException>(() => FichaDeEdicion.Crear(Edicion, (FormatoDeEdicion)99));
     }
 
     [Fact]

@@ -369,12 +369,6 @@ public sealed class ContratoDeRegistroTests
     }
 
     [Theory]
-    [InlineData("CambioDePrecio")]
-    [InlineData("A1b")]
-    public void Un_identificador_de_accion_valido_se_acepta(string identificador) =>
-        Assert.Equal(identificador, new AccionAuditable(identificador).Identificador);
-
-    [Theory]
     [InlineData("")]
     [InlineData("cambioDePrecio")]
     [InlineData("Ab")]

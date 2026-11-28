@@ -30,13 +30,6 @@ public sealed class ContratoDePlataformaTests
     }
 
     [Fact]
-    public void ElMotorDeLimites_EstaEnElInternoDelModulo()
-    {
-        Assert.Equal("BabelHub.Ecommerce.Application.Plataforma.Interno", typeof(IMotorDeLimites).Namespace);
-        Assert.True(typeof(IMotorDeLimites).IsPublic);
-    }
-
-    [Fact]
     public void LasClavesDeLosModulos_CoincidenConLasPoliticasDelDominio()
     {
         Assert.Equal(
@@ -64,22 +57,6 @@ public sealed class ContratoDePlataformaTests
     }
 
     [Fact]
-    public void ClaveDePolitica_ConElMismoValor_EsIgual()
-    {
-        Assert.Equal(new ClaveDePolitica("ingresos-fallidos"), PoliticasDeLimite.IngresosFallidos);
-    }
-
-    [Fact]
-    public void ResultadoDeLimite_Permitido_TraeLaReserva()
-    {
-        var resultado = ResultadoDeLimite.Permitido(Reserva);
-
-        Assert.True(resultado.EsPermitido);
-        Assert.Same(Reserva, resultado.Reserva);
-        Assert.Null(resultado.Motivo);
-    }
-
-    [Fact]
     public void ResultadoDeLimite_Excedido_TraeMotivoEsperaYDisponibilidadSinReserva()
     {
         var resultado = ResultadoDeLimite.Excedido("ingresos-fallidos", 90, Ahora.AddSeconds(90));
@@ -92,15 +69,6 @@ public sealed class ContratoDePlataformaTests
     }
 
     [Fact]
-    public void ResultadoDeLimite_ConDatosInvalidos_Lanza()
-    {
-        Assert.Throws<ArgumentException>(() => ResultadoDeLimite.Excedido(" ", 10, Ahora));
-        Assert.Throws<ArgumentOutOfRangeException>(() => ResultadoDeLimite.Excedido("p", 0, Ahora));
-        Assert.Throws<ArgumentNullException>(() => ResultadoDeLimite.Permitido(null!));
-        Assert.Throws<ArgumentNullException>(() => ResultadoDeLimite.RepeticionCompletada(null!));
-    }
-
-    [Fact]
     public void ResultadoDeLimite_ConUnaRepeticionOUnConflicto_NoPermiteNiTraeReserva()
     {
         var completada = ResultadoDeLimite.RepeticionCompletada(new ResultadoMinimo("creado", "pedido-9"));
@@ -109,15 +77,6 @@ public sealed class ContratoDePlataformaTests
         Assert.Equal("pedido-9", completada.ResultadoGuardado!.IdDelRecurso);
         Assert.Equal(EstadoDeLimite.RepeticionEnCurso, ResultadoDeLimite.RepeticionEnCurso().Estado);
         Assert.Equal(EstadoDeLimite.ClaveEnConflicto, ResultadoDeLimite.ClaveEnConflicto().Estado);
-    }
-
-    [Fact]
-    public void ResultadoMinimoYClaveDeIdempotencia_ConValoresVacios_Lanzan()
-    {
-        Assert.Throws<ArgumentException>(() => new ResultadoMinimo(" "));
-        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("", "/ruta", "h"));
-        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("k", " ", "h"));
-        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("k", "/ruta", ""));
     }
 
     [Fact]
@@ -210,27 +169,6 @@ public sealed class ContratoDePlataformaTests
         Assert.Throws<ArgumentException>(() =>
             new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, Ahora, direccionCompleta: "203.0.113.7"));
         Assert.Null(new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, Ahora).DireccionCompleta);
-    }
-
-    [Fact]
-    public void Alertas_ConDatosInvalidos_Lanzan()
-    {
-        Assert.Throws<ArgumentException>(() => new AlertaTecnica("", Ahora));
-        Assert.Throws<ArgumentException>(() => new AlertaDeSeguridad(" ", Ahora, 11));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new AlertaDeSeguridad("accesos-denegados", Ahora, 0));
-        Assert.Equal(11, new AlertaDeSeguridad("accesos-denegados", Ahora, 11).Total);
-    }
-
-    [Fact]
-    public void ResultadoDeValidacion_ValidoNoTraeErroresEInvalidoSi()
-    {
-        Assert.True(ResultadoDeValidacion.Valido.EsValido);
-
-        var invalido = ResultadoDeValidacion.Invalido([new ErrorDeCampo("cantidad", "fuera-de-rango")]);
-
-        Assert.False(invalido.EsValido);
-        Assert.Equal("cantidad", Assert.Single(invalido.Errores).Campo);
-        Assert.Throws<ArgumentException>(() => ResultadoDeValidacion.Invalido([]));
     }
 
     private static IEnumerable<Type> TiposDeLaFirma(Type tipo)

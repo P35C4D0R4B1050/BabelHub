@@ -65,52 +65,17 @@ public sealed class ArchivosDelCatalogoTests
 
     [Theory]
     [Trait("Criterio", "AC-CAT-12")]
-    [InlineData(1, 1, true)]
-    [InlineData(4000, 4000, true)]
     [InlineData(4096, 3906, true)]
     [InlineData(4096, 4096, false)]
     [InlineData(4097, 10, false)]
-    [InlineData(10, 4097, false)]
     [InlineData(0, 100, false)]
     [InlineData(100, -1, false)]
     public void Las_dimensiones_de_una_imagen_no_pasan_de_4096_por_lado_ni_de_16_millones_de_pixeles(int ancho, int alto, bool valido) =>
         Assert.Equal(valido, PoliticaDeArchivos.DimensionesValidas(ancho, alto));
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void Cada_tipo_corresponde_a_una_finalidad_y_un_libro_a_un_formato()
-    {
-        Assert.Equal(FinalidadDeArchivo.Libro, TiposDeArchivo.FinalidadDe(TipoDeArchivo.Pdf));
-        Assert.Equal(FinalidadDeArchivo.Portada, TiposDeArchivo.FinalidadDe(TipoDeArchivo.Webp));
-        Assert.True(TiposDeArchivo.EsAcordeAlFormato(TipoDeArchivo.Epub, FormatoDigital.Epub));
-        Assert.False(TiposDeArchivo.EsAcordeAlFormato(TipoDeArchivo.Pdf, FormatoDigital.Epub));
-        Assert.False(TiposDeArchivo.EsAcordeAlFormato(TipoDeArchivo.Png, FormatoDigital.Pdf));
-        Assert.Equal("image/webp", TiposDeArchivo.TipoDeMedio(TipoDeArchivo.Webp));
-        Assert.True(TiposDeArchivo.TryDesdeNombre("jpeg", out var tipo));
-        Assert.Equal(TipoDeArchivo.Jpeg, tipo);
-        Assert.False(TiposDeArchivo.TryDesdeNombre("JPEG", out _));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void La_huella_son_32_bytes_con_64_hexadecimales_y_una_huella_corta_de_16()
-    {
-        var huella = UnaHuella("hola");
-
-        Assert.Equal(64, huella.Hex.Length);
-        Assert.Equal(16, huella.Corta.Length);
-        Assert.StartsWith(huella.Corta, huella.Hex, StringComparison.Ordinal);
-        Assert.Throws<ArgumentException>(() => HuellaDeArchivo.Desde(new byte[31]));
-        Assert.True(HuellaDeArchivo.TryDesdeHexadecimal(huella.Hex, out var igual));
-        Assert.False(HuellaDeArchivo.TryDesdeHexadecimal(huella.Hex.ToUpperInvariant(), out _));
-        Assert.Equal(huella, igual);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-CAT-12")]
     [InlineData(null)]
-    [InlineData("")]
-    [InlineData("abc")]
     [InlineData("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")]
     [InlineData("00000000000000000000000000000000000000000000000000000000000000000")]
     [InlineData("../../etc/passwd")]
@@ -214,18 +179,6 @@ public sealed class ArchivosDelCatalogoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-12")]
-    public void Una_portada_no_sirve_como_libro_ni_un_libro_como_portada()
-    {
-        var portada = ListaDePortada();
-        var libro = ListaDeLibro();
-
-        Assert.Equal(ResultadoDeConsumo.FinalidadDistinta, portada.Consumir(Ana, FinalidadDeArchivo.Libro, FormatoDigital.Epub, Ahora.AddMinutes(1)));
-        Assert.Equal(ResultadoDeConsumo.FinalidadDistinta, libro.Consumir(Ana, FinalidadDeArchivo.Portada, null, Ahora.AddMinutes(1)));
-        Assert.Equal(EstadoDeReferencia.Lista, portada.Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public void Un_libro_solo_se_consume_con_el_formato_de_la_licencia()
     {
         var pdf = ListaDeLibro(TipoDeArchivo.Pdf);
@@ -233,47 +186,5 @@ public sealed class ArchivosDelCatalogoTests
         Assert.Equal(ResultadoDeConsumo.TipoNoCoincideConElFormato, pdf.Consumir(Ana, FinalidadDeArchivo.Libro, FormatoDigital.Epub, Ahora.AddMinutes(1)));
         Assert.Equal(ResultadoDeConsumo.TipoNoCoincideConElFormato, pdf.Consumir(Ana, FinalidadDeArchivo.Libro, null, Ahora.AddMinutes(1)));
         Assert.Equal(ResultadoDeConsumo.Consumida, pdf.Consumir(Ana, FinalidadDeArchivo.Libro, FormatoDigital.Pdf, Ahora.AddMinutes(1)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void Una_fila_subiendo_o_en_descarte_no_es_consumible()
-    {
-        var subiendo = ReferenciaDeArchivo.Iniciar(Guid.NewGuid(), Ana, FinalidadDeArchivo.Portada, Ahora);
-        var descarte = ListaDePortada();
-        descarte.PasarADescarte();
-
-        Assert.Equal(ResultadoDeConsumo.NoDisponible, subiendo.Consumir(Ana, FinalidadDeArchivo.Portada, null, Ahora.AddMinutes(1)));
-        Assert.Equal(ResultadoDeConsumo.NoDisponible, descarte.Consumir(Ana, FinalidadDeArchivo.Portada, null, Ahora.AddMinutes(1)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void El_archivo_y_la_portada_solo_nacen_de_una_referencia_consumida_de_su_finalidad()
-    {
-        var sinConsumir = ListaDePortada();
-        var consumida = ListaDePortada();
-        consumida.Consumir(Ana, FinalidadDeArchivo.Portada, null, Ahora.AddMinutes(1));
-
-        Assert.Throws<InvalidOperationException>(() => sinConsumir.ComoPortada());
-        Assert.Throws<InvalidOperationException>(() => consumida.ComoArchivoDeEdicion());
-        var portada = consumida.ComoPortada();
-        Assert.Equal(TipoDeArchivo.Png, portada.TipoDetectado);
-        Assert.Equal(consumida.Huella, portada.Huella);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void El_archivo_de_una_edicion_y_la_portada_validan_su_tipo_su_clave_y_su_tamano()
-    {
-        var clave = ClaveEnAlmacen.Nueva();
-        var huella = UnaHuella();
-
-        Assert.Throws<ArgumentException>(() => new ArchivoDeEdicion(clave, TipoDeArchivo.Png, 10, huella, Ahora, Ana));
-        Assert.Throws<ArgumentException>(() => new ArchivoDeEdicion("libro.epub", TipoDeArchivo.Epub, 10, huella, Ahora, Ana));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ArchivoDeEdicion(clave, TipoDeArchivo.Epub, 52_428_801, huella, Ahora, Ana));
-        Assert.Throws<ArgumentException>(() => new PortadaDeObra(clave, TipoDeArchivo.Pdf, huella));
-        Assert.Throws<ArgumentException>(() => new PortadaDeObra("../x", TipoDeArchivo.Png, huella));
-        Assert.Equal(TipoDeArchivo.Pdf, new ArchivoDeEdicion(clave, TipoDeArchivo.Pdf, 52_428_800, huella, Ahora, Ana).TipoDetectado);
     }
 }

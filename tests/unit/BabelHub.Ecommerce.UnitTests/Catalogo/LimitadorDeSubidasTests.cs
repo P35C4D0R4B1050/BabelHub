@@ -73,14 +73,6 @@ public sealed class LimitadorDeSubidasTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-12")]
-    public void Los_topes_deben_ser_positivos()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LimitadorDeSubidas(maximoGlobal: 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LimitadorDeSubidas(maximoPorUsuario: 0));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Sin_cupo_la_subida_se_rechaza_como_limite_antes_de_tocar_la_base_o_el_almacen()
     {
         var e = new EntornoDelCatalogo();

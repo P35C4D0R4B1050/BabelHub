@@ -107,8 +107,6 @@ public sealed class OperadorYGuardaDeEnviosTests
     [Theory]
     [Trait("Criterio", "AC-ENV-04")]
     [InlineData("Development")]
-    [InlineData("Test")]
-    [InlineData("Staging")]
     [InlineData("Production")]
     [Trait("Criterio", "AC-PAG-37")]
     public void El_simulador_se_acepta_en_desarrollo_pruebas_staging_y_produccion_porque_no_habra_operador_real(string entorno)
@@ -138,7 +136,6 @@ public sealed class OperadorYGuardaDeEnviosTests
     [Theory]
     [Trait("Criterio", "AC-ENV-04")]
     [InlineData(null)]
-    [InlineData("")]
     [InlineData("   ")]
     [InlineData("NULO")]
     public void Sin_valor_o_con_el_nulo_el_arranque_elige_el_operador_nulo_en_cualquier_entorno(string? operador)

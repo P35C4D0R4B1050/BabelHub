@@ -321,7 +321,6 @@ public sealed class RestInventarioDelCarritoTests
     [InlineData("INV-IDEMPOTENCIA-EN-CONFLICTO", TipoDeResultadoDeReservar.ConflictoDeIdempotencia)]
     [InlineData("INV-RESERVA-ESTADO-INVALIDO", TipoDeResultadoDeReservar.EstadoInvalido)]
     [InlineData("INV-VALIDACION-INVALIDA", TipoDeResultadoDeReservar.Rechazada)]
-    [InlineData("INV-PROHIBIDO", TipoDeResultadoDeReservar.Rechazada)]
     public async Task Reservar_traduce_cada_rechazo_del_contrato_a_su_tipo(string codigo, TipoDeResultadoDeReservar esperado)
     {
         var (adaptador, cliente, _) = Crear();

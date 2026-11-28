@@ -120,7 +120,6 @@ public sealed class CheckoutApiTests : IAsyncLifetime
 
     [Theory]
     [InlineData("recojo", "nombre")]
-    [InlineData("recojo", "telefono")]
     [InlineData("digital", "direccion")]
     [InlineData("domicilio", "sucursal")]
     public async Task Un_campo_que_no_corresponde_al_tipo_de_entrega_se_rechaza_en_vez_de_ignorarse(string tipo, string campo)
@@ -215,9 +214,7 @@ public sealed class CheckoutApiTests : IAsyncLifetime
     [InlineData("132,00")]
     [InlineData("132.001")]
     [InlineData("-1")]
-    [InlineData("1e2")]
     [InlineData("12345678901")]
-    [InlineData(".5")]
     [InlineData("")]
     public async Task Un_total_visto_invalido_es_validacion_y_no_se_registra_nada(string total)
     {

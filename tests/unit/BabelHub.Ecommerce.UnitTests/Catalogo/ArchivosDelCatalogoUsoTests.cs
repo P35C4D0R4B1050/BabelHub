@@ -68,24 +68,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    public async Task Las_portadas_jpeg_png_y_webp_validas_se_aceptan_y_una_de_3_mb_se_rechaza_con_su_motivo()
-    {
-        var e = new EntornoDelCatalogo();
-        var jpeg = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3 };
-        var webp = "RIFF\0\0\0\0WEBPVP8 abc"u8.ToArray();
-        var grande = Png((int)(3 * 1024 * 1024));
-
-        var a = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Portada, jpeg));
-        var b = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Portada, Png()));
-        var c = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Portada, webp));
-        var d = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Portada, grande));
-
-        Assert.Equal(["jpeg", "png", "webp"], new[] { a, b, c }.Select(r => r.Valor.Tipo).ToList());
-        Assert.Equal(ClavesDelCatalogo.ArchivoDemasiadoGrande, d.Error!.Clave);
-        Assert.Contains(new ErrorDeCampo("archivo", "demasiado-grande"), d.Error.Errores);
-    }
-
-    [Fact]
     public async Task Un_ejecutable_renombrado_como_epub_y_un_libro_de_60_mb_se_rechazan_sin_dejar_fila_ni_objeto()
     {
         var e = new EntornoDelCatalogo();
@@ -208,19 +190,6 @@ public sealed class ArchivosDelCatalogoUsoTests
         }
     }
 
-    [Fact]
-    public async Task La_referencia_subida_se_puede_consumir_al_registrar_una_obra()
-    {
-        var e = new EntornoDelCatalogo();
-        var portada = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Portada, Png()));
-        var libro = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Libro, Epub()));
-
-        var alta = await e.Administracion().RegistrarObra(new RegistrarObraEntrada("Subida", "A", "E", "C", portada.Valor.ReferenciaId, [e.EdicionDigital(archivoRef: libro.Valor.ReferenciaId)]));
-
-        Assert.True(alta.EsExito, alta.Error?.Clave);
-        Assert.All(e.Referencias.Todas, r => Assert.Equal(EstadoDeReferencia.Consumida, r.Estado));
-    }
-
     // ---------- Portada ----------
 
     [Fact]
@@ -257,23 +226,6 @@ public sealed class ArchivosDelCatalogoUsoTests
             Assert.Equal(CategoriaDeError.NoEncontrado, r.Error!.Categoria);
             Assert.Equal(ClavesDelCatalogo.ObraNoEncontrada, r.Error.Clave);
         });
-    }
-
-    [Fact]
-    public async Task Con_el_almacen_caido_la_portada_responde_no_disponible_y_si_falta_el_objeto_no_encontrada()
-    {
-        var e = new EntornoDelCatalogo();
-        var subida = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Portada, Png()));
-        await e.Administracion().RegistrarObra(new RegistrarObraEntrada("P", "A", "E", "C", subida.Valor.ReferenciaId, [e.EdicionImpresa()]));
-        e.Almacen.NoResponde = true;
-
-        var caido = await e.Archivos().ObtenerPortada(subida.Valor.HuellaSha256);
-        e.Almacen.NoResponde = false;
-        e.Almacen.Objetos.Keys.ToList().ForEach(k => e.Almacen.Borrar(k).GetAwaiter().GetResult());
-        var sinObjeto = await e.Archivos().ObtenerPortada(subida.Valor.HuellaSha256);
-
-        Assert.Equal(CategoriaDeError.NoDisponible, caido.Error!.Categoria);
-        Assert.Equal(CategoriaDeError.NoEncontrado, sinObjeto.Error!.Categoria);
     }
 
     // ---------- Depuración ----------

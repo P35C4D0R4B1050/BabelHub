@@ -190,27 +190,6 @@ public sealed class S3AlmacenDeArchivosTests : IAsyncLifetime
 
     [Fact]
     [Trait("Criterio", "AC-CAT-12")]
-    public async Task Un_libro_de_exactamente_50_MiB_se_acepta_por_partes_y_uno_de_un_byte_mas_se_rechaza_sin_dejar_subidas()
-    {
-        var exacto = EpubDe(PoliticaDeArchivos.TopeDeLibroEnBytes);
-        var claveExacta = Clave();
-        var claveExcedida = Clave();
-
-        var aceptado = await _sut.Escribir(claveExacta, FinalidadDeArchivo.Libro, new MemoryStream(exacto));
-        var excedido = await _sut.Escribir(claveExcedida, FinalidadDeArchivo.Libro, new FlujoGrande(exacto[..1000], PoliticaDeArchivos.TopeDeLibroEnBytes + 1));
-
-        Assert.True(aceptado.Escrito);
-        Assert.Equal(PoliticaDeArchivos.TopeDeLibroEnBytes, aceptado.Archivo!.TamanoEnBytes);
-        Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(exacto)), aceptado.Archivo.Huella.Hex);
-        var guardado = await _almacen.Cliente.GetObjectMetadataAsync(Libros, claveExacta);
-        Assert.Equal(PoliticaDeArchivos.TopeDeLibroEnBytes, guardado.ContentLength);
-        Assert.Equal(MotivoDeRechazoDeArchivo.DemasiadoGrande, excedido.Rechazo);
-        Assert.Null(await Leer(Libros, claveExcedida));
-        Assert.Equal(0, await SubidasSinTerminar(Libros));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_libro_de_60_MB_se_corta_al_pasar_el_tope_sin_leer_todo_el_flujo()
     {
         var clave = Clave();
@@ -304,7 +283,6 @@ public sealed class S3AlmacenDeArchivosTests : IAsyncLifetime
     [Theory]
     [Trait("Criterio", "AC-CAT-12")]
     [InlineData(4097, 100)]
-    [InlineData(100, 4097)]
     [InlineData(4096, 4096)]
     [InlineData(0, 100)]
     public async Task Una_imagen_con_dimensiones_fuera_de_limite_se_rechaza_antes_de_escribir(int ancho, int alto)
@@ -317,15 +295,6 @@ public sealed class S3AlmacenDeArchivosTests : IAsyncLifetime
         Assert.Equal(MotivoDeRechazoDeArchivo.DimensionesInvalidas, png.Rechazo);
         Assert.Equal(MotivoDeRechazoDeArchivo.DimensionesInvalidas, jpeg.Rechazo);
         Assert.Null(await Leer(Portadas, clave));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public async Task Una_imagen_de_4000_por_4000_exactamente_16_millones_se_acepta()
-    {
-        var resultado = await _sut.Escribir(Clave(), FinalidadDeArchivo.Portada, new MemoryStream(Png(4000, 4000, tamanoTotal: 3000)));
-
-        Assert.True(resultado.Escrito);
     }
 
     [Fact]

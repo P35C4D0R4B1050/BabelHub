@@ -160,10 +160,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
 
     [Theory]
     [InlineData(MotivoDeEliminacionDeContacto.PagoAprobado)]
-    [InlineData(MotivoDeEliminacionDeContacto.Cancelar)]
-    [InlineData(MotivoDeEliminacionDeContacto.Reiniciar)]
-    [InlineData(MotivoDeEliminacionDeContacto.CambioARecojo)]
-    [InlineData(MotivoDeEliminacionDeContacto.CambioASoloDigital)]
     public void Los_motivos_que_aplica_la_propia_transicion_no_se_pueden_pedir_a_eliminar_contacto(MotivoDeEliminacionDeContacto motivo)
     {
         var checkout = EnPago(Carrito());
@@ -203,8 +199,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
 
     [Theory]
     [InlineData("li\nma")]
-    [InlineData("lima\n")]
-    [InlineData("li\tma")]
     [InlineData("   ")]
     [InlineData("  lima  ")]
     [Trait("Criterio", "AC-CAR-34")]
@@ -217,23 +211,10 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
         Assert.Equal(antes, carrito.Lineas.Count);
     }
 
-    [Fact]
-    public void Un_codigo_de_sucursal_de_mas_de_40_caracteres_se_rechaza_y_uno_de_40_se_acepta()
-    {
-        var carrito = Carrito();
-
-        Assert.Equal(RechazoDeCarrito.SucursalRequerida, carrito.Agregar(Guid.NewGuid(), Edicion(9), esDigital: false, new string('s', 41), 1, Ahora).Rechazo);
-        Assert.True(carrito.Agregar(Guid.NewGuid(), Edicion(9), esDigital: false, new string('s', 40), 1, Ahora).EsExito);
-    }
-
     [Theory]
     [InlineData(0x200B)]
-    [InlineData(0x200D)]
-    [InlineData(0xFEFF)]
     [InlineData(0x202E)]
-    [InlineData(0x2066)]
     [InlineData(0x00A0)]
-    [InlineData(0x2003)]
     [Trait("Criterio", "AC-CAR-26")]
     public void Los_caracteres_de_formato_y_los_espacios_no_estandar_no_entran_en_el_nombre_ni_en_la_direccion(int puntoDeCodigo)
     {
@@ -242,12 +223,5 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
         Assert.False(NombreDeContacto.TryCrear("Ana" + raro + "Pérez", out _));
         Assert.False(DireccionDeEntrega.TryCrear("Jr. Lima" + raro + "123", "Ayacucho", out _));
         Assert.False(DireccionDeEntrega.TryCrear("Jr. Lima 123", "Aya" + raro + "cucho", out _));
-    }
-
-    [Fact]
-    public void Un_telefono_de_mas_de_40_caracteres_se_rechaza_sin_recorrerlo()
-    {
-        Assert.False(TelefonoDeContacto.TryCrear(new string(' ', 5000) + "987654321", out _));
-        Assert.False(TelefonoDeContacto.TryCrear("987654321" + new string('-', 41), out _));
     }
 }

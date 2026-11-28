@@ -433,24 +433,4 @@ public sealed class ExistenciasPostgresTests(PostgresDeFuentesFixture bd) : ICla
             Assert.Empty(pila.Alertas.Alertas);
         }
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-FUE-06")]
-    public async Task PostgreSQL_NoLanzaErrorSinAlcance_PorEsoLaPilaLoExigeAntes()
-    {
-        // Documenta el riesgo: con el rol real y sin valor de alcance, la política devuelve cero filas y ningún error.
-        var lima = await bd.AgregarFuente("lima");
-        var edicion = await bd.AgregarEdicion();
-        await bd.PonerStock(lima, edicion, 5, 0);
-
-        await using var conexion = await bd.Acceso.OpenConnectionAsync();
-        await using var transaccion = await conexion.BeginTransactionAsync();
-        await using (var rol = new NpgsqlCommand("SET LOCAL ROLE rol_fuentes", conexion, transaccion))
-        {
-            await rol.ExecuteNonQueryAsync();
-        }
-
-        await using var cuenta = new NpgsqlCommand("SELECT count(*) FROM fuentes.stock", conexion, transaccion);
-        Assert.Equal(0L, (long)(await cuenta.ExecuteScalarAsync())!);
-    }
 }

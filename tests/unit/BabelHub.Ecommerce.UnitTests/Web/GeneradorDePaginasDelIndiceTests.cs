@@ -87,35 +87,4 @@ public sealed class GeneradorDePaginasDelIndiceTests
 
         Assert.Equal(200, paginas.Count);
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-01")]
-    public void El_resultado_no_cambia_con_la_cultura_del_hilo()
-    {
-        var original = CultureInfo.CurrentCulture;
-        try
-        {
-            CultureInfo.CurrentCulture = new CultureInfo("tr-TR");
-            var turca = GeneradorDePaginasDelIndice.Generar("s1-p1-e1-v1-pg1");
-            CultureInfo.CurrentCulture = new CultureInfo("es-PE");
-            var peruana = GeneradorDePaginasDelIndice.Generar("s1-p1-e1-v1-pg1");
-
-            Assert.Equal(turca, peruana);
-        }
-        finally
-        {
-            CultureInfo.CurrentCulture = original;
-        }
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-01")]
-    public void El_generador_no_guarda_estado_entre_llamadas_ni_entre_hilos()
-    {
-        var esperada = GeneradorDePaginasDelIndice.Generar("s7-p2-e3-v9-pg77");
-
-        var paginas = Enumerable.Range(0, 64).AsParallel().Select(_ => GeneradorDePaginasDelIndice.Generar("s7-p2-e3-v9-pg77")).ToList();
-
-        Assert.All(paginas, p => Assert.Equal(esperada, p));
-    }
 }

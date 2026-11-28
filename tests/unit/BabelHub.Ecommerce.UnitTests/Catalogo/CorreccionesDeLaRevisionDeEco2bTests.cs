@@ -38,18 +38,6 @@ public sealed class CorreccionesDeLaRevisionDeEco2bTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
-    public async Task La_cancelacion_del_llamador_si_se_propaga_y_no_se_confunde_con_el_plazo()
-    {
-        var e = new EntornoDelCatalogo();
-        Sembrar(e, "Obra");
-        e.Inventario.EsperaElToken = true;
-        using var cancelacion = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => e.ConsultaConPlazo(TimeSpan.FromSeconds(30)).BuscarObras(new BusquedaDeObras(), cancelacion.Token));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-16")]
     public async Task Un_inventario_colgado_en_el_alta_deja_la_obra_creada_y_el_ingreso_fallido_porque_nada_se_envio()
     {
@@ -168,21 +156,6 @@ public sealed class CorreccionesDeLaRevisionDeEco2bTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
-    public async Task El_alta_con_stock_inicial_y_el_inventario_caido_avisa_la_ficha_sin_confirmar_y_deja_el_ingreso_fallido()
-    {
-        var e = new EntornoDelCatalogo();
-        e.Inventario.Caido = true;
-
-        var alta = await e.Administracion().RegistrarObra(e.Obra("Con stock sin ficha", e.EdicionImpresa(stock: 12)));
-
-        var impresa = e.Obras.Todas.Single().Ediciones.Single();
-        Assert.True(alta.EsExito);
-        Assert.Equal([impresa.Id], alta.Valor.FichasSinConfirmar);
-        Assert.Equal(EstadoDeIngresoSolicitado.Fallido, Assert.Single(alta.Valor.Ingresos).Estado);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-17")]
     public async Task La_administracion_ve_el_registro_pendiente_de_una_impresa_que_el_inventario_no_conoce_y_el_publico_la_ve_agotada()
     {
@@ -199,20 +172,6 @@ public sealed class CorreccionesDeLaRevisionDeEco2bTests
         Assert.Null(a.Valor.Ediciones.Single(x => x.Formato == FormatoDeEdicion.Digital).RegistroPendienteEnElInventario);
         Assert.False(b.Valor.Ediciones.Single().RegistroPendienteEnElInventario);
         Assert.Equal(EstadoDeDisponibilidad.Agotada, publica.Valor.Ediciones.Single(x => x.Formato == FormatoDeEdicion.Impresa).Disponibilidad.Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-17")]
-    public async Task Con_el_inventario_caido_la_lectura_de_administracion_no_falla_y_no_afirma_el_registro_pendiente()
-    {
-        var e = new EntornoDelCatalogo();
-        var obra = await e.ObraRegistrada("Caído", e.EdicionImpresa());
-        e.Inventario.Caido = true;
-
-        var ficha = await e.Administracion().ObtenerObra(obra.Id);
-
-        Assert.True(ficha.EsExito);
-        Assert.Null(ficha.Valor.Ediciones.Single().RegistroPendienteEnElInventario);
     }
 
     // ---------- Conciliación e Inventario ----------

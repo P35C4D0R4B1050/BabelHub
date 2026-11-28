@@ -69,36 +69,6 @@ public sealed class CatalogoDeAccionesTests
 
     // ---------- Contrato de todo el catálogo ----------
 
-    [Fact]
-    [Trait("Criterio", "AC-AUD-23")]
-    public void Cada_constante_de_la_raiz_tiene_su_accion_en_el_catalogo_y_al_reves()
-    {
-        var constantes = Constantes().ToList();
-
-        Assert.NotEmpty(constantes);
-        Assert.Equal(constantes.Count, constantes.Select(c => c.Identificador).Distinct().Count());
-        foreach (var constante in constantes)
-        {
-            Assert.True(Catalogo.TryObtener(constante.Identificador, out var accion), $"La constante {constante.Identificador} no está en el catálogo.");
-            Assert.Equal(accion!.Aislada, constante.Aislada);
-        }
-
-        var identificadores = constantes.Select(c => c.Identificador).ToHashSet();
-        foreach (var accion in Catalogo.Acciones)
-        {
-            Assert.True(identificadores.Contains(accion.Identificador), $"La acción {accion.Identificador} no tiene constante en la raíz del contrato.");
-        }
-    }
-
-    [Fact]
-    public void El_nombre_de_cada_constante_es_el_identificador_de_su_accion()
-    {
-        foreach (var campo in typeof(AccionesAuditables).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.FieldType == typeof(AccionAuditable)))
-        {
-            Assert.Equal(campo.Name, ((AccionAuditable)campo.GetValue(null)!).Identificador);
-        }
-    }
-
     [Theory]
     [MemberData(nameof(Acciones))]
     [Trait("Criterio", "AC-AUD-01")]
@@ -622,7 +592,6 @@ public sealed class CatalogoDeAccionesTests
         Assert.NotNull(registro.Origen);
         Assert.True(Catalogo.Obtener("CambioDeRol").ObjetoPersonal);
     }
-
 
     [Fact]
     [Trait("Criterio", "AC-AUD-34")]

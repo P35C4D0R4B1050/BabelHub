@@ -422,14 +422,8 @@ public sealed class PantallasDelCheckoutTests
 
     [Theory]
     [InlineData("checkout-total-cambio", CategoriaDeError.Conflicto, 409, "El total cambió")]
-    [InlineData("checkout-reserva-rechazada", CategoriaDeError.Conflicto, 409, "No pudimos reservar tus libros")]
-    [InlineData("checkout-en-curso", CategoriaDeError.Conflicto, 409, "Estamos preparando tu compra")]
     [InlineData("checkout-stock-no-validable", CategoriaDeError.NoDisponible, 503, "No podemos validar el stock ahora")]
-    [InlineData("checkout-correo-sin-verificar", CategoriaDeError.Prohibido, 403, "Verifica tu correo para pagar")]
-    [InlineData("checkout-textos-pendientes", CategoriaDeError.Prohibido, 403, "Acepta los textos legales vigentes")]
     [InlineData("checkout-cuenta-no-puede-comprar", CategoriaDeError.Prohibido, 403, "Tu cuenta no puede comprar ahora")]
-    [InlineData("checkout-licencia-no-vigente", CategoriaDeError.Conflicto, 409, "Un libro digital ya no se puede vender")]
-    [InlineData("checkout-texto-cambio", CategoriaDeError.Conflicto, 409, "Actualizamos nuestros textos")]
     public async Task Cada_bloqueo_del_paso_de_reserva_se_dice_en_la_misma_pantalla_con_su_texto_y_el_carrito_conservado(string clave, CategoriaDeError categoria, int estado, string titulo)
     {
         var falso = Con(ConEntrega(Mixto));

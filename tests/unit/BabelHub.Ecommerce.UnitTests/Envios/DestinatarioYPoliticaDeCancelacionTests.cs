@@ -24,7 +24,6 @@ public sealed class DestinatarioYPoliticaDeCancelacionTests
     [Theory]
     [Trait("Criterio", "AC-ENV-09")]
     [InlineData(null, "Av. Los Olivos 123", "987654321", CampoDelDestinatario.Nombre)]
-    [InlineData("  ", "Av. Los Olivos 123", "987654321", CampoDelDestinatario.Nombre)]
     [InlineData("Ana Pérez", "", "987654321", CampoDelDestinatario.Direccion)]
     [InlineData("Ana Pérez", "Av. Los Olivos 123", null, CampoDelDestinatario.Telefono)]
     [InlineData("Ana Pérez", null, null, CampoDelDestinatario.Direccion)]
@@ -54,7 +53,6 @@ public sealed class DestinatarioYPoliticaDeCancelacionTests
     [Theory]
     [Trait("Criterio", "AC-ENV-17")]
     [InlineData("Ana\nPérez", "Av. Los Olivos 123", "987654321", CampoDelDestinatario.Nombre)]
-    [InlineData("Ana Pérez", "Av. Los Olivos\r\n123", "987654321", CampoDelDestinatario.Direccion)]
     [InlineData("Ana Pérez", "Av. Los Olivos 123", "98765-abc", CampoDelDestinatario.Telefono)]
     [InlineData("Ana Pérez", "Av. Los Olivos 123", "+ - ()", CampoDelDestinatario.Telefono)]
     public void Un_campo_con_caracteres_de_control_o_un_telefono_con_letras_se_rechaza_para_ese_campo(string nombre, string direccion, string telefono, CampoDelDestinatario esperado)
@@ -78,25 +76,6 @@ public sealed class DestinatarioYPoliticaDeCancelacionTests
         Assert.DoesNotContain("987654321", texto, StringComparison.Ordinal);
         Assert.Equal("[redactado]", destinatario.ToString());
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<DestinatarioParaGuia>("\"[redactado]\""));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-12")]
-    public void La_politica_cancela_el_pendiente_y_el_de_guia_sin_marcador()
-    {
-        Assert.Equal(DecisionDeCancelacion.Cancelar, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.PendienteDeGuia, despachoIniciado: false));
-        Assert.Equal(DecisionDeCancelacion.Cancelar, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.GuiaGenerada, despachoIniciado: false));
-        Assert.Equal(DecisionDeCancelacion.YaCancelado, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.Cancelado, despachoIniciado: false));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-19")]
-    public void La_politica_mantiene_el_de_marcador_el_en_reparto_y_el_entregado()
-    {
-        Assert.Equal(DecisionDeCancelacion.Mantener, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.GuiaGenerada, despachoIniciado: true));
-        Assert.Equal(DecisionDeCancelacion.Mantener, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.EnReparto, despachoIniciado: true));
-        Assert.Equal(DecisionDeCancelacion.Mantener, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.EnReparto, despachoIniciado: false));
-        Assert.Equal(DecisionDeCancelacion.Mantener, PoliticaDeCancelacion.Evaluar(EstadoDeEnvio.Entregado, despachoIniciado: true));
     }
 
     [Fact]

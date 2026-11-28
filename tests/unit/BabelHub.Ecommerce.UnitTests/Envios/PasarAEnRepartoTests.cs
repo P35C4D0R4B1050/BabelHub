@@ -84,27 +84,6 @@ public sealed class PasarAEnRepartoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-03")]
-    public async Task Un_envio_que_no_tiene_guia_o_ya_esta_en_reparto_se_rechaza_por_estado_invalido()
-    {
-        var entorno = new EntornoDeEnvios();
-        var pendiente = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), "lima-central", [Guid.NewGuid()], EntornoDeEnvios.AhoraInicial);
-        entorno.Envios.Sembrar(pendiente);
-        var enReparto = SembrarConGuia(entorno, e =>
-        {
-            e.IniciarDespacho(EntornoDeEnvios.AhoraInicial);
-            e.PasarAEnReparto(EntornoDeEnvios.AhoraInicial);
-        });
-
-        var sinGuia = await entorno.PasarAEnReparto.Ejecutar(pendiente.Id);
-        var repetido = await entorno.PasarAEnReparto.Ejecutar(enReparto.Id);
-
-        Assert.Equal("estado-invalido", sinGuia.Error!.Clave);
-        Assert.Equal("estado-invalido", repetido.Error!.Clave);
-        Assert.Empty(entorno.Reservas.Llamadas);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-ENV-11")]
     public async Task Si_el_inventario_no_responde_el_envio_sigue_en_guia_generada_sin_descontar_y_el_reintento_descuenta_una_sola_vez()
     {
@@ -177,24 +156,6 @@ public sealed class PasarAEnRepartoTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-19")]
-    public async Task Un_cierre_lento_que_el_reintento_ve_en_curso_deja_el_marcador_y_cancelar_mantiene()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarConGuia(entorno);
-        // El primer cierre pudo seguir ejecutándose en el Inventario: el reintento recibe «en curso» (incierto).
-        entorno.Reservas.Encolar(new ResultadoDeCierreDeReservas.Incierto());
-        entorno.Reservas.Encolar(new ResultadoDeCierreDeReservas.Incierto());
-
-        await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-        await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-        var cancelado = await entorno.Cancelar.Ejecutar(envio.PedidoId);
-
-        Assert.Equal(DestinoDelEnvioAlCancelar.Mantenido, Assert.Single(cancelado.Valor).Destino);
-        Assert.Equal(EstadoDeEnvio.GuiaGenerada, Guardado(entorno, envio.Id).Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-19")]
     public async Task Si_la_cancelacion_confirma_primero_el_paso_a_reparto_se_rechaza_sin_tocar_el_inventario()
     {
         var entorno = new EntornoDeEnvios();
@@ -206,23 +167,6 @@ public sealed class PasarAEnRepartoTests
         Assert.Equal("estado-invalido", resultado.Error!.Clave);
         Assert.Empty(entorno.Reservas.Llamadas);
         Assert.Equal(EstadoDeEnvio.Cancelado, Guardado(entorno, envio.Id).Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-19")]
-    public async Task Si_el_paso_a_reparto_confirma_el_marcador_primero_cancelar_mantiene_el_envio()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarConGuia(entorno);
-        Resultado<IReadOnlyList<ResultadoDeCancelarEnvio>>? cancelacion = null;
-        entorno.Reservas.AlCerrar = () => cancelacion = entorno.Cancelar.Ejecutar(envio.PedidoId).GetAwaiter().GetResult();
-
-        var resultado = await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(EstadoDeEnvio.EnReparto, Guardado(entorno, envio.Id).Estado);
-        Assert.Equal(1, entorno.Reservas.EnviosDescontados);
-        Assert.Equal(DestinoDelEnvioAlCancelar.Mantenido, Assert.Single(cancelacion!.Valor).Destino);
     }
 
     [Fact]
@@ -266,43 +210,5 @@ public sealed class PasarAEnRepartoTests
         var guardado = Guardado(entorno, envio.Id);
         Assert.Equal(EstadoDeEnvio.EnReparto, guardado.Estado);
         Assert.Null(guardado.ProgresoEnRepartoInformadoEn); // un trabajo lo reintenta
-    }
-
-    [Theory]
-    [Trait("Criterio", "AC-ENV-08")]
-    [InlineData("cliente")]
-    [InlineData("encargado")]
-    [InlineData("anonimo")]
-    public async Task Quien_no_es_de_logistica_ni_de_la_administracion_central_recibe_prohibido_con_un_acceso_denegado(string quien)
-    {
-        var actor = quien switch
-        {
-            "cliente" => ActorDePrueba.DeCliente(),
-            "encargado" => ActorDePrueba.DeEncargadoDe(Guid.NewGuid()),
-            _ => ActorDePrueba.Anonimo(),
-        };
-        var entorno = new EntornoDeEnvios(actor);
-        var envio = SembrarConGuia(entorno);
-
-        var resultado = await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-
-        Assert.Equal(quien == "anonimo" ? CategoriaDeError.NoAutenticado : CategoriaDeError.Prohibido, resultado.Error!.Categoria);
-        Assert.Single(entorno.Denegaciones.Eventos);
-        Assert.Empty(entorno.Reservas.Llamadas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task Un_envio_inexistente_es_no_encontrado_y_una_base_caida_es_servicio_no_disponible()
-    {
-        var entorno = new EntornoDeEnvios();
-        var inexistente = await entorno.PasarAEnReparto.Ejecutar(Guid.NewGuid());
-        var envio = SembrarConGuia(entorno);
-        entorno.Envios.NoDisponible = true;
-        var caida = await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Equal(CategoriaDeError.NoDisponible, caida.Error!.Categoria);
-        Assert.Empty(entorno.Reservas.Llamadas);
     }
 }

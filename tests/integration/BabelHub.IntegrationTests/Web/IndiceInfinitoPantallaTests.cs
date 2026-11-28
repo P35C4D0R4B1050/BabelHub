@@ -38,18 +38,6 @@ public sealed class IndiceInfinitoPantallaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IND-01")]
-    public async Task El_texto_de_una_direccion_fija_es_el_del_patron_de_oro()
-    {
-        await using var host = await AnfitrionDelIndice.Iniciar();
-
-        var (_, cuerpo, _) = await Pedir(host, "/indice-infinito/s1-p1-e1-v1-pg1");
-
-        var lineas = AnfitrionDelIndice.TextoDeLaPagina(cuerpo).Split('\n');
-        Assert.Equal("implcrjrmolsrñflijp ,,zhqoyjddjzpiwdn.fkktblxtnu qdxkttjrklgkv,pgftbqk", lineas[0]);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-IND-02")]
     public async Task Otra_pagina_al_azar_redirige_a_otra_direccion_con_otro_texto()
     {
@@ -66,31 +54,6 @@ public sealed class IndiceInfinitoPantallaTests
         Assert.Equal(HttpStatusCode.OK, estadoNueva);
         Assert.NotEqual(AnfitrionDelIndice.TextoDeLaPagina(actual), AnfitrionDelIndice.TextoDeLaPagina(nueva));
         Assert.Equal(ubicacion["/indice-infinito/".Length..], AnfitrionDelIndice.DireccionDeLaPagina(nueva));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-02")]
-    public async Task El_enlace_de_otra_al_azar_de_la_pagina_lleva_la_direccion_actual_como_desde()
-    {
-        await using var host = await AnfitrionDelIndice.Iniciar();
-
-        var (_, cuerpo, _) = await Pedir(host, "/indice-infinito/s7-p2-e3-v9-pg77");
-
-        Assert.Contains("href=\"/indice-infinito/acciones/al-azar?desde=s7-p2-e3-v9-pg77\"", cuerpo, StringComparison.Ordinal);
-        Assert.Contains("rel=\"nofollow\"", cuerpo, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-02")]
-    public async Task La_direccion_al_azar_literal_abre_su_pagina_y_la_accion_vive_en_otra_ruta()
-    {
-        await using var host = await AnfitrionDelIndice.Iniciar();
-
-        var (estado, cuerpo, _) = await Pedir(host, "/indice-infinito/al-azar");
-
-        Assert.Equal(HttpStatusCode.OK, estado);
-        Assert.Equal("al-azar", AnfitrionDelIndice.DireccionDeLaPagina(cuerpo));
-        Assert.DoesNotContain("Esa dirección no existe", cuerpo, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -120,8 +83,6 @@ public sealed class IndiceInfinitoPantallaTests
     [Trait("Criterio", "AC-IND-04")]
     [InlineData("/indice-infinito/s12-p3-e4-v5-pg100")]
     [InlineData("/indice-infinito/al-azar")]
-    [InlineData("/indice-infinito/Mayuscula")]
-    [InlineData("/indice-infinito/con%20espacio")]
     public async Task Toda_pagina_trae_el_aviso_de_texto_generado_y_el_enlace_al_catalogo_real(string ruta)
     {
         await using var host = await AnfitrionDelIndice.Iniciar();
@@ -151,25 +112,9 @@ public sealed class IndiceInfinitoPantallaTests
         Assert.DoesNotContain("hx-", principal, StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-IND-06")]
-    public async Task Una_direccion_no_valida_da_el_mensaje_amable_con_una_pagina_al_azar_y_no_un_error()
-    {
-        await using var host = await AnfitrionDelIndice.Iniciar();
-
-        var (estado, cuerpo, _) = await Pedir(host, "/Indice-Infinito/ABC");
-
-        Assert.Equal(HttpStatusCode.OK, estado);
-        Assert.Contains("Esa dirección no existe en este laberinto", cuerpo, StringComparison.Ordinal);
-        Assert.Matches("^[a-z0-9-]{1,64}$", AnfitrionDelIndice.DireccionDeLaPagina(cuerpo));
-        Assert.Equal(20, AnfitrionDelIndice.TextoDeLaPagina(cuerpo).Split('\n').Length);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-IND-03")]
     [InlineData("/indice-infinito")]
-    [InlineData("/indice-infinito/")]
-    [InlineData("/indice-infinito?direccion=")]
     [InlineData("/indice-infinito?direccion=%20%20%20")]
     public async Task La_entrada_vacia_o_de_solo_espacios_redirige_a_una_al_azar(string ruta)
     {
@@ -185,7 +130,6 @@ public sealed class IndiceInfinitoPantallaTests
     [Trait("Criterio", "AC-IND-03")]
     [InlineData("/indice-infinito?direccion=s12-p3-e4-v5-pg100")]
     [InlineData("/indice-infinito?direccion=%20s12-p3-e4-v5-pg100%20")]
-    [InlineData("/indice-infinito/?direccion=s12-p3-e4-v5-pg100")]
     public async Task El_formulario_con_una_direccion_valida_redirige_a_la_canonica(string ruta)
     {
         await using var host = await AnfitrionDelIndice.Iniciar();

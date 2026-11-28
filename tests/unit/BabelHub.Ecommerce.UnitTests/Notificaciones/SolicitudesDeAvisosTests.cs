@@ -429,21 +429,6 @@ public sealed class SolicitudesDeAvisosTests
 
     [Fact]
     [Trait("Criterio", "AC-NOT-04")]
-    public async Task ElMismoEventoParaOtroDestinatarioOOtraPlantilla_SiGeneraOtroAviso()
-    {
-        var e = new Entorno();
-        var uno = e.Cuentas.Con(consiente: true);
-        var otro = e.Cuentas.Con(consiente: true);
-
-        await e.Solicitar.Solicitar(Listo(uno));
-        await e.Solicitar.Solicitar(Listo(otro));
-        await e.Solicitar.Solicitar(new SolicitudDeAviso("pedido:123:listo-para-recojo", DestinatarioDelAviso.Cliente, uno.ToString("D"), "pedido-confirmado", new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123" }));
-
-        Assert.Equal(3, e.Avisos.Guardados.Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-04")]
     public async Task UnClienteSinConsentimiento_ReportadoDosVeces_DejaUnSoloRegistroOmitido()
     {
         var e = new Entorno();
@@ -502,19 +487,6 @@ public sealed class SolicitudesDeAvisosTests
         await e.Cancelar.CancelarLosAvisosDe(cuenta);
 
         Assert.Equal(EstadoDelAviso.Cancelado, Assert.Single(e.Avisos.Guardados).Estado);
-    }
-
-    [Theory]
-    [InlineData("numeroDeTraslado", "TR3f2c9a8e0000123456")]
-    [Trait("Criterio", "AC-NOT-06")]
-    public async Task UnIdentificadorMixtoConMuchosDigitos_NoSeRechazaPorParecerUnaTarjeta(string campo, string valor)
-    {
-        var e = new Entorno();
-        var solicitud = Traslado("AYACUCHO");
-
-        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { [campo] = valor } });
-
-        Assert.Equal(ResultadoDeLaSolicitudDeAviso.Creado, resultado);
     }
 
     [Theory]

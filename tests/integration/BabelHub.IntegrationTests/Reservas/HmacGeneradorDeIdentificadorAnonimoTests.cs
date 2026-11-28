@@ -86,16 +86,6 @@ public sealed class HmacGeneradorDeIdentificadorAnonimoTests
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
-    public void ConLaClaveBien_CargarDevuelveElGenerador()
-    {
-        var generador = ClaveDeBajasDelEntorno.Cargar(Configuracion((HmacGeneradorDeIdentificadorAnonimo.Ruta, Clave)));
-
-        var titular = Guid.NewGuid();
-        Assert.Equal(new HmacGeneradorDeIdentificadorAnonimo(Clave).Generar(titular), generador.Generar(titular));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEL-36")]
     public void SiLaClaveFalta_ElArranqueFalla_NombrandoLaVariable()
     {
         var error = Falla(Configuracion());

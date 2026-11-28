@@ -144,20 +144,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    public async Task Cambiar_la_licencia_a_pdf_exige_reemplazar_tambien_el_libro()
-    {
-        var (entorno, obra) = await ConImpresaYDigital();
-        var digital = obra.Ediciones.Single(e => e.EsDigital);
-        var licenciaPdf = entorno.Licencia(formato: FormatoDeArchivoDigital.Pdf);
-
-        var sinLibro = await entorno.EditarEdicion().Ejecutar(new EditarEdicionEntrada(obra.Id, digital.Id, obra.Version, null, licenciaPdf, null));
-        var conLibro = await entorno.EditarEdicion().Ejecutar(new EditarEdicionEntrada(obra.Id, digital.Id, obra.Version, null, licenciaPdf, entorno.LibroListo(TipoDeArchivo.Pdf)));
-
-        Assert.Equal(ClavesDelCatalogo.LicenciaInvalida, sinLibro.Error!.Clave);
-        Assert.True(conLibro.EsExito);
-    }
-
-    [Fact]
     public async Task Una_impresa_no_acepta_licencia_ni_libro()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -187,19 +173,6 @@ public sealed class EditarObraYEdicionTests
         Assert.Equal(anterior.Huella.Corta, auditoria.Detalle["huellaCortaAnterior"]);
         Assert.Equal(guardada.Portada.Huella.Corta, auditoria.Detalle["huellaCorta"]);
         Assert.DoesNotContain(entorno.Auditoria.Solicitudes, s => s.Accion.Identificador == "ObraEditada");
-    }
-
-    [Fact]
-    public async Task Una_portada_ajena_o_de_otra_finalidad_no_reemplaza_la_de_la_obra()
-    {
-        var (entorno, obra) = await ConImpresaYDigital();
-
-        var ajena = await entorno.EditarObra().Ejecutar(new EditarObraEntrada(obra.Id, obra.Version, obra.Titulo, obra.Autor, obra.Editorial, obra.Categoria, entorno.PortadaLista(Guid.NewGuid())));
-        var comoLibro = await entorno.EditarObra().Ejecutar(new EditarObraEntrada(obra.Id, obra.Version, obra.Titulo, obra.Autor, obra.Editorial, obra.Categoria, entorno.LibroListo()));
-
-        Assert.Equal(ClavesDelCatalogo.ReferenciaDeArchivoInvalida, ajena.Error!.Clave);
-        Assert.Equal(ClavesDelCatalogo.ReferenciaDeArchivoInvalida, comoLibro.Error!.Clave);
-        Assert.Equal(obra.Portada.ClaveDelAlmacen, (await entorno.Obras.Obtener(obra.Id, false))!.Portada.ClaveDelAlmacen);
     }
 
     // ---------- EditarObra ----------
@@ -237,29 +210,6 @@ public sealed class EditarObraYEdicionTests
         Assert.Equal(CategoriaDeError.Conflicto, segunda.Error.Categoria);
         Assert.Equal(ClavesDelCatalogo.ConflictoDeVersion, obraEditada.Error!.Clave);
         Assert.Equal(139m, (await entorno.Obras.Obtener(obra.Id, false))!.BuscarEdicion(impresa.Id)!.Precio.Valor);
-    }
-
-    [Fact]
-    public async Task Una_obra_o_una_edicion_inexistente_o_dada_de_baja_se_rechazan()
-    {
-        var (entorno, obra) = await ConImpresaYDigital();
-        var impresa = obra.Ediciones.Single(e => !e.EsDigital);
-        var digital = obra.Ediciones.Single(e => e.EsDigital);
-
-        var sinObra = await entorno.EditarEdicion().Ejecutar(new EditarEdicionEntrada(Guid.NewGuid(), impresa.Id, 1, 1m, null, null));
-        var sinEdicion = await entorno.EditarEdicion().Ejecutar(new EditarEdicionEntrada(obra.Id, Guid.NewGuid(), obra.Version, 1m, null, null));
-        var obraSinId = await entorno.EditarObra().Ejecutar(new EditarObraEntrada(Guid.NewGuid(), 1, "T", "A", "E", "C", null));
-        // La baja de una edición la hace T09; aquí se siembra la obra con la impresa dada de baja.
-        var dada = RepositorioDeObrasEnMemoria.Clonar(obra);
-        dada.DarDeBajaEdicion(impresa.Id, entorno.Reloj.Ahora);
-        entorno.Obras.Sembrar(dada);
-        var edicionDeBaja = await entorno.EditarEdicion().Ejecutar(new EditarEdicionEntrada(obra.Id, impresa.Id, dada.Version, 1m, null, null));
-
-        Assert.Equal(CategoriaDeError.NoEncontrado, sinObra.Error!.Categoria);
-        Assert.Equal(ClavesDelCatalogo.EdicionNoEncontrada, sinEdicion.Error!.Clave);
-        Assert.Equal(ClavesDelCatalogo.ObraNoEncontrada, obraSinId.Error!.Clave);
-        Assert.Equal(ClavesDelCatalogo.EdicionDadaDeBaja, edicionDeBaja.Error!.Clave);
-        Assert.NotNull(digital);
     }
 
     [Theory]

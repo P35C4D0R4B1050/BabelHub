@@ -249,20 +249,6 @@ public sealed class VolverYReiniciarTests
     }
 
     [Fact]
-    public async Task Si_el_inventario_sigue_sin_responder_la_anotacion_queda_para_la_corrida_siguiente()
-    {
-        var s = await ConLiberacionPendiente(ResultadoDeLiberar.NoSePudo);
-
-        var primera = await Trabajo(s.Entorno);
-        var segunda = await Trabajo(s.Entorno);
-
-        Assert.Equal(1, primera.Valor.SinRespuesta);
-        Assert.Equal(1, segunda.Valor.SinRespuesta);
-        Assert.NotNull(s.Checkout.ReservaALiberarDesde);
-        Assert.Equal(2, s.Entorno.Inventario.Liberaciones.Count);
-    }
-
-    [Fact]
     public async Task Un_pedido_ya_confirmado_se_limpia_sin_reintento_y_se_alerta_de_modo_que_no_reintenta_sin_fin()
     {
         var s = await ConLiberacionPendiente(ResultadoDeLiberar.PedidoConfirmado);

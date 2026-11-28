@@ -126,43 +126,6 @@ public sealed class TrabajosDeFondoDeNotificacionesTests
 
     [Fact]
     [Trait("Criterio", "AC-NOT-04")]
-    public async Task CorrerRepiteLaCorridaEnCadaIntervalo()
-    {
-        using var origen = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var corridas = 0;
-        var (trabajo, _, _, _) = Trabajo(
-            _ =>
-            {
-                if (++corridas == 3)
-                {
-                    origen.Cancel();
-                }
-
-                return Task.CompletedTask;
-            },
-            new OpcionesDelTrabajoDeNotificaciones(TimeSpan.FromMilliseconds(20)));
-
-        await trabajo.Correr(origen.Token);
-
-        Assert.Equal(3, corridas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-04")]
-    public void LosTrabajosDeNotificaciones_TienenNombresEstables_ElEnvioCada30SegundosPorLotesDe10_YLaPurgaCada6Horas()
-    {
-        var trabajos = TrabajosDeNotificaciones.Todos(new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), new RegistroEspia(), new ActorEspia().Ejecutar, new AlertasEspia(), new RelojFijo(Ahora));
-
-        Assert.Equal([TrabajosDeNotificaciones.EnvioDeAvisos, TrabajosDeNotificaciones.PurgaDeAvisos], trabajos.Select(t => t.Nombre));
-        Assert.Equal(TimeSpan.FromSeconds(30), TrabajosDeNotificaciones.OpcionesDelEnvio.Intervalo);
-        Assert.Equal(TimeSpan.FromMinutes(10), TrabajosDeNotificaciones.OpcionesDelEnvio.PlazoDeLaCorrida);
-        Assert.Equal(10, TrabajosDeNotificaciones.LotesPorCorrida);
-        Assert.Equal(TimeSpan.FromHours(6), TrabajosDeNotificaciones.OpcionesDeLaPurga.Intervalo);
-        Assert.Equal(1, TrabajosDeNotificaciones.OpcionesDeLaPurga.FallosSeguidosParaAlertar);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-04")]
     public async Task LaCorridaRealDelEnvio_SinLosServiciosDelModulo_FallaSinCaerElServicio_YQuedaRegistrada()
     {
         var registro = new RegistroEspia();

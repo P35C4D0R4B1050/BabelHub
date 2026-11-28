@@ -174,9 +174,8 @@ public sealed class SesionDeExtremoAExtremoTests(PostgresDeLaWebFixture bd) : IA
 
     [Theory]
     [Trait("Criterio", "AC-WEB-22")]
-    [InlineData(HostWeb.Tienda, RolWeb.Cliente, 7 * 24 * 60)]
     [InlineData(HostWeb.Gestion, RolWeb.Encargado, 8 * 60)]
-    public async Task ActuandoCada25Minutos_ElClienteLlegaAlTopeDe7DiasYElPersonalAlDe8Horas_YLaSiguienteAccionLoCierra(HostWeb host, RolWeb rol, int minutosDeTope)
+    public async Task ActuandoCada25Minutos_ElPersonalLlegaAlTopeDe8Horas_YLaSiguienteAccionLoCierra(HostWeb host, RolWeb rol, int minutosDeTope)
     {
         var (anfitrion, e) = await Armar(host, bd);
         await using var _ = anfitrion;

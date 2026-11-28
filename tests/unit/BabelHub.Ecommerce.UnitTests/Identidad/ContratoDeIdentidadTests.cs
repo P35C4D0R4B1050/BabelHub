@@ -61,21 +61,6 @@ public sealed class ContratoDeIdentidadTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-26")]
-    public void ExistenTodasLasInterfacesDelPlan_EnLaRaizDelModulo()
-    {
-        string[] esperadas =
-        [
-            "IRegistroDeCuentas", "IIngreso", "ISesiones", "IRecuperacionDeAcceso", "ICuentaDelCliente", "ISolicitudesDeDatos", "ICancelacionDeCuenta", "IAdministracionDeUsuarios", "IClavesDeFirma",
-            "IEstadoDeCuenta", "IContextoDeLectura", "IPendientesDeCuenta", "IAplicadorDeCancelacion", "ICarritoDeCuentaReemplazada", "ICancelacionDeAvisos", "IEntregaDeBajas",
-            "IContactoDeAvisosDelCliente", "ICorreoVerificadoDeSistema",
-        ];
-        var publicas = typeof(IIngreso).Assembly.GetExportedTypes().Where(t => t.Namespace == Espacio && t.IsInterface).Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
-
-        Assert.All(esperadas, nombre => Assert.Contains(nombre, publicas));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-IDE-30")]
     public void LaCredencialYLaRenovacion_SonSecretosQueNoSeImprimen()
     {

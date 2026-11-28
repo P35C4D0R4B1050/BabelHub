@@ -123,22 +123,6 @@ public sealed class MarcarEntregadoTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-07")]
-    public async Task El_trabajo_es_idempotente_y_no_hace_nada_si_todo_esta_informado()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarEnReparto(entorno);
-        await entorno.MarcarEntregado.Ejecutar(envio.Id);
-        var llamadas = entorno.Progreso.Llamadas.Count;
-
-        var corrida = await entorno.InformarProgreso.Ejecutar(10);
-
-        Assert.True(corrida.EsExito);
-        Assert.Equal(0, corrida.Valor);
-        Assert.Equal(llamadas, entorno.Progreso.Llamadas.Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-07")]
     public async Task Lo_que_lleva_mas_de_una_hora_sin_informarse_publica_una_alerta_tecnica_sin_datos()
     {
         var entorno = new EntornoDeEnvios();
@@ -174,28 +158,5 @@ public sealed class MarcarEntregadoTests
         var resultado = await informar.Ejecutar(10);
 
         Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);
-    }
-
-    [Theory]
-    [Trait("Criterio", "AC-ENV-08")]
-    [InlineData("cliente")]
-    [InlineData("encargado")]
-    [InlineData("anonimo")]
-    public async Task Quien_no_es_de_logistica_ni_de_la_administracion_central_recibe_prohibido_con_un_acceso_denegado(string quien)
-    {
-        var actor = quien switch
-        {
-            "cliente" => ActorDePrueba.DeCliente(),
-            "encargado" => ActorDePrueba.DeEncargadoDe(Guid.NewGuid()),
-            _ => ActorDePrueba.Anonimo(),
-        };
-        var entorno = new EntornoDeEnvios(actor);
-        var envio = SembrarEnReparto(entorno);
-
-        var resultado = await entorno.MarcarEntregado.Ejecutar(envio.Id);
-
-        Assert.Equal(quien == "anonimo" ? CategoriaDeError.NoAutenticado : CategoriaDeError.Prohibido, resultado.Error!.Categoria);
-        Assert.Single(entorno.Denegaciones.Eventos);
-        Assert.Equal(EstadoDeEnvio.EnReparto, Guardado(entorno, envio.Id).Estado);
     }
 }

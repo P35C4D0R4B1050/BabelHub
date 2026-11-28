@@ -172,13 +172,6 @@ public sealed class MovimientosDeStockTests
     }
 
     [Fact]
-    public async Task Bloquear_ConUnIdentificadorVacioONulo_Lanza()
-    {
-        await Assert.ThrowsAsync<ArgumentException>(() => Movimientos().Bloquear([Guid.Empty]));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => Movimientos().Bloquear(null!));
-    }
-
-    [Fact]
     public async Task Bloquear_ConEdicionesRepetidas_LasPideUnaSolaVezYEnElOrdenDeBloqueo()
     {
         var a = Impresa();

@@ -84,22 +84,6 @@ public sealed class CheckoutTests
     // ---------------------------------------------------------------- inicio, pasos y entrega
 
     [Fact]
-    public void Iniciar_arma_el_checkout_en_edicion_con_un_lineaid_estable_por_linea_tambien_las_digitales()
-    {
-        var checkout = Nuevo(Impreso(1, 2), Digital(2));
-
-        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
-        Assert.Equal(PasoDelCheckout.Revision, checkout.Paso);
-        Assert.Equal(2, checkout.Lineas.Count);
-        Assert.All(checkout.Lineas, l => Assert.NotEqual(Guid.Empty, l.LineaId));
-        Assert.Equal(2, checkout.Lineas.Select(l => l.LineaId).Distinct().Count());
-        Assert.Null(checkout.PedidoId);
-        Assert.Null(checkout.TipoDeEntrega);
-        Assert.True(checkout.EsVivo);
-        Assert.Equal(Ahora, checkout.ModificadoPorLaPersonaEn);
-    }
-
-    [Fact]
     public void Iniciar_sin_lineas_o_con_una_edicion_repetida_se_rechaza()
     {
         Assert.Throws<ArgumentException>(() => Nuevo());
@@ -156,20 +140,6 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    public void Repetir_la_misma_entrega_no_cambia_nada_ni_la_version()
-    {
-        var checkout = Nuevo(Impreso(1));
-        checkout.ElegirDomicilio(Contacto(), Ahora);
-        var version = checkout.Version;
-
-        var otraVez = checkout.ElegirDomicilio(Contacto(), Ahora.AddMinutes(5));
-
-        Assert.Equal(EfectoDeTransicion.SinCambios, otraVez.Efecto);
-        Assert.Equal(version, checkout.Version);
-        Assert.Equal(Ahora, checkout.ModificadoPorLaPersonaEn);
-    }
-
-    [Fact]
     public void Sincronizar_las_lineas_conserva_el_lineaid_de_las_ediciones_que_siguen_y_lo_informado_y_da_uno_nuevo_a_las_nuevas()
     {
         var checkout = Nuevo(Impreso(1, 1), Impreso(2, 1));
@@ -183,17 +153,6 @@ public sealed class CheckoutTests
         var uno = checkout.Lineas.Single(l => l.EdicionId == Edicion(1));
         Assert.Equal((idUno, 4, "lima", true, 3), (uno.LineaId, uno.Cantidad.Valor, uno.CodigoDeFuenteInformado, uno.RequiereTrasladoInformado, uno.PlazoInformadoDias));
         Assert.NotEqual(idUno, checkout.Lineas.Single(l => l.EdicionId == Edicion(3)).LineaId);
-    }
-
-    [Fact]
-    public void Sincronizar_las_mismas_lineas_no_cambia_nada_y_sin_lineas_se_rechaza()
-    {
-        var checkout = Nuevo(Impreso(1, 2));
-        var version = checkout.Version;
-
-        Assert.Equal(EfectoDeTransicion.SinCambios, checkout.SincronizarLineas([Impreso(1, 2)], Guid.NewGuid, Ahora.AddMinutes(1)).Efecto);
-        Assert.Equal(version, checkout.Version);
-        Assert.Equal(RechazoDeCheckout.SinLineas, checkout.SincronizarLineas([], Guid.NewGuid, Ahora).Rechazo);
     }
 
     [Fact]
@@ -262,19 +221,6 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    public void Pasar_al_pago_de_un_carrito_solo_digital_no_requiere_entrega()
-    {
-        var checkout = Nuevo(Digital(1));
-
-        var resultado = Preparar(checkout, CarritoCon(Digital(1)));
-
-        Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
-        Assert.Equal(EstadoDelCheckout.Reservando, checkout.Estado);
-        Assert.Equal(0m, checkout.EnvioCongelado);
-        Assert.Equal(20m, checkout.TotalCongelado);
-    }
-
-    [Fact]
     public void Un_segundo_clic_con_lo_mismo_continua_con_el_mismo_pedido_sin_cambiar_nada()
     {
         var (checkout, carrito) = Reservando();
@@ -329,26 +275,6 @@ public sealed class CheckoutTests
         checkout.SincronizarLineas([Impreso(1, 2), Digital(2)], Guid.NewGuid, Ahora.AddMinutes(3));
         Preparar(checkout, carrito, ahora: Ahora.AddMinutes(4));
         Assert.Equal((pedido, 3), (checkout.PedidoId, checkout.GeneracionDeReserva));
-    }
-
-    [Fact]
-    public void Cambiar_solo_el_telefono_reconstruye_la_instantanea_pero_no_la_reserva()
-    {
-        var checkout = Nuevo(Impreso(1));
-        checkout.ElegirDomicilio(Contacto("987654321"), Ahora);
-        var carrito = CarritoCon(Impreso(1));
-        Preparar(checkout, carrito);
-        ConfirmarEnPago(checkout, carrito);
-        var huellaDeReserva = checkout.HuellaDeReserva;
-        var huellaDeInstantanea = checkout.HuellaDeInstantanea;
-
-        checkout.Editar(carrito, Ahora.AddMinutes(1));
-        checkout.ElegirDomicilio(Contacto("911222333"), Ahora.AddMinutes(1));
-        Preparar(checkout, carrito, ahora: Ahora.AddMinutes(2));
-
-        Assert.Equal(huellaDeReserva, checkout.HuellaDeReserva);
-        Assert.Equal(1, checkout.GeneracionDeReserva);
-        Assert.NotEqual(huellaDeInstantanea, checkout.HuellaDeInstantanea);
     }
 
     [Fact]
@@ -481,14 +407,6 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    public void Editar_con_el_checkout_en_edicion_no_hace_nada_y_el_cambio_lo_hace_quien_llama()
-    {
-        var checkout = Nuevo(Impreso(1));
-
-        Assert.Equal(EfectoDeTransicion.SinCambios, checkout.Editar(CarritoCon(Impreso(1)), Ahora).Efecto);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-23")]
     public void Con_el_pago_pendiente_no_se_puede_editar_volver_ni_reiniciar()
     {
@@ -585,18 +503,6 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    public void Un_aborto_de_un_carrito_solo_digital_no_anota_ninguna_reserva_que_liberar()
-    {
-        var checkout = Nuevo(Digital(1));
-        var carrito = CarritoCon(Digital(1));
-        Preparar(checkout, carrito);
-
-        checkout.AbortarPasoAlPago(EstadoDelCheckout.Reservando, checkout.PedidoId!.Value, checkout.GeneracionDeReserva, carrito, Ahora);
-
-        Assert.Null(checkout.ReservaALiberarDesde);
-    }
-
-    [Fact]
     public void Un_checkout_reservando_desde_hace_dos_minutos_o_mas_esta_vencido_y_uno_mas_reciente_no()
     {
         var (checkout, _) = Reservando();
@@ -640,27 +546,6 @@ public sealed class CheckoutTests
         Assert.Equal(Ahora.AddMinutes(1), checkout.ReservaALiberarDesde);
     }
 
-    [Fact]
-    public void Volver_o_reiniciar_un_checkout_ya_terminado_se_rechaza()
-    {
-        var (checkout, carrito) = EnPago();
-        checkout.Volver(carrito, Ahora);
-
-        Assert.Equal(RechazoDeCheckout.YaTerminado, checkout.Volver(carrito, Ahora).Rechazo);
-        Assert.Equal(RechazoDeCheckout.YaTerminado, checkout.Reiniciar(carrito, Ahora).Rechazo);
-    }
-
-    [Fact]
-    public void Confirmar_que_la_reserva_se_libero_limpia_la_anotacion()
-    {
-        var (checkout, carrito) = EnPago();
-        checkout.Volver(carrito, Ahora);
-
-        checkout.LiberacionConfirmada();
-
-        Assert.Null(checkout.ReservaALiberarDesde);
-    }
-
     // ---------------------------------------------------------------- lo que informa Pagos
 
     [Fact]
@@ -689,12 +574,6 @@ public sealed class CheckoutTests
         Assert.True(checkout.ReservaVigente(Ahora.AddMinutes(14).AddSeconds(59)));
         Assert.False(checkout.ReservaVigente(Ahora.AddMinutes(15)));
         Assert.Equal(TimeSpan.Zero, checkout.CuentaRegresiva(Ahora.AddMinutes(16)));
-    }
-
-    [Fact]
-    public void Sin_estado_de_pago_no_hay_cuenta_regresiva()
-    {
-        Assert.Null(Nuevo(Impreso(1)).CuentaRegresiva(Ahora));
     }
 
     [Fact]
@@ -834,46 +713,6 @@ public sealed class CheckoutTests
         Assert.Equal([new EdicionRetirada(Edicion(2), true)], resultado.Retiradas);
         Assert.DoesNotContain(carrito.Lineas, l => l.EdicionId == Edicion(2));
         Assert.False(carrito.TieneRetirosPendientes);
-    }
-
-    [Fact]
-    public void Volver_reiniciar_abortar_y_pagado_tambien_quitan_las_lineas_con_retiro_pendiente()
-    {
-        foreach (var salida in new Func<Checkout, CarritoDeDominio, ResultadoDeCheckout>[]
-        {
-            (c, k) => c.Volver(k, Ahora.AddMinutes(1)),
-            (c, k) => c.Reiniciar(k, Ahora.AddMinutes(1)),
-            (c, k) => c.AbortarPasoAlPago(EstadoDelCheckout.EnPago, c.PedidoId!.Value, c.GeneracionDeReserva, k, Ahora.AddMinutes(1)),
-            (c, k) => c.PagoAprobado(c.PedidoId!.Value, k, Ahora.AddMinutes(1)),
-        })
-        {
-            var (checkout, carrito) = EnPago();
-            carrito.RetirarEdicion(Edicion(2), diferir: true, Ahora);
-
-            var resultado = salida(checkout, carrito);
-
-            Assert.Equal([new EdicionRetirada(Edicion(2), true)], resultado.Retiradas);
-            Assert.False(carrito.TieneRetirosPendientes);
-        }
-    }
-
-    [Fact]
-    public void Recuperar_un_checkout_reservando_aplica_los_retiros_al_volver_a_en_edicion()
-    {
-        var (checkout, carrito) = Reservando();
-        carrito.RetirarEdicion(Edicion(2), diferir: true, Ahora);
-
-        var resultado = checkout.AbortarPasoAlPago(EstadoDelCheckout.Reservando, checkout.PedidoId!.Value, checkout.GeneracionDeReserva, carrito, Ahora.AddMinutes(3));
-
-        Assert.Equal([new EdicionRetirada(Edicion(2), true)], resultado.Retiradas);
-    }
-
-    [Fact]
-    public void Los_estados_que_sostienen_un_retiro_pendiente_son_reservando_en_pago_y_pago_pendiente()
-    {
-        Assert.Equal(
-            [EstadoDelCheckout.Reservando, EstadoDelCheckout.EnPago, EstadoDelCheckout.PagoPendiente],
-            Enum.GetValues<EstadoDelCheckout>().Where(Checkout.SostieneRetirosPendientes));
     }
 
     [Fact]

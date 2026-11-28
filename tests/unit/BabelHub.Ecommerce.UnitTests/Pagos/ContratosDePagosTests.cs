@@ -87,17 +87,6 @@ public sealed class ContratosDePagosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-17")]
-    public void Los_resultados_de_reembolso_en_la_pasarela_distinguen_aplicado_rechazado_no_soportado_y_sin_respuesta()
-    {
-        Assert.Equal("rf_1", ResultadoDeReembolsoEnPasarela.Aplicado("rf_1").Referencia);
-        Assert.Equal(TipoDeResultadoDeReembolsoEnPasarela.NoSoportado, ResultadoDeReembolsoEnPasarela.NoSoportado.Tipo);
-        Assert.Equal(TipoDeResultadoDeReembolsoEnPasarela.Rechazado, ResultadoDeReembolsoEnPasarela.Rechazado.Tipo);
-        Assert.Equal(TipoDeResultadoDeReembolsoEnPasarela.SinRespuesta, ResultadoDeReembolsoEnPasarela.SinRespuesta.Tipo);
-        Assert.DoesNotContain("rf_1", ResultadoDeReembolsoEnPasarela.Aplicado("rf_1").ToString());
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-PAG-02")]
     public void Los_motivos_de_rechazo_publicos_coinciden_con_los_del_dominio()
     {

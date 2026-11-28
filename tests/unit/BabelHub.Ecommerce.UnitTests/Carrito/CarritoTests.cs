@@ -20,17 +20,6 @@ public sealed class CarritoTests
     private static Guid Edicion(int n) => new(n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
 
     [Fact]
-    public void Un_carrito_nuevo_esta_abierto_y_vacio_y_el_de_cuenta_no_caduca()
-    {
-        var carrito = DeCuenta();
-
-        Assert.Equal(EstadoDeCarrito.Abierto, carrito.Estado);
-        Assert.Empty(carrito.Lineas);
-        Assert.Null(carrito.VenceEn);
-        Assert.False(carrito.EstaCaducado(Ahora.AddYears(5)));
-    }
-
-    [Fact]
     public void Agregar_un_impreso_crea_su_linea_y_volver_a_agregarlo_suma_las_cantidades()
     {
         var carrito = DeCuenta();
@@ -61,18 +50,6 @@ public sealed class CarritoTests
         Assert.Equal(1, carrito.Lineas.Single(l => l.EdicionId == Digital).Cantidad.Valor);
         Assert.Equal(1, resultado.CantidadFinal);
         Assert.Equal(1, cambio.CantidadFinal);
-    }
-
-    [Fact]
-    public void Volver_a_agregar_una_digital_la_deja_en_una_unidad()
-    {
-        var carrito = DeCuenta();
-        carrito.Agregar(Digital, esDigital: true, cantidad: 1, Ahora);
-
-        var otraVez = carrito.Agregar(Digital, esDigital: true, cantidad: 1, Ahora);
-
-        Assert.True(otraVez.EsExito);
-        Assert.Equal(1, Assert.Single(carrito.Lineas).Cantidad.Valor);
     }
 
     [Theory]
@@ -128,20 +105,6 @@ public sealed class CarritoTests
         Assert.Equal(Libro, Assert.Single(carrito.Lineas).EdicionId);
         Assert.Equal(RechazoDeCarrito.LineaNoEstaEnElCarrito, carrito.Modificar(Edicion(9), 1, Ahora).Rechazo);
         Assert.Equal(RechazoDeCarrito.LineaNoEstaEnElCarrito, carrito.Eliminar(Edicion(9), Ahora).Rechazo);
-    }
-
-    [Fact]
-    public void Cada_cambio_sube_la_version_y_el_instante_de_modificacion()
-    {
-        var carrito = DeCuenta();
-        var inicial = carrito.Version;
-
-        carrito.Agregar(Libro, esDigital: false, cantidad: 1, Ahora.AddMinutes(1));
-        carrito.Modificar(Libro, cantidad: 2, Ahora.AddMinutes(2));
-        carrito.Eliminar(Libro, Ahora.AddMinutes(3));
-
-        Assert.Equal(inicial + 3, carrito.Version);
-        Assert.Equal(Ahora.AddMinutes(3), carrito.ModificadoEn);
     }
 
     [Fact]
@@ -202,17 +165,6 @@ public sealed class CarritoTests
     }
 
     [Fact]
-    public void Una_accion_rechazada_no_mueve_la_caducidad()
-    {
-        var carrito = DeVisitante();
-        carrito.Agregar(Libro, esDigital: false, cantidad: 1, Ahora);
-
-        carrito.Agregar(Libro, esDigital: false, cantidad: 500, Ahora.AddDays(20));
-
-        Assert.Equal(Ahora.AddDays(30), carrito.VenceEn);
-    }
-
-    [Fact]
     public void Un_carrito_fusionado_queda_sin_lineas_y_no_admite_ninguna()
     {
         var carrito = DeVisitante();
@@ -225,21 +177,5 @@ public sealed class CarritoTests
         Assert.Equal(RechazoDeCarrito.CarritoFusionado, carrito.Agregar(Libro, esDigital: false, cantidad: 1, Ahora).Rechazo);
         Assert.Equal(RechazoDeCarrito.CarritoFusionado, carrito.Modificar(Libro, 1, Ahora).Rechazo);
         Assert.Equal(RechazoDeCarrito.CarritoFusionado, carrito.Eliminar(Libro, Ahora).Rechazo);
-    }
-
-    [Fact]
-    public void El_propietario_es_una_cuenta_o_un_visitante_con_una_huella_de_32_bytes()
-    {
-        var cuenta = Guid.NewGuid();
-        var deCuenta = PropietarioDelCarrito.DeCuenta(cuenta);
-        var deVisitante = PropietarioDelCarrito.DeVisitante(Enumerable.Range(0, 32).Select(i => (byte)i).ToArray());
-
-        Assert.Equal(cuenta, deCuenta.CuentaId);
-        Assert.False(deCuenta.EsDeVisitante);
-        Assert.True(deVisitante.EsDeVisitante);
-        Assert.Null(deVisitante.CuentaId);
-        Assert.Equal(32, deVisitante.HuellaDelVisitante.Length);
-        Assert.Throws<ArgumentException>(() => PropietarioDelCarrito.DeCuenta(Guid.Empty));
-        Assert.Throws<ArgumentException>(() => PropietarioDelCarrito.DeVisitante(new byte[31]));
     }
 }

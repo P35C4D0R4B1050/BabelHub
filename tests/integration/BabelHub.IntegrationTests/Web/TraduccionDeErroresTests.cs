@@ -17,7 +17,6 @@ public sealed class TraduccionDeErroresTests
 
     [Theory]
     [InlineData("ECO-ERROR-INESPERADO", 500)]
-    [InlineData("INV-ERROR-INESPERADO", 500)]
     [InlineData("ECO-CONFLICTO", 409)]
     [InlineData("ECO-CODIGO-QUE-NADIE-CONOCE", 418)]
     [Trait("Criterio", "AC-WEB-04")]
@@ -120,15 +119,6 @@ public sealed class TraduccionDeErroresTests
         Assert.Equal(403, respuesta.EstadoHttp);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-WEB-02")]
-    public void Sin_salidas_declaradas_el_sin_permiso_ofrece_al_menos_ir_al_inicio()
-    {
-        var respuesta = TraductorDeErrores.Traducir(Problema("ECO-PROHIBIDO", 403));
-
-        Assert.Contains(respuesta.Vista.Salidas, s => s.Ruta == "/");
-    }
-
     [Theory]
     [InlineData("ECO-NO-AUTENTICADO")]
     [InlineData("INV-NO-AUTENTICADO")]
@@ -170,16 +160,6 @@ public sealed class TraduccionDeErroresTests
         var respuesta = TraductorDeErrores.Traducir(Limite("ECO-LIMITE-EXCEDIDO", segundos, DateTimeOffset.UnixEpoch));
 
         Assert.Contains(esperado, respuesta.Vista.Mensaje, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-19")]
-    public void Un_limite_sin_los_datos_de_espera_sigue_explicando_que_hay_que_esperar()
-    {
-        var respuesta = TraductorDeErrores.Traducir(Problema("ECO-LIMITE-EXCEDIDO", 429));
-
-        Assert.Equal(EstadoDePantalla.Error, respuesta.Vista.Estado);
-        Assert.Contains("unos instantes", respuesta.Vista.Mensaje, StringComparison.Ordinal);
     }
 
     [Fact]

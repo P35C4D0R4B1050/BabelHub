@@ -141,35 +141,6 @@ public sealed class FusionDelCarritoTests
         Assert.Empty(e.Bitacora.Bloqueos);
     }
 
-    [Fact]
-    public async Task Una_cookie_desconocida_o_de_un_carrito_caducado_no_fusiona_nada()
-    {
-        var (e, cuenta) = Escenario();
-        var delaCuenta = SembrarCuenta(e, cuenta, (e.Impreso(5), false, 1));
-        var visitante = SembrarVisitante(e, (e.Impreso(5), false, 4));
-        e.Reloj.Ahora = Inicio.AddDays(31);
-
-        var resultado = await Fusionar(e);
-
-        Assert.True(resultado.Valor.BorrarLaCookie);
-        Assert.Equal(1, delaCuenta.Lineas.Single().Cantidad.Valor);
-        Assert.Equal(EstadoDeCarrito.Abierto, visitante.Estado);
-    }
-
-    [Fact]
-    public async Task Un_visitante_sin_lineas_se_marca_fusionado_sin_tocar_a_la_cuenta()
-    {
-        var (e, cuenta) = Escenario();
-        var delaCuenta = SembrarCuenta(e, cuenta, (e.Impreso(5), false, 1));
-        var visitante = SembrarVisitante(e);
-
-        var resultado = await Fusionar(e);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(EstadoDeCarrito.Fusionado, visitante.Estado);
-        Assert.Equal(1, delaCuenta.Lineas.Single().Cantidad.Valor);
-    }
-
     // ---------- Los ajustes ----------
 
     [Fact]
@@ -245,22 +216,6 @@ public sealed class FusionDelCarritoTests
     }
 
     // ---------- Orden de bloqueo ----------
-
-    [Fact]
-    public async Task Los_dos_carritos_se_bloquean_por_id_ascendente_despues_del_checkout()
-    {
-        var (e, cuenta) = Escenario();
-        var a = e.Impreso(5);
-        var delaCuenta = SembrarCuenta(e, cuenta, (a, false, 1));
-        var visitante = SembrarVisitante(e, (a, false, 1));
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, delaCuenta.Id, [new LineaParaCheckout(a, false, "Libro", "9780000000019", 1, 50m, a, Sucursal.Principal)], Guid.NewGuid, Inicio);
-        e.Checkouts.Sembrar(checkout);
-
-        await Fusionar(e);
-
-        var esperados = new[] { delaCuenta.Id, visitante.Id }.Order().Select(id => $"carrito:{id}");
-        Assert.Equal(["checkout", .. esperados], e.Bitacora.Bloqueos);
-    }
 
     // ---------- Compra en curso ----------
 

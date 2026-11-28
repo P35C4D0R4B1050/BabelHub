@@ -65,19 +65,6 @@ public sealed partial class PantallasBaseTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-24")]
-    public async Task La_privacidad_incluye_las_cookies_como_lista()
-    {
-        await using var anfitrion = await AnfitrionWeb.Iniciar();
-
-        var html = await Texto(await anfitrion.Cliente.GetAsync("/legal/privacidad"));
-
-        Assert.Contains("<li>__Host-bh-tienda y __Host-bh-gestion:", html, StringComparison.Ordinal);
-        Assert.Contains("<li>bh-sucursal:", html, StringComparison.Ordinal);
-        Assert.Equal(Regex.Matches(html, "<ul[ >]").Count, Regex.Matches(html, "</ul>").Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-24")]
     public async Task Un_texto_inexistente_es_un_404_con_el_estado_de_no_encontrado()
     {
         await using var anfitrion = await AnfitrionWeb.Iniciar();

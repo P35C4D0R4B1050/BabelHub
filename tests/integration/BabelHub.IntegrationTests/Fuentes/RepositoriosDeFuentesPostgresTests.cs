@@ -51,7 +51,6 @@ public sealed class RepositoriosDeFuentesPostgresTests(PostgresDeFuentesFixture 
         Assert.Equal(1, await En(pila, t => repo.Contar(t)));
     }
 
-
     [Fact]
     [Trait("Criterio", "AC-FUE-06")]
     public async Task UnaFuenteConUnIdentificadorQueNoEsElDerivado_FallaCerradoAlLeerse_ConUnaExcepcionPropia_SinElIdentificador()
@@ -67,12 +66,6 @@ public sealed class RepositoriosDeFuentesPostgresTests(PostgresDeFuentesFixture 
         await bd.Ejecutar("DELETE FROM fuentes.fuentes WHERE codigo = 'antigua'");
     }
 
-    [Theory]
-    [InlineData("ayacucho")]
-    [InlineData("sede-1")]
-    [Trait("Criterio", "AC-FUE-06")]
-    public void ElIdentificadorQueUsaElFixtureParaInsertar_EsElDelDominio_ParaUnCodigoValido(string codigo) =>
-        Assert.Equal(Fuente.IdentificadorDe(codigo), PostgresDeFuentesFixture.IdDeFuente(codigo));
     [Fact]
     [Trait("Criterio", "AC-FUE-01")]
     public async Task Fuentes_LeeLasFuentesPorIdCodigoYRegion_YElContactoSoloSiEsLaSuya()

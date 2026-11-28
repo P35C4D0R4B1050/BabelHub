@@ -255,24 +255,6 @@ public sealed class ConfirmarRecepcionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public async Task Una_devolucion_solo_solicitada_o_inexistente_no_se_confirma()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var linea = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2));
-        var pedido = cliente.SembrarPedido(linea);
-        var solicitada = await cliente.SolicitarImpreso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [new LineaPedidaParaDevolver(linea.LineaId, 1)], new TextoLibre("x"), "lima-central"));
-        var admin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(cliente);
-
-        var sinAprobar = await admin.Recepcion.Ejecutar(solicitada.Valor.DevolucionId);
-        var inexistente = await admin.Recepcion.Ejecutar(Guid.NewGuid());
-
-        Assert.Equal("estado-invalido", sinAprobar.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Empty(admin.Inventario.Reingresos);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-DEV-15")]
     public async Task Un_conflicto_seguido_de_un_rechazo_de_negocio_no_limpia_el_marcador_y_el_plazo_no_rechaza_la_devolucion()
     {

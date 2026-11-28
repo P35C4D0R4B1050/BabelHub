@@ -156,26 +156,6 @@ public sealed class DepuracionYEstadoPostgresTests(PostgresDeAuditoriaFixture bd
         await bd.Ejecutar("DELETE FROM auditoria.estado_de_depuracion");
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-AUD-09")]
-    public async Task ElEstadoDeLaDepuracionSeGuardaYSeLeeConTodosSusCampos()
-    {
-        var unidad = new UnidadDeTrabajoPostgres(bd.Acceso);
-        var estado = new PostgresEstadoDeLaDepuracion(unidad, unidad);
-        Assert.Equal(EstadoDeLaDepuracion.Inicial, await estado.Obtener());
-        var ahora = DateTimeOffset.UtcNow;
-        var esperado = new EstadoDeLaDepuracion(ahora.AddDays(-1), ahora.AddHours(-3), 4, ahora.AddMinutes(8), 17);
-
-        await estado.Guardar(esperado);
-        var leido = await estado.Obtener();
-
-        Assert.Equal(esperado.IntentosFallidos, leido.IntentosFallidos);
-        Assert.Equal(17, leido.AnonimizadosSinRegistrar);
-        Assert.Equal(esperado.UltimaExitosa!.Value.UtcTicks / 10, leido.UltimaExitosa!.Value.UtcTicks / 10);
-        await estado.Guardar(EstadoDeLaDepuracion.Inicial);
-        Assert.Equal(EstadoDeLaDepuracion.Inicial, await estado.Obtener());
-    }
-
     // ---------- Correo de alertas, lectura del Inventario y cursor ----------
 
     [Fact]

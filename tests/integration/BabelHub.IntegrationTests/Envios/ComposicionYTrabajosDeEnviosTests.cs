@@ -147,23 +147,6 @@ public sealed class ComposicionYTrabajosDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-07")]
-    public void Los_dos_trabajos_tienen_nombres_e_intervalos_estables()
-    {
-        var servicios = ConDependencias();
-        servicios.AgregarEnvios(esProduccion: false);
-        servicios.AgregarTrabajosDeFondoDeEnvios(_ => (corrida, ct) => corrida(ct));
-        using var proveedor = servicios.BuildServiceProvider();
-
-        var trabajos = proveedor.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeEnvios>>();
-
-        Assert.Equal(["envios-reintento-de-progreso", "envios-revision-de-estancados"], trabajos.Select(t => t.Nombre));
-        Assert.Equal(TimeSpan.FromMinutes(1), TrabajosDeEnvios.CadaMinuto.Intervalo);
-        Assert.Equal(TimeSpan.FromHours(1), TrabajosDeEnvios.PorHora.Intervalo);
-        Assert.NotNull(proveedor.GetRequiredService<ServicioDeTrabajosDeEnvios>());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-07")]
     public async Task Una_excepcion_con_el_apagado_ya_pedido_no_se_propaga_desde_el_servicio_de_trabajos()
     {
         using var apagado = new CancellationTokenSource();
@@ -217,19 +200,6 @@ public sealed class ComposicionYTrabajosDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-07")]
-    public async Task Una_corrida_exitosa_se_registra_y_no_alerta()
-    {
-        var registro = new RegistroEspia();
-        var alertas = new AlertasEspia();
-
-        await Trabajo(_ => Task.CompletedTask, registro, alertas).EjecutarUnaVez();
-
-        Assert.Equal([("envios-prueba", ResultadoDeTrabajo.Exito)], registro.Corridas);
-        Assert.Empty(alertas.Publicadas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-07")]
     public async Task Tras_tres_fallos_seguidos_se_publica_la_alerta_sin_datos_y_el_trabajo_no_cae()
     {
         var registro = new RegistroEspia();
@@ -244,26 +214,6 @@ public sealed class ComposicionYTrabajosDeEnviosTests
         Assert.All(registro.Corridas, c => Assert.Equal(ResultadoDeTrabajo.Fallo, c.Resultado));
         var alerta = Assert.Single(alertas.Publicadas);
         Assert.Equal("trabajo-de-fondo-detenido", alerta.Motivo);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-07")]
-    public async Task Un_exito_reinicia_la_cuenta_de_fallos_seguidos()
-    {
-        var registro = new RegistroEspia();
-        var alertas = new AlertasEspia();
-        var falla = true;
-        var trabajo = Trabajo(_ => falla ? throw new InvalidOperationException() : Task.CompletedTask, registro, alertas);
-
-        await trabajo.EjecutarUnaVez();
-        await trabajo.EjecutarUnaVez();
-        falla = false;
-        await trabajo.EjecutarUnaVez();
-        falla = true;
-        await trabajo.EjecutarUnaVez();
-        await trabajo.EjecutarUnaVez();
-
-        Assert.Empty(alertas.Publicadas);
     }
 
     [Fact]

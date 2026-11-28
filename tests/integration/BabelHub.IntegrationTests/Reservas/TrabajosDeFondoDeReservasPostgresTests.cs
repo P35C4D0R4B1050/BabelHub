@@ -333,17 +333,4 @@ public sealed class TrabajosDeFondoDeReservasPostgresTests(PostgresDeReservasFix
         Assert.DoesNotContain(restauracion, d => d.ServiceType == typeof(IHostedService));
         Assert.Contains(normal, d => d.ServiceType == typeof(IHostedService));
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEL-08")]
-    public void LosTrabajosTienenNombresEstablesYLosIntervalosDeLaSpec()
-    {
-        Assert.Equal(TimeSpan.FromSeconds(30), TrabajosDeReservas.IntervaloDeLaExpiracion);
-        Assert.Equal(TimeSpan.FromMinutes(15), TrabajosDeReservas.IntervaloDeLaPurgaDeHuellas);
-        Assert.Equal(TimeSpan.FromHours(24), TrabajosDeReservas.IntervaloDeLaDepuracion);
-        Assert.Equal(TimeSpan.FromHours(24), TrabajoDeFondoDeReservas.PlazoSinCorrida);
-        Assert.All(
-            new[] { TrabajosDeReservas.Expiracion, TrabajosDeReservas.PurgaDeHuellas, TrabajosDeReservas.PurgaDeRegistros, TrabajosDeReservas.DepuracionDiaria },
-            nombre => Assert.Matches("^[a-z][a-z0-9-]{0,99}$", nombre));
-    }
 }

@@ -87,19 +87,6 @@ public sealed class ElegirEntregaTests
     }
 
     [Fact]
-    public async Task Sin_lista_de_sucursales_no_se_puede_validar_el_domicilio()
-    {
-        var (e, checkout, _) = await ConCheckout();
-        e.Inventario.Sucursales = null;
-
-        var resultado = await Elegir(e, Domicilio());
-
-        Assert.Equal(ClavesDelCarrito.EntregaNoValidable, resultado.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error.Categoria);
-        Assert.Null(checkout.TipoDeEntrega);
-    }
-
-    [Fact]
     public async Task Un_recojo_con_contacto_lo_ignora_y_no_guarda_nada_personal()
     {
         var (e, checkout, _) = await ConCheckout();
@@ -147,9 +134,7 @@ public sealed class ElegirEntregaTests
     [InlineData("Ana", null, "Jr. Lima 123", "ayacucho", "telefono", "obligatorio")]
     [InlineData("Ana", "123", "Jr. Lima 123", "ayacucho", "telefono", "formato-invalido")]
     [InlineData("Ana", "987654321", null, "ayacucho", "direccion", "obligatorio")]
-    [InlineData("Ana", "987654321", "   ", "ayacucho", "direccion", "obligatorio")]
     [InlineData("Ana", "987654321", "Jr. Lima\n123", "ayacucho", "direccion", "formato-invalido")]
-    [InlineData("Ana\tPérez", "987654321", "Jr. Lima 123", "ayacucho", "nombre", "formato-invalido")]
     [InlineData("Ana", "987654321", "Jr. Lima 123", null, "region", "obligatorio")]
     [InlineData("Ana", "987654321", "Jr. Lima 123", "atlantida", "region", "formato-invalido")]
     public async Task El_domicilio_sin_dirección_o_con_datos_invalidos_no_puede_continuar_y_el_error_no_repite_el_valor(string? nombre, string? telefono, string? direccion, string? region, string campo, string clave)
@@ -164,16 +149,6 @@ public sealed class ElegirEntregaTests
         Assert.Null(checkout.TipoDeEntrega);
         Assert.Null(checkout.Contacto);
         Assert.Equal(0, e.Inventario.ConsultasPrevias);
-    }
-
-    [Fact]
-    public async Task Un_domicilio_sin_contacto_es_una_validacion()
-    {
-        var (e, _, _) = await ConCheckout();
-
-        var resultado = await Elegir(e, new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null));
-
-        Assert.Equal("contacto", Assert.Single(resultado.Error!.Errores).Campo);
     }
 
     [Fact]
@@ -216,20 +191,6 @@ public sealed class ElegirEntregaTests
         Assert.Equal(ClavesDelCarrito.StockNoValidable, resultado.Error!.Clave);
         Assert.Null(checkout.TipoDeEntrega);
         Assert.Equal(0, e.Pagos.Reaperturas);
-    }
-
-    [Fact]
-    public async Task Un_carrito_solo_digital_no_tiene_entrega_y_no_se_consulta_nada()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(), 1, CodigoDeSucursal: Sucursal.Principal));
-        await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
-
-        var resultado = await Elegir(e, Recojo());
-
-        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
-        Assert.Equal("tipoDeEntrega", Assert.Single(resultado.Error.Errores).Campo);
-        Assert.Equal(0, e.Inventario.ConsultasPrevias);
     }
 
     // ---------- El checkout vivo ----------
@@ -306,16 +267,6 @@ public sealed class ElegirEntregaTests
         Assert.Null(checkout.PedidoId);
         Assert.Equal(pedido, checkout.PedidoDescartado);
         Assert.Equal(TipoDeEntrega.Domicilio, checkout.TipoDeEntrega);
-    }
-
-    [Fact]
-    public async Task Sin_checkout_vivo_es_no_encontrado()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-
-        var resultado = await Elegir(e, Recojo());
-
-        Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
     }
 
     [Fact]

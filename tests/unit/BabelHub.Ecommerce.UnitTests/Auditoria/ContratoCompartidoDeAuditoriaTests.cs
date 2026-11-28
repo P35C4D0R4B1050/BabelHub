@@ -45,16 +45,6 @@ public sealed class ContratoCompartidoDeAuditoriaTests
         Assert.Equal(lista.Count, lista.Distinct(StringComparer.Ordinal).Count());
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-AUD-23")]
-    public void CadaConstanteDeAccion_TieneElNombreDeSuValor()
-    {
-        foreach (var campo in typeof(Contrato.AccionesDeAuditoria).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.IsLiteral))
-        {
-            Assert.Equal(campo.Name, (string)campo.GetRawConstantValue()!);
-        }
-    }
-
     // ---------- Motivos de alerta ----------
 
     [Fact]

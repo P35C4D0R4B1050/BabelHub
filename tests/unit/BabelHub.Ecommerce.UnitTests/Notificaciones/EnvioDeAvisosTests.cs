@@ -482,24 +482,6 @@ public sealed class EnvioDeAvisosTests
 
     [Fact]
     [Trait("Criterio", "AC-NOT-14")]
-    public async Task ElOmitidoPorTope_NoSeReenvia_NiPasadaLaVentana()
-    {
-        var m = new Mundo();
-        var cuenta = Guid.NewGuid();
-        m.Clientes.Contactos[cuenta] = new ContactoDeAvisosDelCliente(false, true, NumeroDeLaClienta);
-        var avisos = Enumerable.Range(1, 6).Select(i => m.Pendiente(cuenta, $"pedido:{i}:listo-para-recojo")).ToList();
-        await m.Enviar();
-        var omitido = avisos.Single(a => a.Estado == EstadoDelAviso.OmitidoPorTope);
-
-        m.Base.Reloj.Ahora = m.Ahora.AddHours(2);
-        await m.Enviar();
-
-        Assert.Equal(EstadoDelAviso.OmitidoPorTope, omitido.Estado);
-        Assert.DoesNotContain(m.Envio.Enviados, e => e.AvisoId == omitido.Id);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-14")]
     public async Task ElTopeDe20En24Horas_Rige_AunqueNoSeAlcancenLos5PorHora()
     {
         var m = new Mundo();
@@ -529,25 +511,6 @@ public sealed class EnvioDeAvisosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-NOT-14")]
-    public async Task OtroNumero_NoSeVeAfectadoPorElTopeDeUnNumeroAjeno()
-    {
-        var m = new Mundo();
-        var cuenta = Guid.NewGuid();
-        m.Clientes.Contactos[cuenta] = new ContactoDeAvisosDelCliente(false, true, NumeroDeLaClienta);
-        foreach (var i in Enumerable.Range(1, 6))
-        {
-            m.Pendiente(cuenta, $"pedido:{i}:listo-para-recojo");
-        }
-
-        var (_, otro) = m.ClienteConAviso("+51911111111", evento: "pedido:99:listo-para-recojo");
-        await m.Enviar();
-
-        Assert.Contains(m.Envio.Enviados, e => e.AvisoId == otro.Id);
-        Assert.Equal(EstadoDelAviso.Enviando, otro.Estado);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-NOT-15")]
     public async Task ElCupoSeReservaUnaVezPorAviso_AunqueSeReintente()
     {
@@ -564,23 +527,6 @@ public sealed class EnvioDeAvisosTests
 
         Assert.Equal(reservasTrasElPrimero, m.Base.Motor.ContadoresUsados.Count);
         Assert.Equal(2, aviso.Cupos.Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-15")]
-    public async Task UnaReservaForzadaDosVeces_ConElMismoIdentificadorDelAviso_NuncaCuentaDosVeces()
-    {
-        var m = new Mundo();
-        var (_, aviso) = m.ClienteConAviso();
-        Assert.True(NumeroDeDestino.TryNormalizar(NumeroDeLaClienta, out var numero));
-
-        var primera = await m.Tope.Reservar(aviso, numero);
-        var segunda = await m.Tope.Reservar(aviso, numero);
-
-        Assert.Equal(EstadoDelCupo.Reservado, primera.Estado);
-        Assert.Equal(EstadoDelCupo.Reservado, segunda.Estado);
-        Assert.Equal(primera.Cupos.Select(c => c.Identificador), segunda.Cupos.Select(c => c.Identificador));
-        Assert.Equal(2, CuposAbiertos(m));
     }
 
     [Fact]

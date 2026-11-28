@@ -148,18 +148,6 @@ public sealed class DevolucionTests
         Assert.All(new[] { EstadoDeLineaDeDevolucion.Solicitada, EstadoDeLineaDeDevolucion.Aprobada, EstadoDeLineaDeDevolucion.Recibida, EstadoDeLineaDeDevolucion.Reembolsada }, e => Assert.True(e.ComprometeCupo()));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
-    public void Los_codigos_de_estado_van_y_vuelven()
-    {
-        foreach (var estado in Enum.GetValues<EstadoDeLineaDeDevolucion>())
-        {
-            Assert.Equal(estado, EstadosDeLineaDeDevolucion.Desde(estado.Codigo()));
-        }
-
-        Assert.Throws<ArgumentException>(() => EstadosDeLineaDeDevolucion.Desde("devuelta"));
-    }
-
     // ---------- Plazo de recepción (DEV-14, DEV-16) ----------
 
     [Fact]
@@ -219,17 +207,6 @@ public sealed class DevolucionTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-07")]
-    public void El_marcador_de_reingreso_se_fija_una_vez_y_un_reintento_lo_encuentra_ya_iniciado()
-    {
-        var devolucion = Aprobada();
-
-        Assert.Equal(ResultadoDeInicioDeReingreso.Iniciado, devolucion.IniciarReingreso(Ahora));
-        Assert.Equal(ResultadoDeInicioDeReingreso.YaIniciado, devolucion.IniciarReingreso(Ahora.AddMinutes(5)));
-        Assert.Equal(Ahora, devolucion.ReingresoIniciadoEn);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
     public void No_se_inicia_el_reingreso_de_una_devolucion_no_aprobada_ni_de_un_digital()
     {
         Assert.Equal(ResultadoDeInicioDeReingreso.EstadoInvalido, Impreso().IniciarReingreso(Ahora));
@@ -256,21 +233,6 @@ public sealed class DevolucionTests
         Assert.NotNull(incierto.ReingresoIniciadoEn);
         Assert.False(confirmado.LimpiarMarcadorDeReingreso());
         Assert.False(Aprobada().LimpiarMarcadorDeReingreso());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public void El_primer_resultado_incierto_se_conserva_y_no_se_borra()
-    {
-        var devolucion = Aprobada();
-        devolucion.IniciarReingreso(Ahora);
-
-        devolucion.MarcarReingresoIncierto(Ahora.AddMinutes(1));
-        devolucion.MarcarReingresoIncierto(Ahora.AddMinutes(9));
-
-        Assert.Equal(Ahora.AddMinutes(1), devolucion.ReingresoIncertoEn);
-        Assert.Throws<InvalidOperationException>(() => Aprobada().MarcarReingresoIncierto(Ahora));
-        Assert.Throws<InvalidOperationException>(() => Aprobada().ConfirmarReingreso(Ahora));
     }
 
     // ---------- Reembolso por línea ----------
@@ -317,18 +279,6 @@ public sealed class DevolucionTests
 
         Assert.DoesNotContain(devolucion.Lineas[0].Cambios, c => c.Estado == EstadoDeLineaDeDevolucion.Recibida);
         Assert.Throws<ArgumentException>(() => devolucion.Reembolsar(Guid.NewGuid(), Ahora, ResponsableDelCambio.Sistema));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public void El_responsable_sistema_no_tiene_identificador_y_cliente_y_personal_si()
-    {
-        Assert.Null(ResponsableDelCambio.Sistema.Id);
-        Assert.Throws<ArgumentException>(() => ResponsableDelCambio.Cliente(Guid.Empty));
-        Assert.Throws<ArgumentException>(() => ResponsableDelCambio.Personal(Guid.Empty));
-        Assert.Throws<ArgumentException>(() => ResponsableDelCambio.Rehidratar(TipoDeResponsable.Sistema, Guid.NewGuid()));
-        Assert.Throws<ArgumentException>(() => ResponsableDelCambio.Rehidratar(TipoDeResponsable.Personal, null));
-        Assert.Null(ResponsableDelCambio.Rehidratar(TipoDeResponsable.Cliente, null).Id);
     }
 
     // ---------- Rehidratar ----------

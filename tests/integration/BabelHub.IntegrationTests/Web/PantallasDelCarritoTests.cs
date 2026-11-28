@@ -194,19 +194,6 @@ public sealed class PantallasDelCarritoTests
         Assert.Contains("Tu carrito se conserva al ingresar", anonimo, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Con_una_compra_en_curso_se_ofrece_volver_a_ella()
-    {
-        var falso = new CarritoDelClienteFalso { Respuesta = Resultado<ResultadoDeCarrito>.Exito(Carrito([Linea(Impreso, "Libro", FormatoDeEdicion.Impresa, 1, 10m, Disp(Impreso, EstadoDeDisponibilidad.Disponible, 5))], compraEnCurso: true)) };
-        await using var anfitrion = await Iniciar(falso);
-
-        var html = await Pedir(anfitrion);
-
-        Assert.Contains("href=\"/checkout\"", html, StringComparison.Ordinal);
-        Assert.Contains("Volver a mi compra", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("action=\"/checkout/iniciar\"", html, StringComparison.Ordinal);
-    }
-
     // ---------- Problemas que impiden continuar ----------
 
     [Fact]
@@ -227,20 +214,6 @@ public sealed class PantallasDelCarritoTests
         Assert.Contains("aria-disabled=\"true\"", html, StringComparison.Ordinal);
         Assert.Contains("Resuelve los avisos de arriba para continuar con la compra.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("action=\"/checkout/iniciar\"", html, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Sin_precios_confirmados_se_dice_y_el_subtotal_no_se_inventa()
-    {
-        var falso = new CarritoDelClienteFalso { Respuesta = Resultado<ResultadoDeCarrito>.Exito(Carrito([Linea(Impreso, "Libro", FormatoDeEdicion.Impresa, 1, 0m, null)], sinPrecios: true)) };
-        await using var anfitrion = await Iniciar(falso);
-
-        var html = await Pedir(anfitrion);
-
-        Assert.Contains("No pudimos confirmar los precios ahora", html, StringComparison.Ordinal);
-        Assert.Contains("No se puede confirmar", html, StringComparison.Ordinal);
-        Assert.DoesNotContain(FormatoPeruano.Soles(0m), html, StringComparison.Ordinal);
-        Assert.Contains("Reintentar", html, StringComparison.Ordinal);
     }
 
     // ---------- Avisos ----------

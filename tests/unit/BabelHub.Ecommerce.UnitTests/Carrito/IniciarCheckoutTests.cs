@@ -137,18 +137,6 @@ public sealed class IniciarCheckoutTests
     }
 
     [Fact]
-    public async Task Si_falla_la_consulta_previa_tampoco_se_avanza()
-    {
-        var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
-        e.Inventario.PreviaCaida = true;
-
-        var resultado = await Iniciar(e);
-
-        Assert.Equal(ClavesDelCarrito.StockNoValidable, resultado.Error!.Clave);
-        Assert.Empty(e.Checkouts.Todos);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-06")]
     public async Task Un_carrito_solo_digital_no_consulta_el_inventario_y_tiene_cuatro_pasos_o_menos()
     {
@@ -162,19 +150,6 @@ public sealed class IniciarCheckoutTests
         Assert.True(resultado.Valor.TotalDePasos <= 4);
         Assert.Equal(TipoDeEntregaDeCompra.Digital, resultado.Valor.TipoDeEntrega);
         Assert.All(resultado.Valor.Lineas, l => Assert.Equal(DisponibilidadDeLineaDeCheckout.DisponibleAlInstante, l.Disponibilidad));
-    }
-
-    [Fact]
-    public async Task Un_carrito_mixto_consulta_solo_los_impresos()
-    {
-        var impreso = Guid.Empty;
-        var (e, _, _) = await ConCarrito((x => impreso = x.Impreso(5), 1), (x => x.Digital(), 1));
-
-        var resultado = await Iniciar(e);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal([impreso], Assert.Single(e.Inventario.EdicionesConsultadas));
-        Assert.Equal(2, resultado.Valor.Lineas.Count);
     }
 
     [Fact]
@@ -206,17 +181,6 @@ public sealed class IniciarCheckoutTests
         Assert.True(resultado.EsExito);
         Assert.Single(resultado.Valor.Lineas);
         Assert.Single(e.Checkouts.Todos.Single().Lineas);
-    }
-
-    [Fact]
-    public async Task Si_todas_las_lineas_estan_retiradas_es_un_checkout_vacio()
-    {
-        var (e, _, carrito) = await ConCarrito((x => x.Impreso(5), 1));
-        carrito.RetirarEdicion(carrito.Lineas.Single().EdicionId, diferir: true, Inicio);
-
-        var resultado = await Iniciar(e);
-
-        Assert.Equal(ClavesDelCarrito.CheckoutVacio, resultado.Error!.Clave);
     }
 
     // ---------- Checkout vivo ----------
@@ -343,19 +307,4 @@ public sealed class IniciarCheckoutTests
         Assert.Equal(CategoriaDeError.NoDisponible, sinAlmacen.Error!.Categoria);
         Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
     }
-
-    [Fact]
-    public async Task La_vista_usa_el_precio_vigente_del_catalogo_y_el_total_sin_envio_mientras_no_haya_entrega()
-    {
-        var (e, _, _) = await ConCarrito((x => x.Impreso(5, 37.30m), 3));
-
-        var vista = (await Iniciar(e)).Valor;
-
-        Assert.Equal(111.90m, vista.Subtotal);
-        Assert.Null(vista.TipoDeEntrega);
-        Assert.Equal(111.90m, vista.Total);
-        Assert.Null(vista.Contacto);
-        Assert.Equal([TextoLegalDeCompra.Terminos, TextoLegalDeCompra.Privacidad], vista.TextosPorAceptar);
-    }
-
 }

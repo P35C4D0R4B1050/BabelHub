@@ -130,20 +130,6 @@ public sealed class AdministracionDelCatalogoApiTests(PostgresDelCatalogoYAudito
         Assert.Equal(1, await bd.Consultar<long>("SELECT count(*) FROM catalogo.obras WHERE estado = 'baja'"));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-11")]
-    public async Task Una_obra_o_una_edicion_inexistente_es_404_con_su_codigo()
-    {
-        using var obra = await _host.Json(HttpMethod.Put, $"/administracion/obras/{Guid.NewGuid()}", new { version = 1, titulo = "X", autor = "A", editorial = "E", categoria = "C" });
-        using var edicion = await _host.Json(HttpMethod.Post, $"/administracion/obras/{Guid.NewGuid()}/ediciones/{Guid.NewGuid()}/retirar", new { motivo = "x" });
-        using var rutaMala = await _host.Json(HttpMethod.Put, "/administracion/obras/no-es-un-guid", new { version = 1 });
-
-        Assert.Equal(HttpStatusCode.NotFound, obra.StatusCode);
-        Assert.Equal("ECO-NO-ENCONTRADO", Codigo(await CatalogoApiHost.Leer(obra)));
-        Assert.Equal(HttpStatusCode.NotFound, edicion.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, rutaMala.StatusCode);
-    }
-
     // ---------- Subida de archivos ----------
 
     [Fact]

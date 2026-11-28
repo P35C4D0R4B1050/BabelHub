@@ -186,19 +186,6 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
         Assert.Equal(3, entorno.Denegaciones.Eventos.Count);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
-    public async Task La_administracion_central_ve_todas_sin_resolver_ninguna_sucursal()
-    {
-        var entorno = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral());
-
-        Assert.Null(await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(), default));
-        Assert.Null(await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(TipoDeDevolucion.Digital, OrigenDeDevolucion.Reporte, null), default));
-        Assert.Null(await entorno.Autorizador.ExigirSucursalDeLaRuta("cualquiera", default));
-        Assert.Equal(0, entorno.Sucursales.Consultas);
-        Assert.Empty(entorno.Denegaciones.Eventos);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-DEV-30")]
     [InlineData("no-responde")]

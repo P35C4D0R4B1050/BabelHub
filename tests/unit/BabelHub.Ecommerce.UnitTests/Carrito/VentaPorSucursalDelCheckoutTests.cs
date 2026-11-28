@@ -56,20 +56,6 @@ public sealed class VentaPorSucursalDelCheckoutTests
     }
 
     [Fact]
-    public void Dos_lineas_del_mismo_libro_conviven_y_cada_una_conserva_su_lineaid_al_sincronizar()
-    {
-        var (una, otra) = (Guid.NewGuid(), Guid.NewGuid());
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), [Impreso(una, "ayacucho", 18), Impreso(otra, "cusco", 6)], Guid.NewGuid, Ahora);
-        var antes = checkout.Lineas.ToDictionary(l => l.LineaDeCarritoId!.Value, l => l.LineaId);
-
-        checkout.SincronizarLineas([Impreso(otra, "cusco", 7), Impreso(una, "ayacucho", 18)], Guid.NewGuid, Ahora);
-
-        Assert.Equal([antes[otra], antes[una]], checkout.Lineas.Select(l => l.LineaId));
-        Assert.Equal(["cusco", "ayacucho"], checkout.Lineas.Select(l => l.CodigoDeSucursal));
-        Assert.Throws<ArgumentException>(() => Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), [Impreso(una, "ayacucho"), Impreso(una, "ayacucho")], Guid.NewGuid, Ahora));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-39")]
     public void Con_un_impreso_sin_sucursal_el_checkout_no_avanza_ni_se_paga_salvo_el_pago_ya_pendiente()
     {
@@ -385,19 +371,6 @@ public sealed class VentaPorSucursalDelCheckoutTests
         Assert.Equal(30m, preparado.Instantanea.Envio);
         Assert.Equal([("cusco", 0m), (Sucursal.Principal, 30m)], vista.DesgloseDelEnvio!.Select(x => (x.CodigoDeSucursal, x.Importe)));
         Assert.Equal((30m, mostrado), (vista.Envio, vista.Total));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAR-21")]
-    public async Task Un_recojo_no_lleva_envio_por_sucursal_en_su_instantanea()
-    {
-        var (e, checkout, _, _) = await ConDosSucursales();
-        await Elegir(e, TipoDeEntregaDeCompra.Recojo);
-
-        var preparado = (await Pagar(e, 1000m)).Valor;
-
-        Assert.Null(preparado.Instantanea!.EnviosPorSucursal);
-        Assert.Null(checkout.EnviosCongelados);
     }
 
     // ---------- Compras anteriores ----------

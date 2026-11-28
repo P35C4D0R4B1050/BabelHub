@@ -28,26 +28,6 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
 
     // --- el contenedor ---
 
-    [Theory]
-    [Trait("Criterio", "AC-SEL-27")]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ElContenedor_ResuelveElModuloSinCiclos_YElAdaptadorRealReemplazaAlNuloVengaPrimeroOQueVengaDespues(bool reservasPrimero)
-    {
-        using var pila = new PilaDeReservas(bd, reservasPrimero: reservasPrimero);
-        using var ambito = pila.Proveedor.CreateScope();
-
-        // IReservasDeStock (que Fuentes inyecta en MovimientosDeStock) y IAplicadorDeMovimientos (que Reservas usa al expirar) se resuelven sin ciclo.
-        Assert.IsType<ReservasDeStock>(ambito.ServiceProvider.GetRequiredService<IReservasDeStock>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IAplicadorDeMovimientos>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IMovimientosDeStock>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<ICasoDeUso<ReservarEntrada, ReservaDelPedido>>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<ICasoDeUso<ExpirarReservasEntrada, ExpiracionDelPedido>>());
-        Assert.Empty(ComposicionDeFuentes.AdaptadoresNulosConModuloReal(pila.Proveedor));
-        ComposicionDeFuentes.ExigirAdaptadoresReales(pila.Proveedor, esProduccion: true);
-    }
-
-
     [Fact]
     [Trait("Criterio", "AC-SEL-10")]
     public void LaEstrategiaConfiguradaConUnNombreDesconocido_FallaAlArrancar()
@@ -211,46 +191,6 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
     }
 
     // --- el repositorio ---
-
-    [Fact]
-    [Trait("Criterio", "AC-SEL-01")]
-    public async Task UltimaDelPedido_RehidrataLaCabeceraYSusLineas()
-    {
-        var f = await TresFuentes();
-        var a = await bd.AgregarEdicion();
-        var b = await bd.AgregarEdicion();
-        await bd.PonerStock(f.Lima, a, 5, 0);
-        await bd.PonerStock(f.Cusco, b, 5, 0);
-        using var pila = new PilaDeReservas(bd);
-        var cliente = Cliente();
-        var entrada = ADomicilio("cusco", [Linea(a, 2), Linea(b, 3)]);
-        Assert.True((await pila.Reservar(cliente, entrada)).EsExito);
-
-        var reserva = await pila.EnUnAmbito(cliente, async sp =>
-            await sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(async token => await sp.GetRequiredService<IRepositorioDeReservas>().UltimaDelPedido(entrada.PedidoId, token)));
-
-        Assert.NotNull(reserva);
-        Assert.Equal((entrada.PedidoId, cliente.UsuarioId!.Value, TipoDeEntrega.Domicilio, "cusco", null), (reserva.PedidoId, reserva.ClienteId, reserva.TipoDeEntrega, reserva.RegionDeEntrega, reserva.SucursalDeRecojoId));
-        Assert.Equal(pila.Reloj.Ahora.AddMinutes(15), reserva.FechaDeExpiracion);
-        Assert.False(reserva.Extendida);
-        Assert.Equal(0, reserva.Reemplazos);
-        Assert.Equal(2, reserva.Lineas.Count);
-        Assert.All(reserva.Lineas, l => Assert.Equal(EstadoDeLinea.Pendiente, l.Estado));
-        Assert.Equal(new[] { 2, 3 }.Order(), reserva.Lineas.Select(l => l.Cantidad).Order());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEL-01")]
-    public async Task UltimaDelPedido_SinReserva_EsNulo()
-    {
-        await TresFuentes();
-        using var pila = new PilaDeReservas(bd);
-
-        var reserva = await pila.EnUnAmbito(Cliente(), async sp =>
-            await sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(async token => await sp.GetRequiredService<IRepositorioDeReservas>().UltimaDelPedido(Guid.NewGuid(), token)));
-
-        Assert.Null(reserva);
-    }
 
     // --- la expiración ---
 

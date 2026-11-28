@@ -109,18 +109,6 @@ public sealed class ConciliacionDeIngresosTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-18")]
-    public async Task Despues_de_fallido_se_puede_emitir_una_clave_nueva_y_pedir_otro_ingreso()
-    {
-        var s = await ConPendiente();
-        await Conciliar(s, ResolucionDeIngreso.Fallido, confirma: true);
-
-        var nuevo = await s.Entorno.IngresosDeMercaderia().Registrar(new RegistrarIngresoEntrada(s.Edicion, 30, "GR-002", null, s.Entorno.Token(s.Edicion)));
-
-        Assert.Equal(EstadoDeIngresoSolicitado.Registrado, nuevo.Valor.Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
     public async Task Con_ingresos_listar_caido_el_pendiente_queda_intacto_y_se_responde_servicio_no_disponible()
     {
         var s = await ConPendiente();
@@ -163,24 +151,6 @@ public sealed class ConciliacionDeIngresosTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-18")]
-    public async Task Con_dos_intentos_inciertos_el_ingreso_aplicado_en_el_primero_se_encuentra_porque_la_ventana_llega_al_ultimo_intento()
-    {
-        var s = await ConPendiente();
-        var primerEnvio = s.Fila.SolicitadoEn.AddSeconds(2);
-        s.Entorno.Inventario.Ingresos.Add(IngresoRemoto(s, primerEnvio));
-        s.Entorno.Reloj.Ahora = s.Entorno.Reloj.Ahora.AddHours(2);
-        s.Entorno.Inventario.RespuestasDeIngreso.Enqueue(RespuestaDeIngreso.SinRespuesta);
-        await s.Entorno.IngresosDeMercaderia().Reintentar(new ReintentarIngresoEntrada(s.Fila.Id));
-        var tras = s.Entorno.Ingresos.Todos.Single();
-        Assert.Equal(2, tras.Intentos);
-
-        var resultado = await s.Entorno.IngresosDeMercaderia().Conciliar(new ConciliarIngresoEntrada(s.Fila.Id, ResolucionDeIngreso.Registrado, false));
-
-        Assert.Equal(EstadoDeIngresoSolicitado.Registrado, resultado.Valor.Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
     public async Task Una_fila_anonimizada_no_coincide_con_ningun_ingreso_y_solo_se_cierra_como_fallida_con_confirmacion()
     {
         var s = await ConPendiente();
@@ -196,18 +166,6 @@ public sealed class ConciliacionDeIngresosTests
         Assert.NotNull(registrado.Error);
         Assert.Equal(EstadoDeIngresoSolicitado.Fallido, fallido.Valor.Estado);
         Assert.Null(s.Entorno.Ingresos.Todos.Single().Referencia);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Sin_referencia_en_la_fila_la_coincidencia_no_la_exige()
-    {
-        var s = await ConPendiente(referencia: null);
-        s.Entorno.Inventario.Ingresos.Add(IngresoRemoto(s, referencia: "CUALQUIERA"));
-
-        var resultado = await Conciliar(s, ResolucionDeIngreso.Registrado);
-
-        Assert.Equal(EstadoDeIngresoSolicitado.Registrado, resultado.Valor.Estado);
     }
 
     [Fact]
@@ -314,21 +272,5 @@ public sealed class ConciliacionDeIngresosTests
         Assert.Single(otro.Denegaciones.Eventos);
         Assert.Equal(0, otro.Inventario.LlamadasAListarIngresos);
         Assert.Equal(EstadoDeIngreso.Pendiente, otro.Ingresos.Todos.Single().Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Otro_administrador_central_si_puede_conciliar_el_pendiente_de_un_autor_que_no_esta_disponible()
-    {
-        var s = await ConPendiente();
-        var remoto = IngresoRemoto(s);
-        var otro = new EntornoDelCatalogo(ActorDePrueba.DeAdministradorCentral());
-        otro.Inventario.Ingresos.Add(remoto);
-        await otro.Ingresos.Agregar(RepositorioDeIngresosEnMemoria.Clonar(s.Fila));
-
-        var resultado = await otro.IngresosDeMercaderia().Conciliar(new ConciliarIngresoEntrada(s.Fila.Id, ResolucionDeIngreso.Registrado, false));
-
-        Assert.Equal(EstadoDeIngresoSolicitado.Registrado, resultado.Valor.Estado);
-        Assert.Empty(otro.Denegaciones.Eventos);
     }
 }

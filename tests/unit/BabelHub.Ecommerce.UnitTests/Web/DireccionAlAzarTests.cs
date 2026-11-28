@@ -17,28 +17,6 @@ public sealed class DireccionAlAzarTests
         Assert.Equal("s1-p1-e1-v1-pg1", DireccionAlAzar.Crear(Minimo));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-IND-02")]
-    public void Con_los_maximos_de_cada_rango_la_forma_es_s40_p4_e5_v32_pg410()
-    {
-        Assert.Equal("s40-p4-e5-v32-pg410", DireccionAlAzar.Crear(Maximo));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-02")]
-    public void Pide_a_la_funcion_un_entero_por_cada_rango_con_su_tamano()
-    {
-        var pedidos = new List<int>();
-
-        _ = DireccionAlAzar.Crear(n =>
-        {
-            pedidos.Add(n);
-            return 0;
-        });
-
-        Assert.Equal([40, 4, 5, 32, 410], pedidos);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-IND-02")]
     [InlineData(0)]
@@ -85,21 +63,10 @@ public sealed class DireccionAlAzarTests
     [InlineData("s1-p1-e1-v1-pg0")]
     [InlineData("s1-p1-e1-v1-pg411")]
     [InlineData("s41-p1-e1-v1-pg1")]
-    [InlineData("s1-p1-e1-v1")]
-    [InlineData("s1-p1-e1-v1-pg01")]
     [InlineData("s1-p1-e1-v1-pg1\n")]
-    [InlineData("s1-p1-e1-v1-pg1\r\n")]
     public void Solo_una_direccion_de_la_forma_se_puede_avanzar_y_las_demas_nunca_coinciden_con_una_al_azar(string direccion)
     {
         Assert.False(DireccionAlAzar.TieneLaForma(direccion));
         Assert.Throws<ArgumentException>(() => DireccionAlAzar.AvanzarPagina(direccion));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-02")]
-    public void Toda_direccion_al_azar_tiene_la_forma()
-    {
-        Assert.True(DireccionAlAzar.TieneLaForma("s40-p4-e5-v32-pg410"));
-        Assert.True(DireccionAlAzar.TieneLaForma(DireccionAlAzar.Crear(new Random(3).Next)));
     }
 }

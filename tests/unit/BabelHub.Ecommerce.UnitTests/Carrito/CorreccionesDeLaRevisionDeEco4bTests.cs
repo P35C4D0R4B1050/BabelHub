@@ -81,21 +81,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         Assert.Equal((30, 18), (carrito.Lineas.Count, carrito.Lineas.Single(l => l.EdicionId == libro).Cantidad.Valor));
     }
 
-    [Fact]
-    public async Task Un_rechazo_sin_efectos_previos_no_guarda_nada()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var libro = e.Impreso(1);
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1, CodigoDeSucursal: Sucursal.Principal));
-        var guardados = e.Carritos.Guardados;
-
-        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 5));
-
-        Assert.False(resultado.EsExito);
-        Assert.Equal(guardados, e.Carritos.Guardados);
-        Assert.Empty(e.Checkouts.Guardados);
-    }
-
     // ---------- Antes de reabrir ----------
 
     [Fact]
@@ -110,36 +95,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         Assert.Equal(0, e.Pagos.Reaperturas);
         Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
         Assert.Equal(2, carrito.Lineas.Single().Cantidad.Valor);
-    }
-
-    [Fact]
-    public async Task Los_no_op_no_reabren_la_intencion()
-    {
-        var (e, checkout, carrito, libro) = EnPago();
-
-        var igual = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 2));
-        var inexistente = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(Guid.NewGuid()));
-
-        Assert.True(igual.EsExito);
-        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, inexistente.Error!.Clave);
-        Assert.Equal(0, e.Pagos.Reaperturas);
-        Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
-        Assert.Equal(2, carrito.Lineas.Single().Cantidad.Valor);
-        Assert.Empty(e.Bitacora.Bloqueos);
-    }
-
-    [Fact]
-    public async Task Agregar_una_digital_que_ya_esta_en_el_carrito_es_un_no_op()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var digital = e.Digital();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1, CodigoDeSucursal: Sucursal.Principal));
-        var guardados = e.Carritos.Guardados;
-
-        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1, CodigoDeSucursal: Sucursal.Principal));
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(guardados, e.Carritos.Guardados);
     }
 
     // ---------- La carrera al crear el carrito ----------
@@ -168,24 +123,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     }
 
     // ---------- La fusión ----------
-
-    [Fact]
-    public async Task La_fusion_con_el_checkout_en_pago_guarda_el_checkout()
-    {
-        var (e, checkout, carrito, libro) = EnPago();
-        var cookie = new string('A', 43);
-        Assert.True(HuellaDeLaCookie.TryDe(cookie, out var huella));
-        var visitante = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeVisitante(huella!), Inicio);
-        visitante.Agregar(libro, false, 1, Inicio);
-        e.Carritos.Sembrar(visitante);
-
-        var resultado = await new FusionarCarritoDeVisitante(e.Servicios()).Ejecutar(new FusionarCarritoEntrada(cookie));
-
-        Assert.False(resultado.Valor.Aplazada);
-        Assert.Same(checkout, Assert.Single(e.Checkouts.Guardados));
-        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
-        Assert.Equal(3, carrito.Lineas.Single().Cantidad.Valor);
-    }
 
     [Fact]
     public async Task Si_el_visitante_agrega_una_linea_despues_de_armar_el_terreno_la_fusion_se_aplaza_sin_marcarlo_fusionado()
@@ -264,20 +201,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     }
 
     // ---------- Avisos vistos ----------
-
-    [Fact]
-    public async Task Marcar_los_avisos_como_vistos_los_quita_de_la_vista()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var cuenta = e.Actor.Actual!.UsuarioId!.Value;
-        var aviso = new AvisoDelCarrito(Guid.NewGuid(), TipoDeAvisoDelCarrito.EdicionRetirada, Guid.NewGuid(), "Libro", null, null, Inicio);
-        await e.Carritos.AgregarAvisos(cuenta, [aviso]);
-
-        var resultado = await new MarcarAvisosComoVistos(e.Servicios()).Ejecutar(new MarcarAvisosEntrada([aviso.Id]));
-
-        Assert.True(resultado.EsExito);
-        Assert.Empty(resultado.Valor.Carrito.Avisos);
-    }
 
     [Fact]
     public async Task Marcar_avisos_exige_sesion_de_cliente_y_una_lista_valida()

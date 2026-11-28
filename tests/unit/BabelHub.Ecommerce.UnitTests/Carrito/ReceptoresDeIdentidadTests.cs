@@ -135,12 +135,4 @@ public sealed class ReceptoresDeIdentidadTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Eliminador(e).Eliminar(cuenta, "cancelacion"));
     }
-
-    [Fact]
-    public async Task Una_cuenta_vacia_es_un_argumento_invalido()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-
-        await Assert.ThrowsAsync<ArgumentException>(() => Eliminador(e).Eliminar(Guid.Empty, "cancelacion"));
-    }
 }

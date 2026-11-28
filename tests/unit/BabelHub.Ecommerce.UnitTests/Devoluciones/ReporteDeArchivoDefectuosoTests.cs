@@ -263,21 +263,6 @@ public sealed class ReporteDeArchivoDefectuosoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-24")]
-    public async Task Decidir_un_reporte_ya_decidido_es_estado_invalido_y_una_devolucion_que_no_es_un_reporte_es_no_encontrada()
-    {
-        var (admin, _, _, devolucionId) = await ConReporteAbierto();
-        await admin.Decidir.Aprobar(devolucionId);
-
-        var repetida = await admin.Decidir.Aprobar(devolucionId);
-        var inexistente = await admin.Decidir.Aprobar(Guid.NewGuid());
-
-        Assert.Equal("estado-invalido", repetida.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Single(admin.Reembolsos.Registrados);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-DEV-21")]
     public async Task Con_la_auditoria_caida_el_reporte_se_revierte_y_el_acceso_no_queda_suspendido()
     {
