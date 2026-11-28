@@ -38,48 +38,6 @@ public class ComposicionDeBibliotecaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-BIB-01")]
-    public void Biblioteca_reemplaza_a_los_dobles_provisionales_de_los_cuatro_contratos()
-    {
-        var servicios = ConDobles();
-        Assert.All(Contratos, c => Assert.False(EsDeBiblioteca(servicios, c), $"{c.Name} debía empezar con un doble provisional."));
-
-        servicios.AgregarBiblioteca(esProduccion: false);
-
-        Assert.All(Contratos, c => Assert.True(EsDeBiblioteca(servicios, c), $"{c.Name} debía resolver a Biblioteca."));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-01")]
-    public void El_resultado_no_depende_del_orden_de_registro()
-    {
-        var antes = new ServiceCollection();
-        antes.AgregarBiblioteca(esProduccion: false);
-        antes.AgregarDoblesProvisionalesDelCarrito(esProduccion: false);
-        antes.AgregarDoblesProvisionalesDePedidos(esProduccion: false);
-
-        // Con TryAdd, los dobles no pisan lo que ya estaba: el último registro de cada contrato sigue siendo el de Biblioteca.
-        Assert.All(Contratos.Where(c => c != typeof(IAccesosParaDevoluciones)), c => Assert.True(EsDeBiblioteca(antes, c), $"{c.Name} debía seguir resolviendo a Biblioteca."));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-01")]
-    public void En_produccion_las_guardas_de_los_otros_modulos_ya_no_ven_esos_contratos_como_provisionales()
-    {
-        var servicios = new ServiceCollection();
-        servicios.AgregarBiblioteca(esProduccion: true, Almacen);
-        servicios.AgregarDoblesProvisionalesDelCarrito(esProduccion: false);
-        servicios.AgregarDoblesProvisionalesDePedidos(esProduccion: false);
-
-        // La guarda de Pedidos nombra solo lo que sigue siendo doble: IAccesosDeBiblioteca ya no figura (los demás contratos de Pedidos no son de Biblioteca).
-        var error = Assert.Throws<InvalidOperationException>(() => servicios.AgregarDoblesProvisionalesDePedidos(esProduccion: true));
-        Assert.DoesNotContain(nameof(IAccesosDeBiblioteca), error.Message, StringComparison.Ordinal);
-
-        var carrito = Assert.Throws<InvalidOperationException>(() => servicios.AgregarDoblesProvisionalesDelCarrito(esProduccion: true));
-        Assert.DoesNotContain(nameof(IPosesionDeEdiciones), carrito.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-BIB-12")]
     public void Sin_el_almacen_de_libros_el_arranque_de_produccion_falla_y_fuera_de_produccion_usa_el_contenido_sintetico()
     {

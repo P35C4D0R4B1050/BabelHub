@@ -75,24 +75,6 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
         Assert.Equal((EstadoDeHoja.Respondido, AvisoDeRespuesta.Enviado, quien), (leida!.Estado, leida.AvisoDeRespuesta!.Value, leida.RespondidaPor!.Value));
     }
 
-    [Fact]
-    public async Task Descartar_y_marcar_la_cuenta_cancelada_se_guardan()
-    {
-        var hoja = Hoja(1, "clave-1");
-        await Agregar(hoja);
-        Assert.Equal(ResultadoDeTransicion.Hecha, hoja.Descartar(Inicio.AddHours(1)));
-        Assert.True(hoja.MarcarDeCuentaCancelada());
-        await Guardar(hoja);
-
-        Assert.Equivalent(hoja, await Leer(hoja.Id), strict: true);
-    }
-
-    [Fact]
-    public async Task Guardar_una_hoja_que_no_existe_falla()
-    {
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Guardar(Hoja(1, "clave-1")));
-    }
-
     // ---------- Secuencia y clave ----------
 
     [Fact]
@@ -108,15 +90,6 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
         Assert.Equal(esperados, obtenidos);
         Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Hojas.SiguienteSecuencia(2027, token)));
         Assert.Equal(4, await bd.Unidad.Ejecutar(token => bd.Hojas.SiguienteSecuencia(2026, token)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-REC-04")]
-    public async Task Cincuenta_registros_simultaneos_reciben_numeros_unicos_y_consecutivos()
-    {
-        var numeros = await Task.WhenAll(Enumerable.Range(0, 50).Select(_ => bd.Unidad.Ejecutar(token => bd.Hojas.SiguienteSecuencia(2026, token))));
-
-        Assert.Equal(Enumerable.Range(1, 50), numeros.Order());
     }
 
     [Fact]

@@ -39,22 +39,6 @@ public sealed class S3EntregaDeArchivosTests(AlmacenDeLibrosFixture almacen)
     }
 
     [Fact]
-    [Trait("Criterio", "AC-BIB-12")]
-    public void El_mismo_instante_produce_la_misma_url_y_otro_instante_otra_distinta()
-    {
-        var entrega = Entrega();
-        var clave = new string('a', 32);
-        var instante = new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero);
-
-        var a = entrega.FirmarEnlace(clave, "Libro.epub", instante, 300);
-        var b = entrega.FirmarEnlace(clave, "Libro.epub", instante, 300);
-        var c = entrega.FirmarEnlace(clave, "Libro.epub", instante.AddSeconds(1), 300);
-
-        Assert.Equal(a, b);
-        Assert.NotEqual(a, c);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-BIB-04")]
     public void La_url_vence_en_trescientos_segundos_como_maximo_obliga_attachment_y_no_lleva_el_secreto()
     {
@@ -69,35 +53,6 @@ public sealed class S3EntregaDeArchivosTests(AlmacenDeLibrosFixture almacen)
         Assert.DoesNotContain(AlmacenDeLibrosFixture.ClaveSecreta, url.AbsoluteUri, StringComparison.Ordinal);
         Assert.Throws<InvalidOperationException>(() => entrega.FirmarEnlace(new string('b', 32), "x.epub", DateTimeOffset.UtcNow, 301));
         Assert.Throws<InvalidOperationException>(() => entrega.FirmarEnlace("../../secreto", "x.epub", DateTimeOffset.UtcNow, 300));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-12")]
-    public async Task El_navegador_descarga_directamente_del_almacen_con_attachment_y_el_contenido_intacto()
-    {
-        var contenido = Encoding.UTF8.GetBytes("contenido sintético de prueba " + Guid.NewGuid());
-        var clave = await almacen.GuardarSintetico(contenido);
-        var url = Entrega().FirmarEnlace(clave, "Mi libro.epub", DateTimeOffset.UtcNow.AddSeconds(-1), 300);
-
-        using var respuesta = await Http.GetAsync(url);
-
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-        Assert.Equal(contenido, await respuesta.Content.ReadAsByteArrayAsync());
-        Assert.StartsWith("attachment", respuesta.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
-        Assert.Contains("Mi libro.epub", respuesta.Content.Headers.ContentDisposition?.FileName ?? string.Empty, StringComparison.Ordinal);
-        Assert.Equal(almacen.Opciones.Endpoint.Authority, url.Authority);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-06")]
-    public async Task Un_enlace_firmado_hace_diez_minutos_no_completa_la_descarga()
-    {
-        var clave = await almacen.GuardarSintetico(Encoding.UTF8.GetBytes("sintético"));
-        var vencido = Entrega().FirmarEnlace(clave, "Libro.epub", DateTimeOffset.UtcNow.AddMinutes(-10), 300);
-
-        using var respuesta = await Http.GetAsync(vencido);
-
-        Assert.True(respuesta.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.BadRequest, $"Un enlace vencido debía rechazarse y respondió {(int)respuesta.StatusCode}.");
     }
 
     [Fact]

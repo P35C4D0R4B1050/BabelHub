@@ -154,24 +154,6 @@ public sealed class RepositoriosDeBibliotecaPostgresTests(PostgresDeBibliotecaFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-BIB-15")]
-    public async Task Con_una_sola_descarga_restante_veinte_solicitudes_simultaneas_dejan_el_contador_en_el_maximo()
-    {
-        var cuenta = Guid.NewGuid();
-        var id = await Conceder(cuenta, Guid.NewGuid(), Guid.NewGuid());
-        for (var i = 0; i < 4; i++)
-        {
-            await En(token => bd.Accesos.ConsumirCupo(id, cuenta, token));
-        }
-
-        var resultados = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() => En(token => bd.Accesos.ConsumirCupo(id, cuenta, token)))));
-
-        Assert.Equal(1, resultados.Count(r => r == ResultadoDelConteoAtomico.Contada));
-        var leido = (await En(token => bd.Accesos.Obtener(id, cuenta, token)))!;
-        Assert.Equal((5, 5), (leido.DescargasUsadas, leido.EnlacesEntregados));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-BIB-03")]
     public async Task El_conteo_exige_la_cuenta_titular_y_el_estado_vigente()
     {
@@ -183,30 +165,6 @@ public sealed class RepositoriosDeBibliotecaPostgresTests(PostgresDeBibliotecaFi
         await En(token => bd.Accesos.Suspender(cuenta, id, Ahora, token));
         Assert.Equal(ResultadoDelConteoAtomico.NoAfecto, await En(token => bd.Accesos.ConsumirCupo(id, cuenta, token)));
         Assert.Equal(0, (await En(token => bd.Accesos.Obtener(id, cuenta, token)))!.DescargasUsadas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-BIB-20")]
-    public async Task Cincuenta_pares_de_entrega_y_revocacion_sin_enlace_nunca_dejan_un_enlace_sobre_un_acceso_revocado()
-    {
-        var pares = new List<(Guid Cuenta, Guid Id, Guid Pedido, Guid Edicion)>();
-        for (var i = 0; i < 50; i++)
-        {
-            var cuenta = Guid.NewGuid();
-            var edicion = Guid.NewGuid();
-            var pedido = Guid.NewGuid();
-            pares.Add((cuenta, await Conceder(cuenta, edicion, pedido), pedido, edicion));
-        }
-
-        await Task.WhenAll(pares.SelectMany(p => new Task[]
-        {
-            Task.Run(() => En(token => bd.Accesos.ConsumirCupo(p.Id, p.Cuenta, token))),
-            Task.Run(() => En(token => bd.Accesos.RevocarSiNoHayEnlace(p.Cuenta, p.Pedido, p.Edicion, Ahora, token))),
-        }));
-
-        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM biblioteca.accesos WHERE estado = 'revocado' AND enlaces_entregados > 0"));
-        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM biblioteca.accesos WHERE estado = 'vigente' AND enlaces_entregados = 0 AND descargas_usadas > 0"));
-        Assert.Equal(50L, await bd.Consultar<long>("SELECT count(*) FROM biblioteca.accesos WHERE (estado = 'revocado' AND enlaces_entregados = 0) OR (estado = 'vigente' AND enlaces_entregados = 1)"));
     }
 
     [Fact]

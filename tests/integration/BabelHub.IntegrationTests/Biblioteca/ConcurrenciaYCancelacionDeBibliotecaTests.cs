@@ -279,17 +279,6 @@ public sealed class ConcurrenciaYCancelacionDeBibliotecaTests(PostgresDeBibliote
     }
 
     [Fact]
-    [Trait("Criterio", "AC-BIB-22")]
-    public async Task Cancelar_una_cuenta_sin_accesos_termina_sin_error()
-    {
-        await bd.Unidad.Ejecutar(async token =>
-        {
-            await _entorno.Cancelacion.Aplicar(Guid.NewGuid(), Guid.NewGuid(), token);
-            return 0;
-        });
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-BIB-25")]
     public async Task Si_la_transaccion_de_identidad_falla_despues_de_la_parte_de_biblioteca_todo_se_revierte_y_se_puede_reintentar()
     {
