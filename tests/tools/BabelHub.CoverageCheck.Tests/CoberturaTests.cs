@@ -302,6 +302,13 @@ public sealed class CoberturaTests : IDisposable
         var conAvisos = Ejecutar(debajo);
         Assert.True(conAvisos.Codigo == 0, conAvisos.Salida);
         Assert.Contains("AVISO: Ecommerce/Pagos (crítico): la cobertura de Dominio y Aplicación es 0.0 % y la referencia es 85 %", conAvisos.Salida, StringComparison.Ordinal);
+
+        // Un módulo crítico sin datos solo se avisa; los demás se informan en la tabla con sus porcentajes y su referencia.
+        var sinPagos = Escribir("sin-pagos", Informe([.. PoliticaDeCobertura.Vigente.ModulosCriticos.Where(m => m != "Ecommerce/Pagos").Select(m => Modulo(m, 100, 100))]));
+        var incompleto = Ejecutar(sinPagos);
+        Assert.True(incompleto.Codigo == 0, incompleto.Salida);
+        Assert.Contains("AVISO: Ecommerce/Pagos (crítico): no hay datos", incompleto.Salida, StringComparison.Ordinal);
+        Assert.Matches(@"Ecommerce/Identidad\s+crítico\s+100\.0 % \(85\)\s+100\.0 % \(70\)", incompleto.Salida);
     }
 
     [Fact]
@@ -318,6 +325,9 @@ public sealed class CoberturaTests : IDisposable
         Assert.Contains("Inventario: no hay datos", incompleto.Salida, StringComparison.Ordinal);
         Assert.Equal(2, Ejecutar(roto).Codigo);
         Assert.Equal(2, Ejecutar(bueno, roto).Codigo);
+        Assert.Contains("no es un XML válido", Ejecutar(roto).Salida, StringComparison.Ordinal);
+        Assert.Contains("No se encontró ningún informe", Ejecutar(carpetaVacia).Salida, StringComparison.Ordinal);
+        Assert.Contains("No existe:", Ejecutar(Path.Combine(_carpeta, "no-existe.xml")).Salida, StringComparison.Ordinal);
         Assert.Equal(2, Ejecutar(carpetaVacia).Codigo);
         Assert.Equal(2, Ejecutar(Path.Combine(_carpeta, "no-existe.xml")).Codigo);
         Assert.Equal(2, Ejecutar(bueno, "--servicios", ",").Codigo);

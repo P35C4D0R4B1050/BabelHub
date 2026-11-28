@@ -76,7 +76,7 @@ public sealed class PoliticaDeCobertura
 
     public Referencia ReferenciaDeNoCriticos { get; } = new(DominioYAplicacion: 60, Total: 40);
 
-    /// <summary>Los módulos críticos declarados, como <c>Servicio/Modulo</c>: todos deben tener datos de cobertura.</summary>
+    /// <summary>Los módulos críticos declarados, como <c>Servicio/Modulo</c>: de uno sin datos de cobertura se avisa.</summary>
     public IReadOnlyCollection<string> ModulosCriticos => _criticos;
 
     /// <summary>Los módulos no críticos declarados, como <c>Servicio/Modulo</c>.</summary>
