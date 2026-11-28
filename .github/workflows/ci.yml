@@ -38,7 +38,8 @@ jobs:
         run: bash scripts/pruebas-sin-red.sh
       - name: Probar con cobertura (unitarias, integración, arquitectura y herramientas)
         run: dotnet test BabelHub.sln --no-build --nologo --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
-      - name: Verificar los umbrales de cobertura (Dominio y Aplicación 85 %, total 70 %)
+      # Mínimos por módulo según su criticidad (PLA-14): críticos 85 % / 70 %, no críticos 60 % / 40 %. La lista está en tools/CoverageCheck/PoliticaDeCobertura.cs.
+      - name: Verificar la cobertura de cada módulo según su criticidad
         run: dotnet run --project tools/CoverageCheck -- TestResults --html TestResults/reporte-de-cobertura/index.html
       - name: Archivar el reporte HTML de cobertura (evidencia del Sprint 2)
         if: always()
