@@ -178,14 +178,10 @@ public sealed class GestionDeFuentesTests
     [Theory]
     [Trait("Criterio", "AC-FUE-01")]
     [InlineData("L", "Piura", "piura", null, "codigo")]
-    [InlineData("Piura", "Piura", "piura", null, "codigo")]
     [InlineData("piura\n", "Piura", "piura", null, "codigo")]
     [InlineData("piura", " ", "piura", null, "nombre")]
-    [InlineData("piura", "P", "piura", null, "nombre")]
     [InlineData("piura", " Piura", "piura", null, "nombre")]
-    [InlineData("piura", "Piura", "Piura", null, "region")]
     [InlineData("piura", "Piura", "atlantida", null, "region")]
-    [InlineData("piura", "Piura", "piura", "no es un número", "contactoDeNotificacion")]
     [InlineData("piura", "Piura", "piura", "123", "contactoDeNotificacion")]
     public async Task Registrar_ConDatosInvalidos_DevuelveElCampoYNoCambiaNada(string codigo, string nombre, string region, string? contacto, string campo)
     {

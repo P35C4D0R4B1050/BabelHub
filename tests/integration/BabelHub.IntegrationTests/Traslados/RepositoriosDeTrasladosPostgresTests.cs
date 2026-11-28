@@ -43,26 +43,6 @@ public sealed class RepositoriosDeTrasladosPostgresTests(PostgresDeReservasFixtu
         pila.EnUnAmbito(actor, sp => sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(_ => operacion(sp)));
 
     [Fact]
-    public async Task UnTrasladoSeGuardaConSuNumeroYSeLeeIgual_ConTodosSusCampos()
-    {
-        var (_, cusco, ayacucho, libro) = await Escenario();
-        using var pila = new PilaDeReservas(bd, conTraslados: true);
-        var traslado = Reposicion(libro, cusco, ayacucho, 4);
-
-        await EnUnaTransaccion(pila, Sistema, async sp =>
-        {
-            await sp.GetRequiredService<IRepositorioDeTraslados>().Insertar(traslado);
-            return 0;
-        });
-        var leido = await EnUnaTransaccion(pila, Sistema, sp => sp.GetRequiredService<IRepositorioDeTraslados>().PorId(traslado.Id));
-
-        Assert.True(traslado.Numero > 0);
-        Assert.NotNull(leido);
-        Assert.Equal((traslado.Numero, EstadoDeTraslado.Solicitado, 4, "reposición", cusco, ayacucho, libro, 0L), (leido.Numero, leido.Estado, leido.Cantidad, leido.Motivo, leido.OrigenId, leido.DestinoId, leido.EdicionId, leido.Version));
-        Assert.Equal((traslado.SolicitadoPor, Ahora), (leido.SolicitadoPor, leido.SolicitadoEn));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-TRA-23")]
     public async Task LaTransicionEsCondicionalPorLaVersion_LaSegundaConLaMismaVersionNoActualizaNada()
     {

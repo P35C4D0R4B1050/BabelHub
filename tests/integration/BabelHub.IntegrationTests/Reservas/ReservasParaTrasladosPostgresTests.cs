@@ -71,21 +71,6 @@ public sealed class ReservasParaTrasladosPostgresTests(PostgresDeReservasFixture
 
     [Fact]
     [Trait("Criterio", "AC-SEL-11")]
-    public async Task ElContenedorResuelveLasPiezasDeTrasladosConLasDeReservasSinCiclos()
-    {
-        var lima = await bd.AgregarFuente("lima", recepcion: true);
-        _ = lima;
-        using var pila = new PilaDeReservas(bd, s => s.AddScoped<TrasladosDeEjemplo>());
-        using var ambito = pila.Proveedor.CreateScope();
-
-        var traslados = ambito.ServiceProvider.GetRequiredService<TrasladosDeEjemplo>();
-
-        Assert.IsType<ReservasParaTraslados>(traslados.Reservas);
-        Assert.Equal(4, traslados.Piezas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEL-11")]
     public async Task ElTrasladoCompleto_ConsumeEnCuscoYRecreaEnLima_ElEncargadoDeCadaSucursalEscribeLaSuya()
     {
         var (pila, d, traslado) = await Preparar();

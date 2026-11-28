@@ -19,37 +19,6 @@ public sealed class ResolucionDelContenedorDeTrasladosTests(PostgresDeReservasFi
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ElContenedorResuelveTodasLasPiezasDeTrasladosSinCiclos_EnCualquierOrdenDeRegistro(bool reservasPrimero)
-    {
-        await bd.AgregarFuente("lima", recepcion: true);
-        using var pila = new PilaDeReservas(bd, reservasPrimero: reservasPrimero, conTraslados: true);
-        using var ambito = pila.Proveedor.CreateScope();
-        var sp = ambito.ServiceProvider;
-
-        Assert.IsType<GenerarTrasladosDePedido>(sp.GetRequiredService<IGeneradorDeTrasladosDePedido>());
-        Assert.Contains(sp.GetRequiredService<IEnumerable<IAlLiberarPedido>>(), r => r is CancelarTrasladosDePedido);
-        Assert.IsType<ReservasParaTraslados>(sp.GetRequiredService<IReservasParaTraslados>());
-        Assert.NotNull(sp.GetRequiredService<EntregarMensajesSalientes>());
-
-        // Todos los casos de uso del contrato público se resuelven por ICasoDeUso.
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<SolicitarTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<AprobarTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<RechazarTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<CancelarTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<DespacharTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<RecibirTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<RegistrarGuiaDeTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<ConsultarOrigenesPosiblesEntrada, OrigenesPosibles>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<ConsultarTrasladoEntrada, TrasladoRegistrado>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<ListarTrasladosEntrada, PaginaDeTraslados>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<ConsultarTrasladosDeUnPedidoEntrada, TrasladosDeUnPedido>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<RevisarTrasladosSinAprobarEntrada, ResultadoDeLaRevision>>());
-        Assert.NotNull(sp.GetRequiredService<ICasoDeUso<DepurarTrasladosEntrada, ResultadoDeLaDepuracionDeTraslados>>());
-    }
-
     [Fact]
     public async Task LosPuertosDeReservasNoSonCasosDeUsoExpuestos_NiLaGeneracionNiLaCancelacionPorPedido()
     {

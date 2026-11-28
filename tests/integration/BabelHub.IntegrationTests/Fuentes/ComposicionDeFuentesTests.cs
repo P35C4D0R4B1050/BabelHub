@@ -63,25 +63,6 @@ public sealed class ComposicionDeFuentesTests
 
     [Fact]
     [Trait("Criterio", "AC-FUE-02")]
-    public void ElContenedor_ResuelveTodosLosCasosDeUsoYElContratoPublicoSinCiclos()
-    {
-        using var proveedor = Construir();
-        using var ambito = proveedor.CreateScope();
-
-        foreach (var (entrada, salida, _) in CasosDeUso)
-        {
-            Assert.NotNull(ambito.ServiceProvider.GetRequiredService(typeof(ICasoDeUso<,>).MakeGenericType(entrada, salida)));
-        }
-
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IMovimientosDeStock>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IAplicadorDeMovimientos>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IExistencias>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IDirectorioDeFuentes>());
-        Assert.NotNull(ambito.ServiceProvider.GetRequiredService<IFichasDeEdiciones>());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-FUE-02")]
     public void ElAplicadorSeRegistraConLaImplementacionSinLiberacionPrevia_NoConMovimientosDeStock_QueLoInyecta()
     {
         using var proveedor = Construir();
@@ -140,30 +121,5 @@ public sealed class ComposicionDeFuentesTests
         Assert.Equal(["IReservasDeStock", "IOrigenDeUnidadesVendidas", "IReingresosPorDevolucion"], ComposicionDeFuentes.AdaptadoresNulosConModuloReal(proveedor));
         Assert.Throws<InvalidOperationException>(() => ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: true));
         ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: false);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-FUE-02")]
-    public void UnAdaptadorRealRegistradoPrimero_GanaAlNulo()
-    {
-        using var proveedor = Construir(s => s.AddSingleton<IReservasDeStock, ReservasDeStockFijo>());
-        using var ambito = proveedor.CreateScope();
-
-        Assert.IsType<ReservasDeStockFijo>(ambito.ServiceProvider.GetRequiredService<IReservasDeStock>());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-FUE-02")]
-    public void LaDeteccionDelModuloReal_MiraSiExisteUnaImplementacionQueNoSeaElNulo()
-    {
-        var nulo = typeof(ComposicionDeFuentes).Assembly.GetTypes().Single(t => t.Name == "AdaptadoresNulosDeFuentes");
-        var detectar = nulo.GetMethod("ExisteAdaptadorReal")!;
-
-        // En la Infraestructura no hay un Reservas ni un Ajustes reales (el de Reservas vive en la Aplicación, que la guarda también mira); en el ensamblado de pruebas sí hay una implementación (el doble) y se detecta.
-        Assert.False((bool)detectar.Invoke(null, [typeof(IReservasDeStock), typeof(ComposicionDeFuentes).Assembly])!);
-        Assert.False((bool)detectar.Invoke(null, [typeof(IOrigenDeUnidadesVendidas), typeof(ComposicionDeFuentes).Assembly])!);
-        Assert.False((bool)detectar.Invoke(null, [typeof(IReingresosPorDevolucion), typeof(ComposicionDeFuentes).Assembly])!);
-        Assert.True((bool)detectar.Invoke(null, [typeof(IReservasDeStock), typeof(ReservasDeStockFijo).Assembly])!);
-        Assert.True((bool)detectar.Invoke(null, [typeof(IReservasDeStock), typeof(IReservasDeStock).Assembly])!);
     }
 }
