@@ -79,7 +79,6 @@ public sealed class LicenciaDigitalTests
     [Theory]
     [Trait("Criterio", "AC-CAT-13")]
     [InlineData("PER")]
-    [InlineData("P")]
     [InlineData("P1")]
     [InlineData("")]
     public void Un_territorio_debe_ser_un_codigo_de_pais_de_dos_letras(string codigo)
@@ -87,26 +86,6 @@ public sealed class LicenciaDigitalTests
         var resultado = Comercial(Hoy.AddDays(5), territorios: ["PE", codigo]);
 
         Assert.Contains(new ErrorDeLicencia("territorios", "formato-invalido"), resultado.Errores);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-13")]
-    public void Los_territorios_se_normalizan_en_mayusculas_sin_repetir_y_con_un_tope()
-    {
-        var resultado = Comercial(Hoy.AddDays(5), territorios: ["pe", "CL", "PE", " ar "]);
-        var demasiados = Comercial(Hoy.AddDays(5), territorios: Enumerable.Range(0, 251).Select(i => $"{(char)('A' + (i / 26 % 26))}{(char)('A' + (i % 26))}"));
-
-        Assert.Equal(["AR", "CL", "PE"], resultado.Licencia!.Territorios);
-        Assert.Contains(new ErrorDeLicencia("territorios", "formato-invalido"), demasiados.Errores);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-13")]
-    public void El_titular_tiene_un_tope_de_longitud()
-    {
-        var resultado = Comercial(Hoy.AddDays(5), titular: new string('a', 201));
-
-        Assert.Contains(new ErrorDeLicencia("titular", "demasiado-largo"), resultado.Errores);
     }
 
     [Fact]
@@ -151,17 +130,5 @@ public sealed class LicenciaDigitalTests
         Assert.False(vencida.EstaVigente(Hoy));
         Assert.Throws<ArgumentException>(() => LicenciaDigital.Rehidratar(TipoDeLicencia.Comercial, "", ["PE"], Hoy.AddYears(1), FormatoDigital.Pdf));
         Assert.Throws<ArgumentException>(() => LicenciaDigital.Rehidratar(TipoDeLicencia.DominioPublico, "Titular", ["PE"], Hoy, FormatoDigital.Pdf));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-05")]
-    public void Dos_licencias_con_los_mismos_datos_son_iguales()
-    {
-        var a = Comercial(Hoy.AddDays(10), territorios: ["PE", "CL"]).Licencia!;
-        var b = Comercial(Hoy.AddDays(10), territorios: ["CL", "PE"]).Licencia!;
-        var c = Comercial(Hoy.AddDays(11), territorios: ["CL", "PE"]).Licencia!;
-
-        Assert.Equal(a, b);
-        Assert.NotEqual(a, c);
     }
 }

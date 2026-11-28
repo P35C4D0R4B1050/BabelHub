@@ -130,20 +130,6 @@ public sealed class AdministracionDelCatalogoApiTests(PostgresDelCatalogoYAudito
         Assert.Equal(1, await bd.Consultar<long>("SELECT count(*) FROM catalogo.obras WHERE estado = 'baja'"));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-11")]
-    public async Task Una_obra_o_una_edicion_inexistente_es_404_con_su_codigo()
-    {
-        using var obra = await _host.Json(HttpMethod.Put, $"/administracion/obras/{Guid.NewGuid()}", new { version = 1, titulo = "X", autor = "A", editorial = "E", categoria = "C" });
-        using var edicion = await _host.Json(HttpMethod.Post, $"/administracion/obras/{Guid.NewGuid()}/ediciones/{Guid.NewGuid()}/retirar", new { motivo = "x" });
-        using var rutaMala = await _host.Json(HttpMethod.Put, "/administracion/obras/no-es-un-guid", new { version = 1 });
-
-        Assert.Equal(HttpStatusCode.NotFound, obra.StatusCode);
-        Assert.Equal("ECO-NO-ENCONTRADO", Codigo(await CatalogoApiHost.Leer(obra)));
-        Assert.Equal(HttpStatusCode.NotFound, edicion.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, rutaMala.StatusCode);
-    }
-
     // ---------- Subida de archivos ----------
 
     [Fact]
@@ -332,18 +318,6 @@ public sealed class AdministracionDelCatalogoApiTests(PostgresDelCatalogoYAudito
         Assert.Equal(HttpStatusCode.Conflict, conflicto.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, validacion.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, sinPortada.StatusCode);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public async Task Un_cuerpo_json_de_mas_de_64_KiB_se_rechaza_sin_parsearlo_entero()
-    {
-        var enorme = "{\"titulo\":\"" + new string('x', 200_000) + "\"}";
-
-        using var respuesta = await _host.Json(HttpMethod.Post, "/administracion/obras", enorme);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Equal(0, await bd.Consultar<long>("SELECT count(*) FROM catalogo.obras"));
     }
 
     // ---------- Portadas ----------

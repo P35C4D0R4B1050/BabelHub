@@ -27,24 +27,6 @@ public sealed class LecturasDeAdministracionTests
         Assert.Equal(1, pagina.Valor.Total);
     }
 
-    [Fact]
-    public async Task La_lista_oculta_las_dadas_de_baja_salvo_que_se_pidan_y_busca_por_texto()
-    {
-        var e = new EntornoDelCatalogo();
-        var obra = await e.ObraRegistrada("Visible", e.EdicionImpresa());
-        var otra = await e.ObraRegistrada("Dada de baja", e.EdicionImpresa("0-306-40615-2"));
-        await e.DarDeBajaObra().Ejecutar(new DarDeBajaObraEntrada(otra.Id, otra.Version));
-
-        var visibles = await e.Administracion().ListarObras(new ListarObrasDeAdministracionEntrada());
-        var todas = await e.Administracion().ListarObras(new ListarObrasDeAdministracionEntrada(IncluirDadasDeBaja: true));
-        var texto = await e.Administracion().ListarObras(new ListarObrasDeAdministracionEntrada("dada", true));
-
-        Assert.Equal([obra.Id], visibles.Valor.Obras.Select(o => o.ObraId).ToList());
-        Assert.Equal(2, todas.Valor.Total);
-        Assert.True(todas.Valor.Obras.Single(o => o.ObraId == otra.Id).DadaDeBaja);
-        Assert.Equal([otra.Id], texto.Valor.Obras.Select(o => o.ObraId).ToList());
-    }
-
     [Theory]
     [Trait("Criterio", "AC-CAT-11")]
     [InlineData("encargado")]

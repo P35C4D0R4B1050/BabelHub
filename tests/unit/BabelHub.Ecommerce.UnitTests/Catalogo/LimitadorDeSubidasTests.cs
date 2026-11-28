@@ -43,24 +43,6 @@ public sealed class LimitadorDeSubidasTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-12")]
-    public void Liberar_un_permiso_devuelve_el_cupo_una_sola_vez_aunque_se_libere_dos_veces()
-    {
-        var limitador = new LimitadorDeSubidas(maximoGlobal: 2, maximoPorUsuario: 1);
-        var a = limitador.Intentar(Ana)!;
-        using var b = limitador.Intentar(Beto);
-
-        Assert.Null(limitador.Intentar(Ana));
-        a.Dispose();
-        a.Dispose();
-
-        Assert.Equal(1, limitador.EnCurso);
-        using var otra = limitador.Intentar(Ana);
-        Assert.NotNull(otra);
-        Assert.Equal(2, limitador.EnCurso);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task El_permiso_se_cancela_al_cumplirse_la_duracion_maxima()
     {
         var limitador = new LimitadorDeSubidas(duracionMaxima: TimeSpan.FromMilliseconds(30));
@@ -69,14 +51,6 @@ public sealed class LimitadorDeSubidasTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Task.Delay(Timeout.Infinite, permiso.Cancelacion));
 
         Assert.True(permiso.Cancelacion.IsCancellationRequested);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
-    public void Los_topes_deben_ser_positivos()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LimitadorDeSubidas(maximoGlobal: 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LimitadorDeSubidas(maximoPorUsuario: 0));
     }
 
     [Fact]

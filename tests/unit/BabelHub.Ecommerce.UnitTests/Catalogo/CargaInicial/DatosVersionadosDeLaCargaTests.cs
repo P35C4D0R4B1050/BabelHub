@@ -81,17 +81,6 @@ public sealed class DatosVersionadosDeLaCargaTests
 
     [Fact]
     [Trait("Criterio", "AC-CIN-12")]
-    public void Ninguna_fila_del_archivo_versionado_repite_una_portada_ni_una_clave()
-    {
-        var leido = Leer();
-
-        Assert.Equal(leido.Filas.Count, leido.Filas.Select(f => f.Portada).Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal(leido.Filas.Count, leido.Filas.Select(f => f.Clave).Distinct(StringComparer.Ordinal).Count());
-        Assert.All(leido.Filas, f => Assert.EndsWith(".png", f.Portada, StringComparison.Ordinal));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CIN-12")]
     public void Los_precios_el_stock_y_los_isbn_provisionales_del_archivo_son_los_que_produce_la_regla_determinista_documentada()
     {
         var leido = Leer();

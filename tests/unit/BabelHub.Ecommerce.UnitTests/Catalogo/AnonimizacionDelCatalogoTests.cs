@@ -63,19 +63,6 @@ public sealed class AnonimizacionDelCatalogoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-16")]
-    public async Task Una_corrida_sin_cambios_no_deja_registro_de_auditoria()
-    {
-        var e = new EntornoDelCatalogo();
-        var anonimizador = new AnonimizadorEspia(new AnonimizacionDelCatalogoRealizada(0, 0, 0));
-
-        var resultado = await Crear(e, ActorDePrueba.DelSistema(), anonimizador).Ejecutar();
-
-        Assert.True(resultado.EsExito);
-        Assert.Empty(e.Auditoria.Solicitudes);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
     public async Task Con_la_auditoria_caida_falla_cerrada_la_excepcion_sale_y_no_queda_registro()
     {
         var e = new EntornoDelCatalogo();

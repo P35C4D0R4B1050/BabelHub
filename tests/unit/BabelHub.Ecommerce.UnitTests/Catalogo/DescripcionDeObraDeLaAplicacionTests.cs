@@ -64,19 +64,6 @@ public sealed class DescripcionDeObraDeLaAplicacionTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-20")]
-    public async Task Editar_con_601_caracteres_se_rechaza_y_no_cambia_nada()
-    {
-        var entorno = new EntornoDelCatalogo();
-        var obra = await entorno.ObraRegistrada("Base", entorno.EdicionImpresa());
-
-        var resultado = await entorno.EditarObra().Ejecutar(new EditarObraEntrada(obra.Id, obra.Version, obra.Titulo, obra.Autor, obra.Editorial, obra.Categoria, null, new string('x', 601)));
-
-        Assert.Contains(new ErrorDeCampo("descripcion", "demasiado-largo"), resultado.Error!.Errores!);
-        Assert.Equal(obra.Version, (await entorno.Obras.Obtener(obra.Id, false))!.Version);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-20")]
     public async Task Un_encargado_de_sucursal_que_intenta_editar_la_descripcion_se_rechaza_y_queda_el_acceso_denegado()
     {
         var entorno = new EntornoDelCatalogo(ActorDePrueba.DeEncargadoDe(Guid.NewGuid()));

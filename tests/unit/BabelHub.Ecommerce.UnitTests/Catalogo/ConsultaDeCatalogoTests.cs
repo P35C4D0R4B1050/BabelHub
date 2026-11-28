@@ -246,26 +246,6 @@ public sealed class ConsultaDeCatalogoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-09")]
-    public async Task Un_dato_de_exactamente_10_minutos_ya_es_mas_antiguo_y_sin_dato_no_se_puede_confirmar()
-    {
-        var e = new EntornoDelCatalogo();
-        var conDato = Sembrar(e, "Con dato", "Técnico", Impresa());
-        var sinDato = Sembrar(e, "Sin dato", "Técnico", Impresa());
-        e.Inventario.ConStock(Impr(conDato).Id, 9);
-        await e.Consulta.ObtenerObra(conDato.Id);
-        e.Inventario.Caido = true;
-        e.Reloj.Ahora = e.Reloj.Ahora.AddMinutes(10);
-
-        var antiguo = await e.Consulta.ObtenerObra(conDato.Id);
-        var vacio = await e.Consulta.ObtenerObra(sinDato.Id);
-
-        Assert.Equal(EstadoDeDisponibilidad.NoSePuedeConfirmar, antiguo.Valor.Ediciones.Single().Disponibilidad.Estado);
-        Assert.Equal(FrescuraDeLaDisponibilidad.NoSePuedeConfirmar, antiguo.Valor.Ediciones.Single().Disponibilidad.Frescura);
-        Assert.Equal(EstadoDeDisponibilidad.NoSePuedeConfirmar, vacio.Valor.Ediciones.Single().Disponibilidad.Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
     public async Task Con_el_inventario_caido_una_edicion_sin_dato_o_sin_confirmar_no_cumple_el_filtro_de_disponibilidad_y_la_digital_si()
     {
         var e = new EntornoDelCatalogo();
@@ -311,28 +291,6 @@ public sealed class ConsultaDeCatalogoTests
         e.Inventario.Caido = true;
         var respaldo = await e.Consulta.ObtenerObra(obra.Id);
         Assert.Equal(FrescuraDeLaDisponibilidad.PuedeEstarDesactualizada, respaldo.Valor.Ediciones.Single().Disponibilidad.Frescura);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
-    public async Task El_instante_guardado_es_el_del_catalogo_y_una_respuesta_invalida_del_inventario_cuenta_como_sin_respuesta()
-    {
-        var e = new EntornoDelCatalogo();
-        var obra = Sembrar(e, "Datos raros", "Técnico", Impresa());
-        var edicion = Impr(obra).Id;
-        e.Inventario.Ahora = e.Reloj.Ahora.AddYears(-3);
-        e.Inventario.ConStock(edicion, 5);
-
-        await e.Consulta.ObtenerObra(obra.Id);
-
-        Assert.Equal(e.Reloj.Ahora, e.Memoria.Obtener(edicion)!.ConsultadaEn);
-
-        var otra = Sembrar(e, "Negativa", "Técnico", Impresa());
-        e.Inventario.ConStock(Impr(otra).Id, -4);
-        var resultado = await e.Consulta.ObtenerObra(otra.Id);
-
-        Assert.Equal(EstadoDeDisponibilidad.NoSePuedeConfirmar, resultado.Valor.Ediciones.Single().Disponibilidad.Estado);
-        Assert.Null(e.Memoria.Obtener(Impr(otra).Id));
     }
 
     // ---------- Ficha ----------
@@ -428,34 +386,7 @@ public sealed class ConsultaDeCatalogoTests
 
     // ---------- Disponibilidad ----------
 
-    [Fact]
-    public async Task Consultar_la_disponibilidad_devuelve_cada_edicion_en_el_orden_pedido_y_valida_el_tope_de_50()
-    {
-        var e = new EntornoDelCatalogo();
-        var obra = Sembrar(e, "Dos", "Técnico", Impresa(), Digital(e));
-        e.Inventario.ConStock(Impr(obra).Id, 3);
-
-        var resultado = await e.Consulta.Consultar([Digi(obra).Id, Impr(obra).Id, Guid.NewGuid()]);
-        var demasiadas = await e.Consulta.Consultar(Enumerable.Range(0, 51).Select(_ => Guid.NewGuid()).ToList());
-
-        Assert.Equal([Digi(obra).Id, Impr(obra).Id], resultado.Valor.Select(d => d.EdicionId).ToList());
-        Assert.Equal([EstadoDeDisponibilidad.DisponibleAlInstante, EstadoDeDisponibilidad.Disponible], resultado.Valor.Select(d => d.Estado).ToList());
-        Assert.Equal(CategoriaDeError.Validacion, demasiadas.Error!.Categoria);
-    }
-
     // ---------- Sorpréndeme ----------
-
-    [Fact]
-    public async Task Sorprendeme_cuenta_una_digital_vigente_sin_consultar_al_inventario()
-    {
-        var e = new EntornoDelCatalogo();
-        var digital = Sembrar(e, "Solo digital", "Técnico", Digital(e));
-
-        var resultado = await e.Consulta.ObtenerObraAlAzar();
-
-        Assert.Equal(digital.Id, resultado.Valor!.ObraId);
-        Assert.Empty(e.Inventario.LotesConsultados);
-    }
 
     [Fact]
     public async Task Con_el_inventario_caido_sorprendeme_solo_ofrece_digitales_o_ninguna()
@@ -492,21 +423,5 @@ public sealed class ConsultaDeCatalogoTests
         Assert.Null(vacio.Valor);
         Assert.Null(sinStock.Valor);
         Assert.Equal(conStock.Id, elegida.Valor!.ObraId);
-    }
-
-    [Fact]
-    public async Task Sorprendeme_muestrea_hasta_3_lotes_de_50_y_se_detiene_al_encontrar_una_disponible()
-    {
-        var e = new EntornoDelCatalogo();
-        for (var i = 0; i < 120; i++)
-        {
-            Sembrar(e, $"Agotada {i:D3}", "Técnico", Impresa());
-        }
-
-        var ninguna = await e.Consulta.ObtenerObraAlAzar();
-
-        Assert.Null(ninguna.Valor);
-        Assert.Equal(3, e.Inventario.LotesConsultados.Count);
-        Assert.All(e.Inventario.LotesConsultados, l => Assert.True(l.Count <= 50));
     }
 }

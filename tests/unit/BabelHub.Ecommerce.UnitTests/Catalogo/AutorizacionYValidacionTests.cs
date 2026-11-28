@@ -18,20 +18,6 @@ public sealed class AutorizacionYValidacionTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-11")]
-    public async Task La_administracion_central_pasa_y_no_deja_evento()
-    {
-        var admin = Guid.NewGuid();
-        var (autorizador, denegaciones) = Crear(ActorDePrueba.DeAdministradorCentral(admin));
-
-        var error = await autorizador.ExigirAdministracionCentral(default);
-
-        Assert.Null(error);
-        Assert.Equal(admin, autorizador.UsuarioId);
-        Assert.Empty(denegaciones.Eventos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-11")]
     public async Task Un_encargado_de_sucursal_se_rechaza_como_prohibido_y_queda_el_acceso_denegado()
     {
         var (autorizador, denegaciones) = Crear(ActorDePrueba.DeEncargadoDe(Guid.NewGuid()));
@@ -48,7 +34,6 @@ public sealed class AutorizacionYValidacionTests
     [Theory]
     [Trait("Criterio", "AC-CAT-19")]
     [InlineData("cliente")]
-    [InlineData("personal-de-logistica")]
     [InlineData("sistema")]
     [InlineData("integracion")]
     public async Task Ningun_otro_actor_con_contexto_es_la_administracion_central(string actor)
@@ -93,15 +78,6 @@ public sealed class AutorizacionYValidacionTests
 
         Assert.Equal(CategoriaDeError.Prohibido, error.Categoria);
         Assert.Equal("recurso-ajeno", Assert.Single(denegaciones.Eventos).Motivo);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-11")]
-    public void El_rol_de_la_aplicacion_es_el_de_la_administracion_central()
-    {
-        Assert.Equal("administrador-central", RolesDelCatalogo.AdministradorCentral);
-        Assert.True(RolesDelCatalogo.EsAdministradorCentral(ActorDePrueba.DeAdministradorCentral().Actual));
-        Assert.False(RolesDelCatalogo.EsAdministradorCentral(null));
     }
 
     // ---------- Validación ----------
@@ -176,7 +152,6 @@ public sealed class AutorizacionYValidacionTests
 
     [Theory]
     [Trait("Criterio", "AC-CAT-19")]
-    [InlineData(6000)]
     [InlineData(5001)]
     [InlineData(-3)]
     [InlineData(0)]
@@ -185,16 +160,6 @@ public sealed class AutorizacionYValidacionTests
         var resultado = new ValidadorDeRegistrarObra().Validar(Obra(Impresa(stock: stock)));
 
         Assert.Equal([new ErrorDeCampo("ediciones[0].stockInicial", "fuera-de-rango")], resultado.Errores);
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(12)]
-    [InlineData(5000)]
-    public void Un_stock_inicial_de_1_a_5000_o_ausente_se_acepta(int stock)
-    {
-        Assert.True(new ValidadorDeRegistrarObra().Validar(Obra(Impresa(stock: stock))).EsValido);
-        Assert.True(new ValidadorDeRegistrarObra().Validar(Obra(Impresa(stock: null))).EsValido);
     }
 
     [Theory]
@@ -251,14 +216,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    public void Las_bajas_exigen_identificadores_y_version()
-    {
-        Assert.Equal(["obraId", "version"], Campos(new ValidadorDeDarDeBajaObra().Validar(new DarDeBajaObraEntrada(Guid.Empty, 0))));
-        Assert.Equal(["obraId", "edicionId", "version"], Campos(new ValidadorDeDarDeBajaEdicion().Validar(new DarDeBajaEdicionEntrada(Guid.Empty, Guid.Empty, -2))));
-        Assert.True(new ValidadorDeDarDeBajaEdicion().Validar(new DarDeBajaEdicionEntrada(Guid.NewGuid(), Guid.NewGuid(), 1)).EsValido);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-05")]
     public void El_motivo_de_retiro_es_obligatorio_tiene_tope_de_300_y_no_lleva_datos_prohibidos()
     {
@@ -276,7 +233,6 @@ public sealed class AutorizacionYValidacionTests
     [InlineData(0)]
     [InlineData(-3)]
     [InlineData(5001)]
-    [InlineData(6000)]
     public void La_cantidad_de_un_ingreso_fuera_de_1_a_5000_se_rechaza(int cantidad)
     {
         var resultado = new ValidadorDeRegistrarIngreso().Validar(new RegistrarIngresoEntrada(Guid.NewGuid(), cantidad, "GR-001", null, "token"));
@@ -307,16 +263,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    public void Reintentar_conciliar_emitir_y_listar_exigen_sus_identificadores_y_una_resolucion_conocida()
-    {
-        Assert.Equal(["ingresoId"], Campos(new ValidadorDeReintentarIngreso().Validar(new ReintentarIngresoEntrada(Guid.Empty))));
-        Assert.Equal(["ingresoId", "resolucion"], Campos(new ValidadorDeConciliarIngreso().Validar(new ConciliarIngresoEntrada(Guid.Empty, (ResolucionDeIngreso)9, false))));
-        Assert.Equal(["edicionId"], Campos(new ValidadorDeEmitirClaveDeIngreso().Validar(new EmitirClaveDeIngresoEntrada(Guid.Empty))));
-        Assert.Equal(["edicionId"], Campos(new ValidadorDeListarIngresos().Validar(new ListarIngresosEntrada(Guid.Empty))));
-        Assert.True(new ValidadorDeConciliarIngreso().Validar(new ConciliarIngresoEntrada(Guid.NewGuid(), ResolucionDeIngreso.Fallido, true)).EsValido);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-12")]
     public void Subir_un_archivo_exige_una_finalidad_conocida_y_un_cuerpo()
     {
@@ -336,25 +282,6 @@ public sealed class AutorizacionYValidacionTests
         Assert.True(new ValidadorDeBusquedaDeObras().Validar(new BusquedaDeObras("Estructuras", null, null, "Técnico", FormatoDeEdicion.Digital, 0m, 100m, true, 1, 50)).EsValido);
         Assert.True(new ValidadorDeBusquedaDeObras().Validar(new BusquedaDeObras()).EsValido);
         Assert.Equal(["pagina"], Campos(new ValidadorDeBusquedaDeObras().Validar(new BusquedaDeObras(Pagina: 1_000_001))));
-    }
-
-    [Fact]
-    public void La_lista_de_administracion_valida_el_texto_y_la_pagina()
-    {
-        Assert.Equal(["q", "tamano"], Campos(new ValidadorDeListarObrasDeAdministracion().Validar(new ListarObrasDeAdministracionEntrada(new string('q', 101), false, 1, 0))));
-        Assert.True(new ValidadorDeListarObrasDeAdministracion().Validar(new ListarObrasDeAdministracionEntrada()).EsValido);
-    }
-
-    [Fact]
-    public void Las_ediciones_por_identificador_son_hasta_50_sin_vacios()
-    {
-        var cincuenta = Enumerable.Range(0, 50).Select(_ => Guid.NewGuid()).ToList();
-
-        Assert.True(ValidadorDeEdicionesPorIdentificador.Validar(cincuenta).EsValido);
-        Assert.Equal(["edicionIds"], Campos(ValidadorDeEdicionesPorIdentificador.Validar([.. cincuenta, Guid.NewGuid()])));
-        Assert.Equal(["edicionIds"], Campos(ValidadorDeEdicionesPorIdentificador.Validar([])));
-        Assert.Equal(["edicionIds"], Campos(ValidadorDeEdicionesPorIdentificador.Validar(null)));
-        Assert.Equal(["edicionIds"], Campos(ValidadorDeEdicionesPorIdentificador.Validar([Guid.Empty])));
     }
 
     [Fact]

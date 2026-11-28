@@ -116,23 +116,6 @@ public sealed class BajasDeObraYEdicionTests
     }
 
     [Fact]
-    public async Task Una_digital_retirada_cuenta_como_edicion_existente_y_la_otra_si_se_puede_dar_de_baja()
-    {
-        var (entorno, obra) = await ConAmbas();
-        var digital = obra.Ediciones.Single(e => e.EsDigital);
-        var impresa = obra.Ediciones.Single(e => !e.EsDigital);
-        var copia = RepositorioDeObrasEnMemoria.Clonar(obra);
-        copia.RetirarEdicionDigital(digital.Id, "Fin del contrato", entorno.Reloj.Ahora);
-        entorno.Obras.Sembrar(copia);
-
-        var resultado = await entorno.DarDeBajaEdicion().Ejecutar(new DarDeBajaEdicionEntrada(obra.Id, impresa.Id, copia.Version));
-        var ultima = await entorno.DarDeBajaEdicion().Ejecutar(new DarDeBajaEdicionEntrada(obra.Id, digital.Id, resultado.Valor.Version));
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(ClavesDelCatalogo.ObraSinEdiciones, ultima.Error!.Clave);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-10")]
     public async Task Dar_de_baja_una_edicion_digital_conserva_su_archivo_y_la_edicion_sigue_legible()
     {

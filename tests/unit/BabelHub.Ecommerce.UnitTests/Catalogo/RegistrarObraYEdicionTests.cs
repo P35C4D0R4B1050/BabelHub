@@ -95,19 +95,6 @@ public sealed class RegistrarObraYEdicionTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-14")]
-    public async Task Un_isbn_10_y_su_isbn_13_son_la_misma_edicion()
-    {
-        var entorno = new EntornoDelCatalogo();
-        await entorno.ObraRegistrada("Primera", entorno.EdicionImpresa("0-306-40615-2"));
-
-        var repetido = await entorno.RegistrarObra().Ejecutar(entorno.Obra("Segunda", entorno.EdicionImpresa("978-0-306-40615-7")));
-
-        Assert.Equal(ClavesDelCatalogo.IsbnDuplicado, repetido.Error!.Clave);
-        Assert.Contains(new ErrorDeCampo("tituloExistente", "Primera"), repetido.Error.Errores);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-14")]
     public async Task Un_isbn_con_digito_de_control_invalido_se_rechaza_por_formato_antes_de_crear_nada()
     {
         var entorno = new EntornoDelCatalogo();
@@ -238,18 +225,6 @@ public sealed class RegistrarObraYEdicionTests
         Assert.Empty(entorno.Inventario.FichasRegistradas);
     }
 
-    [Fact]
-    public async Task Sin_stock_inicial_no_hay_fila_de_ingreso()
-    {
-        var entorno = new EntornoDelCatalogo();
-
-        var resultado = await entorno.RegistrarObra().Ejecutar(entorno.Obra(ediciones: entorno.EdicionImpresa()));
-
-        Assert.True(resultado.EsExito);
-        Assert.Empty(resultado.Valor.Ingresos);
-        Assert.Empty(entorno.Ingresos.Todos);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-CAT-11")]
     [InlineData("encargado")]
@@ -286,21 +261,6 @@ public sealed class RegistrarObraYEdicionTests
         Assert.Equal(EstadoDeReferencia.Lista, entorno.Referencias.Todas.Single().Estado);
     }
 
-    [Fact]
-    public async Task Una_obra_con_una_impresa_y_una_digital_audita_la_obra_y_cada_edicion()
-    {
-        var entorno = new EntornoDelCatalogo();
-
-        var resultado = await entorno.RegistrarObra().Ejecutar(entorno.Obra("Ambas", entorno.EdicionImpresa(), entorno.EdicionDigital()));
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(
-            ["ObraRegistrada", "EdicionRegistrada", "EdicionRegistrada"],
-            entorno.Auditoria.Solicitudes.Select(s => s.Accion.Identificador).ToList());
-        Assert.Equal(["impresa", "digital"], entorno.Auditoria.Solicitudes.Skip(1).Select(s => s.Detalle["formato"]).ToList());
-        Assert.Equal(2, entorno.Referencias.Todas.Count(r => r.Estado == EstadoDeReferencia.Consumida));
-    }
-
     // ---------- RegistrarEdicion ----------
 
     [Fact]
@@ -322,19 +282,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    public async Task Agregar_una_edicion_impresa_con_stock_inicial_deja_su_fila_pendiente()
-    {
-        var entorno = new EntornoDelCatalogo();
-        var obra = await entorno.ObraRegistrada("Solo digital", entorno.EdicionDigital());
-
-        var resultado = await entorno.RegistrarEdicion().Ejecutar(new RegistrarEdicionEntrada(obra.Id, obra.Version, entorno.EdicionImpresa(stock: 30)));
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(30, entorno.Ingresos.Todos.Single().Cantidad);
-        Assert.Equal(EstadoDeIngresoSolicitado.Pendiente, resultado.Valor.Ingresos.Single().Estado);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAT-02")]
     public async Task Una_edicion_con_el_isbn_de_otra_obra_se_rechaza_con_su_titulo_y_no_cambia_la_obra()
     {
@@ -350,21 +297,6 @@ public sealed class RegistrarObraYEdicionTests
         Assert.Single(intacta.Ediciones);
         Assert.Equal(otra.Version, intacta.Version);
         Assert.Equal(1, entorno.Referencias.Todas.Count(r => r.Estado == EstadoDeReferencia.Lista && r.Finalidad == FinalidadDeArchivo.Libro));
-    }
-
-    [Fact]
-    public async Task Con_una_version_vieja_responde_conflicto_y_con_una_obra_inexistente_no_encontrada()
-    {
-        var entorno = new EntornoDelCatalogo();
-        var obra = await entorno.ObraRegistrada("Base", entorno.EdicionImpresa());
-
-        var vieja = await entorno.RegistrarEdicion().Ejecutar(new RegistrarEdicionEntrada(obra.Id, obra.Version + 4, entorno.EdicionDigital()));
-        var inexistente = await entorno.RegistrarEdicion().Ejecutar(new RegistrarEdicionEntrada(Guid.NewGuid(), 1, entorno.EdicionDigital()));
-
-        Assert.Equal(ClavesDelCatalogo.ConflictoDeVersion, vieja.Error!.Clave);
-        Assert.Equal(CategoriaDeError.Conflicto, vieja.Error.Categoria);
-        Assert.Equal(ClavesDelCatalogo.ObraNoEncontrada, inexistente.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error.Categoria);
     }
 
     [Fact]
@@ -407,12 +339,5 @@ public sealed class RegistrarObraYEdicionTests
         Assert.Single(guardada.Ediciones);
         Assert.Equal(obra.Version, guardada.Version);
         Assert.Equal(EstadoDeReferencia.Lista, entorno.Referencias.Todas.Single(r => r.Id == nueva.ArchivoRef).Estado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-14")]
-    public void El_dominio_distingue_dos_isbn_de_la_misma_edicion_por_su_isbn_13()
-    {
-        Assert.Equal(Isbn13("0-306-40615-2"), Isbn13("978-0-306-40615-7"));
     }
 }

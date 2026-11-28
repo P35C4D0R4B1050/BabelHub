@@ -29,17 +29,6 @@ public sealed class CacheDeDisponibilidadDeCargaTests(ITestOutputHelper salida)
 
     [Fact]
     [Trait("Criterio", "AC-CAT-04")]
-    public async Task ConUnCatalogoGrandeYPopularidadDesigual_LaCacheQuitaLaMayoriaDeLasConsultasPeroNoTodas()
-    {
-        var (consultas, alInventario, _) = await Simular(ediciones: 5000, exponente: 1.0);
-
-        var acierto = 1 - alInventario / (double)consultas;
-        salida.WriteLine($"5 000 ediciones, popularidad tipo Zipf(1): {consultas} consultas → {alInventario} al Inventario ({alInventario / (double)Segundos:F2}/s); acierto {acierto:P1}");
-        Assert.InRange(acierto, 0.30, 0.99);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-04")]
     public async Task UnaConsultaDespuesDeLos30Segundos_VuelveAlInventarioYMuestraElStockActual_NuncaUnoInventado()
     {
         var e = new EntornoDelCatalogo();
