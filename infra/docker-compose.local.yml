@@ -11,7 +11,7 @@ services:
   postgres:
     # Una instancia con una base y un rol por servicio: ecommerce e inventario (AD03). Identidad es un esquema de ecommerce (AD18).
     # Igual que en VM-INVENTARIO; `infra/postgres/init/` crea las bases la primera vez que arranca el volumen.
-    image: postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065
+    image: postgres:19-alpine@sha256:cac45fb483caee3668946088a1c0532db89d5285c28dbfeac889b4068296e06f
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Define POSTGRES_ADMIN_PASSWORD en .env}
