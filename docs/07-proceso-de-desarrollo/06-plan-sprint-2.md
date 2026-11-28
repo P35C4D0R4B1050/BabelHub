@@ -14,7 +14,7 @@ El criterio fundamental: la implementación respeta las decisiones arquitectóni
 | 4. Endpoints REST con OpenAPI/Swagger | Contratos v1 (`docs/03/08`, `BabelHub.Shared/Contratos`) y **documento OpenAPI generado por servicio** | **Falta**: bloque OAS-1 |
 | 5. Base de datos y caché | `docs/03/05`, `docs/02/07`; **análisis con mediciones** (consultas, índices, Redis de contadores, p95 con y sin caché) | Parcial: bloque DOC-1 |
 | 6. SOLID y patrones | Estrategia de selección de fuente, decoradores, puertos y adaptadores; sección en el informe | Hecho (falta el texto de la evidencia) |
-| 7. Pruebas automatizadas, cobertura y CI/CD | xUnit (referencial a Jest), Testcontainers, 6600 pruebas, umbrales (Dominio y Aplicación 85 %, total 70 %), `ci.yml` de GitHub Actions | Casi: **reporte de cobertura (HTML)** y primera corrida en GitHub |
+| 7. Pruebas automatizadas, cobertura y CI/CD | xUnit (referencial a Jest), Testcontainers, 6600 pruebas, umbrales (entonces Dominio y Aplicación 85 % y total 70 % por servicio; desde el 2026-11-27, solo de referencia por módulo, RNF28), `ci.yml` de GitHub Actions | Casi: **reporte de cobertura (HTML)** y primera corrida en GitHub |
 | 8. Pruebas de atributos de calidad (k6 hasta 2000 usuarios virtuales) | Escenarios k6 por atributo (`tests/load/`), resultados y gráficas en `progress/evidencias/` | **Parcial**: un solo escenario; bloque K6-1 |
 
 ## 2. Alcance congelado (decisión de la persona, 2026-11-19)
@@ -63,7 +63,7 @@ Las sesiones de los carriles superan las 5000 y 7000 mensajes: cada turno arrast
 
 ## 7. CI/CD y dependencias
 
-- **GitHub Actions:** `.github/workflows/ci.yml` (especificaciones y trazabilidad; compilación sin advertencias; pruebas sin red; pruebas con cobertura y umbrales) y `secretos.yml` (escaneo de secretos). El `push` lo hace la persona; con él corre el flujo y queda la evidencia del CI. Conviene hacerlo pronto para descubrir fallos del flujo con tiempo.
+- **GitHub Actions:** `.github/workflows/ci.yml` (especificaciones y trazabilidad; compilación sin advertencias; pruebas sin red; pruebas con cobertura, con umbrales entonces y solo informativa desde el 2026-11-27) y `secretos.yml` (escaneo de secretos). El `push` lo hace la persona; con él corre el flujo y queda la evidencia del CI. Conviene hacerlo pronto para descubrir fallos del flujo con tiempo.
 - **Dependabot:** `.github/dependabot.yml` abre pull requests semanales de NuGet (agrupados), acciones, npm de los E2E, imágenes y Compose. Ninguno se fusiona sin pasar el CI y sin revisión; respeta la política de versiones y huellas fijas.
 
 ## 8. Riesgos

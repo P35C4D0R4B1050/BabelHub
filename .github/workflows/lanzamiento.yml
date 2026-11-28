@@ -60,7 +60,7 @@ jobs:
           # Solo se publica lo que está en la rama principal: una etiqueta puesta sobre una rama sin revisar no sale a producción.
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "El commit $GITHUB_SHA no está en la rama principal: no se publica." >&2; exit 1; }
-          # Y solo lo que ya pasó la verificación: compilación, pruebas, arquitectura, cobertura y escáner de secretos (PLA-31).
+          # Y solo lo que ya pasó la verificación: compilación, pruebas, arquitectura (con el informe de cobertura) y escáner de secretos (PLA-31).
           for flujo in ci.yml secretos.yml; do
             conclusion="$(gh run list --repo "$REPOSITORIO" --workflow "$flujo" --commit "$GITHUB_SHA" --status completed --json conclusion --jq '[.[].conclusion] | join(",")')"
             [[ ",$conclusion," == *",success,"* ]] \

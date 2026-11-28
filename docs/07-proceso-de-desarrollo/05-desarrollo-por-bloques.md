@@ -8,7 +8,7 @@ El 2026-11-14 la persona responsable (Diego Amiquero) decidió, para llegar al p
 | :--- | :--- |
 | Cuánto se valida y se revisa **por tarea** (según el nivel de la sección 2). | Una spec **Approved** y un plan **Planned** antes de programar; el ciclo y sus puertas de `01-flujo-sdd.md`. |
 | La validación completa y la revisión pasan a hacerse **por bloque** (sección 3). | `dotnet build BabelHub.sln -warnaserror` sin advertencias y las pruebas de arquitectura. |
-| Varias sesiones avanzan a la vez en **carriles** con un protocolo de integración (sección 4). | Cada criterio de aceptación con al menos una prueba que lo nombra (`SpecCheck`) y las puertas de cobertura. |
+| Varias sesiones avanzan a la vez en **carriles** con un protocolo de integración (sección 4). | Cada criterio de aceptación con al menos una prueba que lo nombra (`SpecCheck`) y el informe de cobertura. |
 | Tu intervención se concentra en los **cierres de bloque**. | Sin secretos, sin datos personales y sin archivos digitales en el repositorio; sin debilitar pruebas, validaciones ni hooks. |
 | | Las decisiones de negocio, `AGENTS.md` y el `push` siguen siendo tuyos. |
 

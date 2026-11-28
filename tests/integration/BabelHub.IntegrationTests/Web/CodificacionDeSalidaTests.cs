@@ -46,8 +46,6 @@ public sealed partial class CodificacionDeSalidaTests
         }
     }
 
-    public static TheoryData<string> Archivos => new([.. ArchivosDeLaPresentacion()]);
-
     [Fact]
     public void LaRevisionVeLosArchivosDeLaPresentacion()
     {
@@ -55,19 +53,31 @@ public sealed partial class CodificacionDeSalidaTests
         Assert.All(Permitidos.Keys, p => Assert.Contains(p, ArchivosDeLaPresentacion()));
     }
 
-    [Theory]
-    [MemberData(nameof(Archivos))]
+    [Fact]
     [Trait("Criterio", "AC-SEG-02")]
-    public void UnArchivoDeLaPresentacion_NoEscribeMarcadoSinCodificarNiValoresDelModeloEnScripts(string archivo)
+    public void NingunArchivoDeLaPresentacion_EscribeMarcadoSinCodificarNiPoneValoresDelModeloEnScripts()
     {
-        var texto = File.ReadAllText(Path.Combine(BuscarRaiz(), "src", archivo));
-
-        if (!Permitidos.ContainsKey(archivo))
+        var raiz = BuscarRaiz();
+        var archivos = ArchivosDeLaPresentacion().ToList();
+        var infractores = new List<string>();
+        foreach (var archivo in archivos)
         {
-            Assert.False(SalidaSinCodificar().IsMatch(texto), $"{archivo} escribe marcado sin codificar.");
+            var texto = File.ReadAllText(Path.Combine(raiz, "src", archivo));
+
+            if (!Permitidos.ContainsKey(archivo) && SalidaSinCodificar().IsMatch(texto))
+            {
+                infractores.Add($"{archivo} escribe marcado sin codificar.");
+            }
+
+            if (ValorDelModeloEnScriptOManejador().IsMatch(texto))
+            {
+                infractores.Add($"{archivo} pone un valor del modelo en un script o en un manejador de evento.");
+            }
         }
 
-        Assert.False(ValorDelModeloEnScriptOManejador().IsMatch(texto), $"{archivo} pone un valor del modelo en un script o en un manejador de evento.");
+        // Sin archivos que revisar, la prueba no estaría comprobando nada.
+        Assert.True(archivos.Count > 100, $"Solo se listaron {archivos.Count} archivos de la presentación.");
+        Assert.True(infractores.Count == 0, $"{infractores.Count} infractor(es):\n" + string.Join('\n', infractores));
     }
 
     [Theory]

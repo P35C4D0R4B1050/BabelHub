@@ -1,15 +1,14 @@
-using System.Globalization;
+using System.Text;
 using BabelHub.Tools.CoverageCheck;
 
-// Verifica los umbrales de cobertura de líneas por servicio (PLA-14): Dominio y Aplicación al menos 85 % y el total al menos 70 %,
-// sin código generado ni migraciones. Uso:
-//   dotnet run --project tools/CoverageCheck -- <archivo-o-carpeta>... [--minimo-dominio-aplicacion 85] [--minimo-total 70]
-//                                                [--servicios Ecommerce,Inventario] [--html reporte.html]
-// Cada carpeta se recorre buscando informes *.cobertura.xml (el formato de coverlet). Sale con 0 si se cumplen, 1 si no y 2 si el
-// uso o los informes son inválidos.
+// Informa la cobertura de líneas de cada módulo de cada servicio frente a la referencia de su criticidad (PLA-14): las referencias y la
+// lista de módulos están en PoliticaDeCobertura.cs, sin código generado ni migraciones. Uso:
+//   dotnet run --project tools/CoverageCheck -- <archivo-o-carpeta>... [--servicios Ecommerce,Inventario] [--html reporte.html]
+// Cada carpeta se recorre buscando informes *.cobertura.xml (el formato de coverlet). Los porcentajes son referenciales: quedar por
+// debajo solo se avisa. Sale con 0 si pudo informar y con 2 si el uso es inválido, si no puede leer los informes o si no tienen datos
+// de un servicio (PLA-45).
+Console.OutputEncoding = Encoding.UTF8;
 var rutas = new List<string>();
-var dominioYAplicacion = 85;
-var total = 70;
 var servicios = new List<string> { "Ecommerce", "Inventario" };
 string? archivoHtml = null;
 
@@ -17,14 +16,6 @@ for (var i = 0; i < args.Length; i++)
 {
     switch (args[i])
     {
-        case "--minimo-dominio-aplicacion" when i + 1 < args.Length && int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var da):
-            dominioYAplicacion = da;
-            i++;
-            break;
-        case "--minimo-total" when i + 1 < args.Length && int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var t):
-            total = t;
-            i++;
-            break;
         case "--html" when i + 1 < args.Length:
             archivoHtml = args[i + 1];
             i++;
@@ -48,6 +39,12 @@ for (var i = 0; i < args.Length; i++)
 if (rutas.Count == 0)
 {
     Console.Error.WriteLine("Indica al menos un informe *.cobertura.xml o una carpeta que los contenga.");
+    return 2;
+}
+
+if (servicios.Count == 0)
+{
+    Console.Error.WriteLine("La lista de servicios no puede estar vacía.");
     return 2;
 }
 
@@ -75,15 +72,16 @@ if (informes.Count == 0)
     return 2;
 }
 
-IReadOnlyList<CoberturaDeServicio> resultado;
+var politica = PoliticaDeCobertura.Vigente;
+IReadOnlyList<CoberturaDeModulo> resultado;
 try
 {
     var lineasLeidas = Cobertura.Leer(informes.Select(File.ReadAllText));
-    resultado = Cobertura.Calcular(lineasLeidas);
+    resultado = Cobertura.Calcular(lineasLeidas, politica);
     if (archivoHtml is not null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(archivoHtml))!);
-        File.WriteAllText(archivoHtml, ReporteHtml.Generar(lineasLeidas, servicios, new Umbrales(dominioYAplicacion, total)));
+        File.WriteAllText(archivoHtml, ReporteHtml.Generar(lineasLeidas, servicios, politica));
         Console.WriteLine($"Reporte HTML: {archivoHtml}");
     }
 }
@@ -92,24 +90,41 @@ catch (System.Xml.XmlException error)
     Console.Error.WriteLine($"Un informe de cobertura no es un XML válido: {error.Message}");
     return 2;
 }
+catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"No se pudo leer o escribir un informe: {error.Message}");
+    return 2;
+}
 
 Console.WriteLine($"Informes leídos: {informes.Count}");
-Console.WriteLine($"{"Servicio",-12} {"Dominio y Aplicación",22} {"Total",10}");
-foreach (var servicio in resultado)
+Console.WriteLine($"{"Módulo",-30} {"Criticidad",-14} {"Dominio y Aplicación (ref.)",28} {"Total (ref.)",18}");
+foreach (var modulo in resultado)
 {
-    Console.WriteLine($"{servicio.Servicio,-12} {Cobertura.Formato(servicio.PorcentajeDominioYAplicacion) + " %",22} {Cobertura.Formato(servicio.PorcentajeTotal) + " %",10}");
+    var referencia = politica.ReferenciaDe(modulo.Criticidad);
+    var dominioYAplicacion = modulo.TieneDominioYAplicacion
+        ? $"{Cobertura.Formato(modulo.PorcentajeDominioYAplicacion)} % ({referencia.DominioYAplicacion})"
+        : "sin líneas";
+    var total = $"{Cobertura.Formato(modulo.PorcentajeTotal)} % ({referencia.Total})";
+    var criticidad = modulo.Criticidad == Criticidad.SinClasificar ? "sin clasificar" : Cobertura.Rotulo(modulo.Criticidad);
+    Console.WriteLine($"{modulo.Nombre,-30} {criticidad,-14} {dominioYAplicacion,28} {total,18}");
 }
 
-var incumplimientos = Cobertura.Verificar(resultado, servicios, new Umbrales(dominioYAplicacion, total));
-if (incumplimientos.Count == 0)
+var avisos = Cobertura.Avisos(resultado, servicios, politica);
+foreach (var aviso in avisos)
 {
-    Console.WriteLine($"OK: cobertura de Dominio y Aplicación >= {dominioYAplicacion} % y total >= {total} % en {string.Join(", ", servicios)}.");
-    return 0;
+    Console.WriteLine($"AVISO: {aviso}");
 }
 
-foreach (var incumplimiento in incumplimientos)
+var sinDatos = Cobertura.ServiciosSinDatos(resultado, servicios);
+if (sinDatos.Count > 0)
 {
-    Console.Error.WriteLine($"ERROR: {incumplimiento}");
+    foreach (var error in sinDatos)
+    {
+        Console.Error.WriteLine($"ERROR: {error}");
+    }
+
+    return 2;
 }
 
-return 1;
+Console.WriteLine($"Informe de {string.Join(", ", servicios)} completo, con {avisos.Count} aviso(s). Los porcentajes son referenciales y no hacen fallar la verificación.");
+return 0;
