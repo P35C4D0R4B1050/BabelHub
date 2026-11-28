@@ -19,7 +19,7 @@ Tres pasos:
 | De ellos, críticos y soporte: unitarias | 6624 | 6526 | −98 (−1,5 %) |
 | De ellos, críticos: integración | 3380 | 3269 | −111 (−3,3 %) |
 
-403 métodos de prueba menos y 73 teorías con 182 filas menos; 162 archivos tocados y unas 5800 líneas menos.
+403 métodos de prueba menos y 73 teorías con 182 filas menos; 161 archivos tocados y unas 5700 líneas menos.
 
 **Tiempo.** Lo quitado sumaba en la línea base **97 s en integración** (de 1970 s sumados en mis carpetas, −5 %) y 12 s en unitarias. Dos pruebas explican 66 s: el tope de 7 días de la sesión (46 s) y el libro de 50 MiB contra el adaptador S3 (20 s). La suite completa sobre `d96d9873` tarda 45 min 33 s en integración (dato de la coordinación) y mi corrida de línea base, solas mis carpetas, unos 6 minutos: **la mayor parte del tiempo está fuera de mi alcance**. La medición «después» la hará la coordinación con los tres carriles integrados.
 
