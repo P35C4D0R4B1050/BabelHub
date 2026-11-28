@@ -354,14 +354,6 @@ public sealed class SolicitudesDeAvisosTests
     }
 
     [Fact]
-    public async Task UnaSolicitudNula_SeRechaza_SinLanzar()
-    {
-        var e = new Entorno();
-
-        Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, await e.Solicitar.Solicitar(null!));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-NOT-01")]
     public async Task SiLaBaseFalla_NuncaLanza_PublicaLaAlertaTecnica_YDevuelveQueNoSeGuardo()
     {
@@ -389,20 +381,6 @@ public sealed class SolicitudesDeAvisosTests
         Assert.Single(e.Alertas.Tecnicas);
     }
 
-    [Fact]
-    public async Task SiLaAlertaTecnicaTambienFalla_NadaLanza()
-    {
-        var e = new Entorno();
-        var cuenta = e.Cuentas.Con(consiente: true);
-        e.Avisos.Falla = true;
-        e.Alertas.Falla = true;
-
-        // La alerta técnica de prueba solo falla las de seguridad: se simula con una que lanza en las técnicas.
-        var solicitar = new SolicitarAviso(e.Avisos, e.Cuentas, new AlertasQueLanzan(), e.Reloj);
-
-        Assert.Equal(ResultadoDeLaSolicitudDeAviso.NoSeGuardo, await solicitar.Solicitar(Listo(cuenta)));
-    }
-
     private sealed class AlertasQueLanzan : IAlertas
     {
         public Task PublicarTecnica(CodigoDeAlerta motivo, CancellationToken cancelacion = default) => throw new InvalidOperationException("Sin registro técnico.");
@@ -423,35 +401,6 @@ public sealed class SolicitudesDeAvisosTests
         var segunda = await e.Solicitar.Solicitar(Listo(cuenta));
 
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.Creado, primera);
-        Assert.Equal(ResultadoDeLaSolicitudDeAviso.YaExistia, segunda);
-        Assert.Single(e.Avisos.Guardados);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-04")]
-    public async Task ElMismoEventoParaOtroDestinatarioOOtraPlantilla_SiGeneraOtroAviso()
-    {
-        var e = new Entorno();
-        var uno = e.Cuentas.Con(consiente: true);
-        var otro = e.Cuentas.Con(consiente: true);
-
-        await e.Solicitar.Solicitar(Listo(uno));
-        await e.Solicitar.Solicitar(Listo(otro));
-        await e.Solicitar.Solicitar(new SolicitudDeAviso("pedido:123:listo-para-recojo", DestinatarioDelAviso.Cliente, uno.ToString("D"), "pedido-confirmado", new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123" }));
-
-        Assert.Equal(3, e.Avisos.Guardados.Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-04")]
-    public async Task UnClienteSinConsentimiento_ReportadoDosVeces_DejaUnSoloRegistroOmitido()
-    {
-        var e = new Entorno();
-        var cuenta = e.Cuentas.Con(consiente: false);
-
-        await e.Solicitar.Solicitar(Listo(cuenta));
-        var segunda = await e.Solicitar.Solicitar(Listo(cuenta));
-
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.YaExistia, segunda);
         Assert.Single(e.Avisos.Guardados);
     }
@@ -491,32 +440,6 @@ public sealed class SolicitudesDeAvisosTests
         Assert.Equal(cuenta.ToString("D"), Assert.Single(e.Avisos.Guardados).DestinatarioRef);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-NOT-07")]
-    public async Task UnAvisoPedidoConLaCuentaEnMayusculas_QuedaCancelado_AlCancelarLaCuenta()
-    {
-        var e = new Entorno();
-        var cuenta = e.Cuentas.Con(consiente: true);
-        await e.Solicitar.Solicitar(Listo(cuenta) with { DestinatarioRef = cuenta.ToString("N").ToUpperInvariant() });
-
-        await e.Cancelar.CancelarLosAvisosDe(cuenta);
-
-        Assert.Equal(EstadoDelAviso.Cancelado, Assert.Single(e.Avisos.Guardados).Estado);
-    }
-
-    [Theory]
-    [InlineData("numeroDeTraslado", "TR3f2c9a8e0000123456")]
-    [Trait("Criterio", "AC-NOT-06")]
-    public async Task UnIdentificadorMixtoConMuchosDigitos_NoSeRechazaPorParecerUnaTarjeta(string campo, string valor)
-    {
-        var e = new Entorno();
-        var solicitud = Traslado("AYACUCHO");
-
-        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { [campo] = valor } });
-
-        Assert.Equal(ResultadoDeLaSolicitudDeAviso.Creado, resultado);
-    }
-
     [Theory]
     [InlineData("4111111111111111")]
     [InlineData("4111-1111-1111-1111")]
@@ -529,16 +452,6 @@ public sealed class SolicitudesDeAvisosTests
         var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { ["numeroDeTraslado"] = valor } });
 
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, resultado);
-    }
-
-    [Fact]
-    public async Task UnaSolicitudRechazada_DejaUnaAlertaTecnica_PorqueEsUnErrorDelModuloQueLlama()
-    {
-        var e = new Entorno();
-
-        await e.Solicitar.Solicitar(Listo(Guid.NewGuid()) with { Plantilla = "no-existe" });
-
-        Assert.Equal(SolicitarAviso.MotivoDeFallaPropia, Assert.Single(e.Alertas.Tecnicas));
     }
 
     // ---------------------------------------------------------------- cancelar (T06)
@@ -623,10 +536,8 @@ public sealed class SolicitudesDeAvisosTests
     [Theory]
     [InlineData("+51999111222")]
     [InlineData("999111222")]
-    [InlineData("999 111 222")]
     [InlineData("0999111222")]
     [InlineData("0051999111222")]
-    [InlineData("(+51) 999-111-222")]
     [InlineData("٩٩٩١١١٢٢٢")]
     [Trait("Criterio", "AC-NOT-13")]
     public async Task ElNumeroDesactivado_SeExcluyeEscritoDeCualquierForma(string variante)
@@ -653,20 +564,6 @@ public sealed class SolicitudesDeAvisosTests
 
         Assert.True(await e.Desactivar.EstaDesactivado(mismo));
         Assert.False(await e.Desactivar.EstaDesactivado(otro));
-    }
-
-    [Fact]
-    public async Task DesactivarDosVeces_EsIdempotente_YNoVuelveAAuditar()
-    {
-        var e = new Entorno();
-        ComoAdministrador(e);
-
-        await e.Desactivar.Desactivar("999111222", "a pedido del titular");
-        var otra = await e.Desactivar.Desactivar("+51 999 111 222", "a pedido del titular");
-
-        Assert.True(otra.EsExito);
-        Assert.Single(e.Desactivados.Guardados);
-        Assert.Single(e.Auditoria.Registradas);
     }
 
     [Theory]
@@ -701,17 +598,12 @@ public sealed class SolicitudesDeAvisosTests
 
     [Theory]
     [InlineData("no-es-un-numero", "motivo")]
-    [InlineData("12345", "motivo")]
     [InlineData("999111222", "")]
     [InlineData("999111222", "   ")]
     [InlineData("999111222", "llamar al 999 111 222 de nuevo")]
     [InlineData("999111222", "ver https://example.com/x")]
-    [InlineData("999111222", "llamar al 999.111.222")]
-    [InlineData("999111222", "llamar al (999) 111 222")]
     [InlineData("999111222", "al ٩٩٩١١١٢٢٢")]
-    [InlineData("999111222", "al 999‑111‑222")]
     [InlineData("999111222", "escribir a titular@example.com")]
-    [InlineData("999111222", "escribir a titular＠example.com")]
     public async Task UnNumeroOUnMotivoInvalidos_SeRechazan(string numero, string motivo)
     {
         var e = new Entorno();

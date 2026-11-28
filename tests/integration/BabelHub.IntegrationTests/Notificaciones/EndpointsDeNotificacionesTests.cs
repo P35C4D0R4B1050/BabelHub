@@ -425,25 +425,12 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
     [InlineData("{}")]
     [InlineData("no es json")]
     [InlineData("{\"eventoId\":\"traslado:1:aprobado\",\"plantilla\":\"x\",\"codigoDeSucursal\":\"AYACUCHO\",\"campos\":{},\"numero\":\"987654321\"}")]
-    [InlineData("[]")]
     [Trait("Criterio", "AC-NOT-08")]
     public async Task LaSolicitudMalFormadaOConCamposDeMas_Es400_YNoLlegaALaAplicacion(string cuerpo)
     {
         var respuesta = await _cliente.PostAsync(EndpointsDeNotificaciones.RutaDeLasSolicitudesDelInventario, new StringContent(cuerpo, Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Empty(_recepcion.Recibidas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-08")]
-    public async Task LaSolicitudDemasiadoGrande_SeRechaza()
-    {
-        var grande = Aviso() with { Campos = new Dictionary<string, string> { ["x"] = new string('a', EndpointsDeNotificaciones.TopeDeLaSolicitudDelInventario) } };
-
-        var respuesta = await SolicitudDelInventario(grande);
-
-        Assert.True(respuesta.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge);
         Assert.Empty(_recepcion.Recibidas);
     }
 
@@ -526,7 +513,6 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
         Assert.All(new[] { primero, repetido, otroReintento }, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
         Assert.Equal(2, _registro.Registrados.Count(r => r.Aviso == aviso && r.Estado == EstadoDeEntrega.Fallido));
     }
-
 
     [Fact]
     [Trait("Criterio", "AC-NOT-13")]

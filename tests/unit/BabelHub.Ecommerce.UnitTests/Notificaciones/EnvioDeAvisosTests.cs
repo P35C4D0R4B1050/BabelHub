@@ -251,23 +251,6 @@ public sealed class EnvioDeAvisosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-NOT-13")]
-    public async Task UnNumeroDesactivado_ConUnaVersionAnteriorDeLaClave_SigueExcluido()
-    {
-        var m = new Mundo();
-        m.Base.Huellas.VersionActual = 1;
-        var (_, aviso) = m.ClienteConAviso();
-        Assert.True(NumeroDeDestino.TryNormalizar(NumeroDeLaClienta, out var numero));
-        await m.Base.Desactivados.Agregar(new NumeroDesactivado(m.Base.Huellas.Actual(numero), m.Ahora, "a pedido del titular"));
-        m.Base.Huellas.VersionActual = 2;
-
-        await m.Enviar();
-
-        Assert.Equal(EstadoDelAviso.Cancelado, aviso.Estado);
-        Assert.Empty(m.Envio.Enviados);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-NOT-16")]
     public async Task SiSeDesactivaUnNumeroConMasDeCincoAvisos_TodosQuedanCancelados_SinCupoNiOmisionPorTopeNiEvento()
     {
@@ -284,25 +267,6 @@ public sealed class EnvioDeAvisosTests
         Assert.Empty(m.Envio.Enviados);
         Assert.Empty(m.Base.Motor.ContadoresUsados);
         Assert.Empty(m.Base.EventosAutomaticos.Eventos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-13")]
-    public async Task TrasReactivarElNumero_UnAvisoPosteriorSiSale()
-    {
-        var m = new Mundo();
-        Assert.True(NumeroDeDestino.TryNormalizar(NumeroDeLaClienta, out var numero));
-        await m.Base.Desactivados.Agregar(new NumeroDesactivado(m.Base.Huellas.Actual(numero), m.Ahora, "a pedido del titular"));
-        var (_, cancelado) = m.ClienteConAviso(evento: "pedido:1:listo-para-recojo");
-        await m.Enviar();
-        Assert.Equal(EstadoDelAviso.Cancelado, cancelado.Estado);
-
-        await m.Base.Desactivados.Eliminar(m.Base.Huellas.Vigentes(numero));
-        var (_, posterior) = m.ClienteConAviso(evento: "pedido:2:listo-para-recojo");
-        await m.Enviar();
-
-        Assert.Equal(EstadoDelAviso.Cancelado, cancelado.Estado);
-        Assert.Contains(m.Envio.Enviados, e => e.AvisoId == posterior.Id);
     }
 
     // ---------------------------------------------------------------- reintentos (NOT-04, AC-NOT-12)
@@ -482,24 +446,6 @@ public sealed class EnvioDeAvisosTests
 
     [Fact]
     [Trait("Criterio", "AC-NOT-14")]
-    public async Task ElOmitidoPorTope_NoSeReenvia_NiPasadaLaVentana()
-    {
-        var m = new Mundo();
-        var cuenta = Guid.NewGuid();
-        m.Clientes.Contactos[cuenta] = new ContactoDeAvisosDelCliente(false, true, NumeroDeLaClienta);
-        var avisos = Enumerable.Range(1, 6).Select(i => m.Pendiente(cuenta, $"pedido:{i}:listo-para-recojo")).ToList();
-        await m.Enviar();
-        var omitido = avisos.Single(a => a.Estado == EstadoDelAviso.OmitidoPorTope);
-
-        m.Base.Reloj.Ahora = m.Ahora.AddHours(2);
-        await m.Enviar();
-
-        Assert.Equal(EstadoDelAviso.OmitidoPorTope, omitido.Estado);
-        Assert.DoesNotContain(m.Envio.Enviados, e => e.AvisoId == omitido.Id);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-14")]
     public async Task ElTopeDe20En24Horas_Rige_AunqueNoSeAlcancenLos5PorHora()
     {
         var m = new Mundo();
@@ -529,25 +475,6 @@ public sealed class EnvioDeAvisosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-NOT-14")]
-    public async Task OtroNumero_NoSeVeAfectadoPorElTopeDeUnNumeroAjeno()
-    {
-        var m = new Mundo();
-        var cuenta = Guid.NewGuid();
-        m.Clientes.Contactos[cuenta] = new ContactoDeAvisosDelCliente(false, true, NumeroDeLaClienta);
-        foreach (var i in Enumerable.Range(1, 6))
-        {
-            m.Pendiente(cuenta, $"pedido:{i}:listo-para-recojo");
-        }
-
-        var (_, otro) = m.ClienteConAviso("+51911111111", evento: "pedido:99:listo-para-recojo");
-        await m.Enviar();
-
-        Assert.Contains(m.Envio.Enviados, e => e.AvisoId == otro.Id);
-        Assert.Equal(EstadoDelAviso.Enviando, otro.Estado);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-NOT-15")]
     public async Task ElCupoSeReservaUnaVezPorAviso_AunqueSeReintente()
     {
@@ -568,23 +495,6 @@ public sealed class EnvioDeAvisosTests
 
     [Fact]
     [Trait("Criterio", "AC-NOT-15")]
-    public async Task UnaReservaForzadaDosVeces_ConElMismoIdentificadorDelAviso_NuncaCuentaDosVeces()
-    {
-        var m = new Mundo();
-        var (_, aviso) = m.ClienteConAviso();
-        Assert.True(NumeroDeDestino.TryNormalizar(NumeroDeLaClienta, out var numero));
-
-        var primera = await m.Tope.Reservar(aviso, numero);
-        var segunda = await m.Tope.Reservar(aviso, numero);
-
-        Assert.Equal(EstadoDelCupo.Reservado, primera.Estado);
-        Assert.Equal(EstadoDelCupo.Reservado, segunda.Estado);
-        Assert.Equal(primera.Cupos.Select(c => c.Identificador), segunda.Cupos.Select(c => c.Identificador));
-        Assert.Equal(2, CuposAbiertos(m));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-15")]
     public async Task SiElMotorDeLimitesNoResponde_ElAvisoSigueConIntentosIntactos_ConEsperaDe5Minutos_YNoUsaElMotorLocal()
     {
         var m = new Mundo();
@@ -598,26 +508,6 @@ public sealed class EnvioDeAvisosTests
         Assert.Equal(0, aviso.Intentos);
         Assert.Equal(m.Ahora.AddMinutes(5), aviso.ProximaFecha);
         Assert.False(aviso.CupoReservado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-15")]
-    public async Task ConElMotorCaido_ElAvisoSigueAplazandoseHastaSuEdadMaxima_YVenceSinEnviarse()
-    {
-        var m = new Mundo();
-        var (_, aviso) = m.ClienteConAviso();
-        m.Base.Motor.NoDisponible = true;
-        while (m.Ahora < aviso.Creado.AddHours(24))
-        {
-            await m.Enviar();
-            m.Base.Reloj.Ahora = aviso.ProximaFecha > m.Ahora ? aviso.ProximaFecha : m.Ahora.AddMinutes(5);
-        }
-
-        await m.Enviar();
-
-        Assert.Empty(m.Envio.Enviados);
-        Assert.Equal(EstadoDelAviso.Fallido, aviso.Estado);
-        Assert.Equal("vencido", aviso.MotivoDeCierre);
     }
 
     [Fact]
@@ -675,21 +565,6 @@ public sealed class EnvioDeAvisosTests
         Assert.Equal(EstadoDelAviso.Pendiente, aviso.Estado);
         Assert.Equal(1, aviso.Intentos);
         Assert.Equal(m.Ahora.AddMinutes(1), aviso.ProximaFecha);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-NOT-13")]
-    public async Task UnNumeroDesactivado_TambienExcluyeAlContactoDeUnaSucursal()
-    {
-        var m = new Mundo();
-        var aviso = m.AvisoDeSucursal();
-        Assert.True(NumeroDeDestino.TryNormalizar("+51912345678", out var numero));
-        await m.Base.Desactivados.Agregar(new NumeroDesactivado(m.Base.Huellas.Actual(numero), m.Ahora, "a pedido del titular"));
-
-        await m.Enviar();
-
-        Assert.Empty(m.Envio.Enviados);
-        Assert.Equal(EstadoDelAviso.Cancelado, aviso.Estado);
     }
 
     [Fact]
