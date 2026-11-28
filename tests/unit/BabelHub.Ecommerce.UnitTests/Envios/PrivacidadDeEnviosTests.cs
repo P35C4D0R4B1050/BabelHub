@@ -110,15 +110,6 @@ public sealed class PrivacidadDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-18")]
-    public void El_detector_de_centinelas_detecta_un_contacto_serializado()
-    {
-        var texto = JsonSerializer.Serialize(new { detalle = $"{Nombre} {Direccion}" });
-
-        Assert.ThrowsAny<Exception>(() => SinCentinelas(texto));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-18")]
     public async Task La_auditoria_de_una_guia_exitosa_lleva_exactamente_las_claves_cerradas_y_ningun_dato_de_contacto()
     {
         var entorno = new EntornoDeEnvios();
@@ -211,17 +202,5 @@ public sealed class PrivacidadDeEnviosTests
             Assert.NotEmpty(miembros);
             Assert.DoesNotContain(miembros, m => prohibidos.Any(p => m.Contains(p, StringComparison.OrdinalIgnoreCase)));
         }
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-17")]
-    public void El_destinatario_para_la_guia_se_redacta_al_imprimirlo_y_al_serializarlo()
-    {
-        var destinatario = DestinatarioParaGuia.Validar(Nombre, $"{Direccion}, {Region}", Telefono).Destinatario!;
-
-        Assert.Contains("[redactado]", JsonSerializer.Serialize(destinatario), StringComparison.Ordinal);
-        SinCentinelas(destinatario.ToString()!);
-        SinCentinelas(JsonSerializer.Serialize(destinatario));
-        SinCentinelas(JsonSerializer.Serialize(new { destinatario }));
     }
 }

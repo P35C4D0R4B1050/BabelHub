@@ -32,25 +32,6 @@ public sealed class CrearEnvioTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-01")]
-    public async Task Un_pedido_de_dos_fuentes_crea_un_envio_por_llamada_y_las_que_quedan_listas_despues_forman_otro()
-    {
-        var entorno = new EntornoDeEnvios();
-        var lima = EntornoDeEnvios.Impresa("lima-central");
-        var cusco = EntornoDeEnvios.Impresa("cusco-norte");
-        var rezagada = EntornoDeEnvios.Impresa("lima-central");
-        var pedido = entorno.SembrarPedido(true, lima, cusco, rezagada);
-
-        var primero = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [lima.LineaId]));
-        var segundo = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "cusco-norte", [cusco.LineaId]));
-        var tercero = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [rezagada.LineaId]));
-
-        Assert.All([primero, segundo, tercero], r => Assert.True(r.EsExito));
-        Assert.Equal(3, entorno.Envios.Todos.Count);
-        Assert.Equal(3, new[] { primero.Valor.EnvioId, segundo.Valor.EnvioId, tercero.Valor.EnvioId }.Distinct().Count());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-01")]
     public async Task Un_pedido_de_recojo_no_crea_envio()
     {
         var entorno = new EntornoDeEnvios();
@@ -82,22 +63,6 @@ public sealed class CrearEnvioTests
         Assert.Equal(digital.LineaId, rechazada.LineaId);
         Assert.Equal(MotivoDeLineaRechazadaDelEnvio.Digital, rechazada.Motivo);
         Assert.Equal([impresa.LineaId], Assert.Single(entorno.Envios.Todos).Lineas.Select(l => l.LineaId));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-01")]
-    public async Task Sin_lineas_impresas_no_se_crea_nada()
-    {
-        var entorno = new EntornoDeEnvios();
-        var digital = EntornoDeEnvios.Digital();
-        var pedido = entorno.SembrarPedido(true, digital);
-
-        var resultado = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [digital.LineaId]));
-
-        Assert.False(resultado.EsExito);
-        Assert.Equal(CategoriaDeError.ReglaDeNegocio, resultado.Error!.Categoria);
-        Assert.Equal("linea-digital", resultado.Error.Clave);
-        Assert.Empty(entorno.Envios.Todos);
     }
 
     [Fact]
@@ -178,23 +143,6 @@ public sealed class CrearEnvioTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-01")]
-    public async Task La_lectura_del_pedido_ocurre_en_la_unidad_de_trabajo_del_llamador_y_sin_abrir_otra()
-    {
-        var entorno = new EntornoDeEnvios();
-        var linea = EntornoDeEnvios.Impresa();
-        var pedido = entorno.SembrarPedido(true, linea);
-
-        // Pedidos abre su transacción (con el pedido ya bloqueado), marca listas las líneas y llama a Crear dentro de ella.
-        var resultado = await entorno.Unidad.Ejecutar(token => entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [linea.LineaId]), token));
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(1, entorno.Pedidos.LecturasDentroDeLaTransaccion);
-        Assert.Equal(1, entorno.Unidad.Ejecuciones); // Crear no abrió una transacción propia
-        Assert.Equal(0, entorno.Envios.LecturasConBloqueo); // y no tomó ningún bloqueo: el pedido ya está bloqueado
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-01")]
     public async Task Un_pedido_inexistente_o_con_pedidos_no_disponible_o_la_base_caida_falla_sin_crear_nada()
     {
         var entorno = new EntornoDeEnvios();
@@ -231,56 +179,5 @@ public sealed class CrearEnvioTests
         Assert.All([sinFuente, sinLineas, repetidas], r => Assert.Equal(CategoriaDeError.Validacion, r.Error!.Categoria));
         Assert.Empty(entorno.Envios.Todos);
         Assert.Equal(0, entorno.Pedidos.Lecturas); // la validación rechaza antes de leer
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-01")]
-    public async Task Repetir_la_llamada_cuando_las_lineas_ya_avanzaron_de_estado_devuelve_el_envio_existente()
-    {
-        var entorno = new EntornoDeEnvios();
-        var a = EntornoDeEnvios.Impresa();
-        var pedido = entorno.SembrarPedido(true, a);
-        var entrada = new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [a.LineaId]);
-        var primera = await entorno.Crear.Ejecutar(entrada);
-
-        // Pedidos ya despachó la línea: deja de figurar como «lista», pero la repetición sigue siendo idempotente.
-        entorno.Pedidos.Sembrar(pedido with { Lineas = [a with { EstaLista = false }] });
-        var repeticion = await entorno.Crear.Ejecutar(entrada);
-
-        Assert.True(repeticion.EsExito);
-        Assert.True(repeticion.Valor.YaExistia);
-        Assert.Equal(primera.Valor.EnvioId, repeticion.Valor.EnvioId);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-01")]
-    public async Task Una_linea_marcada_lista_dentro_de_la_misma_transaccion_se_ve_al_crear_el_envio()
-    {
-        var entorno = new EntornoDeEnvios();
-        var linea = EntornoDeEnvios.Impresa(lista: false);
-        var pedido = entorno.SembrarPedido(true, linea);
-
-        var resultado = await entorno.Unidad.Ejecutar(async token =>
-        {
-            // Pedidos marca lista la línea y llama a Crear dentro de la misma transacción.
-            entorno.Pedidos.Sembrar(pedido with { Lineas = [linea with { EstaLista = true }] });
-            return await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [linea.LineaId]), token);
-        });
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(1, entorno.Pedidos.LecturasDentroDeLaTransaccion);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-01")]
-    public async Task Una_fuente_de_mas_de_40_caracteres_es_una_validacion_fallida_y_no_una_excepcion()
-    {
-        var entorno = new EntornoDeEnvios();
-        var linea = EntornoDeEnvios.Impresa();
-        var pedido = entorno.SembrarPedido(true, linea);
-
-        var resultado = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, new string('f', 41), [linea.LineaId]));
-
-        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
     }
 }

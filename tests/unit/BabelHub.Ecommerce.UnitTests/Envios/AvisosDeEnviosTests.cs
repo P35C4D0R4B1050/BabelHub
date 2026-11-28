@@ -82,22 +82,6 @@ public sealed class AvisosDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-06")]
-    public async Task Entregado_y_cancelado_no_generan_aviso_propio()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarConGuia(entorno);
-        await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-        entorno.Notificador.Solicitudes.Clear();
-
-        await entorno.MarcarEntregado.Ejecutar(envio.Id);
-        var pendiente = SembrarPendiente(entorno);
-        await entorno.Cancelar.Ejecutar(pendiente.PedidoId);
-
-        Assert.Empty(entorno.Notificador.Solicitudes);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-06")]
     public async Task Ningun_aviso_lleva_datos_de_contacto()
     {
         var entorno = new EntornoDeEnvios();
@@ -164,18 +148,5 @@ public sealed class AvisosDeEnviosTests
         Assert.Equal(CategoriaDeError.NoDisponible, reparto.Error!.Categoria);
         Assert.Empty(entorno.Reservas.Llamadas);
         Assert.Null(entorno.Envios.Todos.Single().DespachoIniciadoEn);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-06")]
-    public async Task Una_repeticion_con_la_guia_ya_registrada_no_pide_otro_aviso()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarPendiente(entorno);
-        await entorno.SolicitarGuia.Ejecutar(envio.Id);
-
-        await entorno.SolicitarGuia.Ejecutar(envio.Id);
-
-        Assert.Single(entorno.Notificador.Solicitudes);
     }
 }

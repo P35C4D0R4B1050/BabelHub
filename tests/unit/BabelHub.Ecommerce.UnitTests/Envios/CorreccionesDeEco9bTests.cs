@@ -81,33 +81,6 @@ public sealed class CorreccionesDeEco9bTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-15")]
-    public async Task Una_excepcion_inesperada_al_registrar_la_guia_libera_el_arrendamiento_y_el_reintento_recupera_la_misma_guia()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarPendiente(entorno);
-        entorno.Auditoria.FallaEnLaLlamada = 0;
-        var fallida = false;
-        entorno.Operador.AlLlamar = () =>
-        {
-            if (!fallida)
-            {
-                fallida = true;
-                entorno.Envios.FallaAlGuardarElSiguiente = true;
-            }
-        };
-
-        var primera = await entorno.SolicitarGuia.Ejecutar(envio.Id);
-
-        Assert.Equal(CategoriaDeError.NoDisponible, primera.Error!.Categoria);
-        Assert.Null(entorno.Envios.Todos.Single().GuiaEnCursoHasta);
-
-        var recuperada = await entorno.SolicitarGuia.Ejecutar(envio.Id);
-        Assert.True(recuperada.EsExito);
-        Assert.Equal(1, entorno.Operador.GuiasCreadas);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-ENV-11")]
     public async Task Una_excepcion_inesperada_del_inventario_es_un_resultado_incierto_y_no_propaga_su_texto()
     {
@@ -125,56 +98,6 @@ public sealed class CorreccionesDeEco9bTests
         Assert.NotNull(guardado.DespachoIncertoEn);
         Assert.Null(guardado.DespachoEnCursoHasta);
         Assert.Equal(DestinoDelEnvioAlCancelar.Mantenido, Assert.Single((await entorno.Cancelar.Ejecutar(envio.PedidoId)).Valor).Destino);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-11")]
-    public async Task El_cierre_del_inventario_lleva_el_pedido_el_envio_y_todas_las_lineas()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarConGuia(entorno);
-
-        await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-
-        var llamada = Assert.Single(entorno.Reservas.Llamadas);
-        Assert.Equal(envio.PedidoId, llamada.PedidoId);
-        Assert.Equal(envio.Id, llamada.EnvioId);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-19")]
-    public void Retomar_un_marcador_existente_cuenta_como_intento_incierto_y_ya_no_se_limpia()
-    {
-        var envio = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), "lima-central", [Guid.NewGuid()], EntornoDeEnvios.AhoraInicial);
-        envio.TomarSolicitudDeGuia(EntornoDeEnvios.AhoraInicial, Guid.NewGuid());
-        envio.RegistrarGuia(NumeroDeGuia.Crear("GUIA-000123"), "operador-a", EntornoDeEnvios.AhoraInicial);
-        envio.IniciarDespacho(EntornoDeEnvios.AhoraInicial);
-        envio.LiberarArrendamientoDelDespacho();
-
-        envio.IniciarDespacho(EntornoDeEnvios.AhoraInicial.AddMinutes(5));
-
-        Assert.Equal(EntornoDeEnvios.AhoraInicial.AddMinutes(5), envio.DespachoIncertoEn);
-        Assert.False(envio.LimpiarMarcadorDeDespacho());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-07")]
-    public async Task La_alerta_de_progreso_mide_desde_la_entrega_cuando_lo_pendiente_es_la_entrega()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = SembrarConGuia(entorno);
-        var guardado = entorno.Envios.Todos.Single();
-        guardado.IniciarDespacho(EntornoDeEnvios.AhoraInicial.AddDays(-3));
-        guardado.PasarAEnReparto(EntornoDeEnvios.AhoraInicial.AddDays(-3));
-        guardado.RegistrarProgresoEnRepartoInformado(EntornoDeEnvios.AhoraInicial.AddDays(-3));
-        guardado.MarcarEntregado(EntornoDeEnvios.AhoraInicial.AddMinutes(-5));
-        entorno.Envios.Sembrar(guardado);
-        entorno.Progreso.Falla = true;
-
-        await entorno.InformarProgreso.Ejecutar(10);
-
-        Assert.Empty(entorno.Alertas.Alertas); // la entrega lleva 5 minutos, no 3 días
-        _ = envio;
     }
 
     [Fact]

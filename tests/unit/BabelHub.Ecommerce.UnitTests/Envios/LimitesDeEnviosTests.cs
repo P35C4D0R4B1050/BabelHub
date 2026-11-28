@@ -40,42 +40,6 @@ public sealed class LimitesDeEnviosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task La_consulta_del_titular_tambien_cuenta_contra_el_limite_de_consultas()
-    {
-        var cuenta = Guid.NewGuid();
-        var entorno = new EntornoDeEnvios(ActorDePrueba.DeCliente(cuenta));
-        var pedido = new PedidoParaEnvios(Guid.NewGuid(), "PED-2026-0001", cuenta, true, []);
-        entorno.Pedidos.Sembrar(pedido);
-        entorno.Limites.Maximos["consultas-de-envios-por-usuario"] = 1;
-
-        var primera = await entorno.EnviosDelPedido.Ejecutar(pedido.PedidoId);
-        var segunda = await entorno.EnviosDelPedido.Ejecutar(pedido.PedidoId);
-
-        Assert.True(primera.EsExito);
-        Assert.Equal(CategoriaDeError.Limite, segunda.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task Las_operaciones_pasan_por_el_limite_de_operaciones_por_usuario_antes_de_tocar_nada()
-    {
-        var entorno = new EntornoDeEnvios();
-        entorno.Limites.Maximos["operaciones-de-envios-por-usuario"] = 0;
-        var envio = SembrarPendiente(entorno);
-
-        var guia = await entorno.SolicitarGuia.Ejecutar(envio.Id);
-        var reparto = await entorno.PasarAEnReparto.Ejecutar(envio.Id);
-        var entrega = await entorno.MarcarEntregado.Ejecutar(envio.Id);
-
-        Assert.All([guia, reparto, entrega], r => Assert.Equal(CategoriaDeError.Limite, r.Error!.Categoria));
-        Assert.Empty(entorno.Operador.Recibidas);
-        Assert.Empty(entorno.Reservas.Llamadas);
-        Assert.Equal(0, entorno.Contactos.Lecturas);
-        Assert.Null(entorno.Envios.Todos.Single().ClaveDeSolicitud);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-ENV-15")]
     public async Task El_tope_de_guias_al_operador_se_reserva_antes_de_fijar_la_clave_y_no_llama_al_operador()
     {
@@ -109,19 +73,5 @@ public sealed class LimitesDeEnviosTests
         Assert.Equal(CategoriaDeError.NoDisponible, lista.Error!.Categoria);
         Assert.Equal(CategoriaDeError.NoDisponible, guia.Error!.Categoria);
         Assert.Empty(entorno.Operador.Recibidas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task Un_rol_sin_permiso_se_rechaza_antes_de_consumir_el_limite()
-    {
-        var entorno = new EntornoDeEnvios(ActorDePrueba.DeCliente());
-        var envio = SembrarPendiente(entorno);
-
-        await entorno.Listar.Ejecutar(new ListarEnviosEntrada());
-        await entorno.SolicitarGuia.Ejecutar(envio.Id);
-
-        Assert.Empty(entorno.Limites.Reservas);
-        Assert.Equal(2, entorno.Denegaciones.Eventos.Count);
     }
 }

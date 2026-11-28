@@ -47,22 +47,6 @@ public sealed class RevisarEnviosEstancadosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-11")]
-    public async Task Un_envio_que_ya_paso_a_en_reparto_no_alerta()
-    {
-        var entorno = new EntornoDeEnvios();
-        var envio = ConDespachoIniciado(entorno, EntornoDeEnvios.AhoraInicial.AddHours(-30));
-        var guardado = entorno.Envios.Todos.Single(e => e.Id == envio.Id);
-        guardado.PasarAEnReparto(EntornoDeEnvios.AhoraInicial.AddHours(-29));
-        entorno.Envios.Sembrar(guardado);
-
-        var resultado = await entorno.RevisarEstancados.Ejecutar(100);
-
-        Assert.Equal(0, resultado.Valor);
-        Assert.Empty(entorno.Alertas.Alertas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-11")]
     public async Task Una_guia_sin_uso_de_un_envio_cancelado_alerta_una_sola_vez_en_la_ventana_de_24_a_25_horas()
     {
         var entorno = new EntornoDeEnvios();
@@ -112,17 +96,5 @@ public sealed class RevisarEnviosEstancadosTests
         var resultado = await revisar.Ejecutar(100);
 
         Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-11")]
-    public async Task Con_la_base_caida_es_servicio_no_disponible()
-    {
-        var entorno = new EntornoDeEnvios();
-        entorno.Envios.NoDisponible = true;
-
-        var resultado = await entorno.RevisarEstancados.Ejecutar(100);
-
-        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
     }
 }

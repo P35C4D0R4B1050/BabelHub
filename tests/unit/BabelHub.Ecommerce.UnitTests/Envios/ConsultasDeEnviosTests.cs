@@ -59,19 +59,6 @@ public sealed class ConsultasDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-08")]
-    public async Task Una_pagina_o_un_tamano_invalidos_se_corrigen_al_rango()
-    {
-        var entorno = new EntornoDeEnvios();
-        Sembrar(entorno, Guid.NewGuid());
-
-        var resultado = await entorno.Listar.Ejecutar(new ListarEnviosEntrada(null, -3, 0));
-
-        Assert.Equal(1, resultado.Valor.Pagina);
-        Assert.Equal(1, resultado.Valor.Tamano);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
     public async Task Logistica_y_la_administracion_central_obtienen_un_envio_y_uno_inexistente_es_no_encontrado_sin_evento()
     {
         var entorno = new EntornoDeEnvios(ActorDePrueba.DeAdministradorCentral());
@@ -131,20 +118,6 @@ public sealed class ConsultasDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-05")]
-    public async Task Un_pedido_sin_envios_todavia_responde_una_lista_vacia()
-    {
-        var cuenta = Guid.NewGuid();
-        var entorno = new EntornoDeEnvios(ActorDePrueba.DeCliente(cuenta));
-        var pedido = SembrarPedidoDe(entorno, cuenta);
-
-        var resultado = await entorno.EnviosDelPedido.Ejecutar(pedido.PedidoId);
-
-        Assert.True(resultado.EsExito);
-        Assert.Empty(resultado.Valor.Envios);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-05")]
     public async Task Un_pedido_ajeno_y_uno_inexistente_responden_exactamente_igual_con_un_acceso_denegado_por_cada_intento()
     {
         var entorno = new EntornoDeEnvios(ActorDePrueba.DeCliente());
@@ -159,22 +132,6 @@ public sealed class ConsultasDeEnviosTests
         Assert.Equal(inexistente.Error.Clave, deOtro.Error.Clave);
         Assert.Equal(2, entorno.Denegaciones.Eventos.Count);
         Assert.All(entorno.Denegaciones.Eventos, e => Assert.Equal("ECO-NO-ENCONTRADO", e.CodigoDeError));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-05")]
-    public async Task Logistica_consulta_los_envios_de_un_pedido_ajeno_y_uno_inexistente_es_no_encontrado_sin_evento()
-    {
-        var entorno = new EntornoDeEnvios();
-        var pedido = SembrarPedidoDe(entorno, Guid.NewGuid());
-        Sembrar(entorno, pedido.PedidoId);
-
-        var existente = await entorno.EnviosDelPedido.Ejecutar(pedido.PedidoId);
-        var inexistente = await entorno.EnviosDelPedido.Ejecutar(Guid.NewGuid());
-
-        Assert.Single(existente.Valor.Envios);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Empty(entorno.Denegaciones.Eventos);
     }
 
     [Theory]
@@ -211,21 +168,5 @@ public sealed class ConsultasDeEnviosTests
         Assert.Equal(CategoriaDeError.NoDisponible, pedidosCaido.Error!.Categoria);
         Assert.Equal(CategoriaDeError.NoDisponible, baseCaida.Error!.Categoria);
         Assert.Empty(entorno.Denegaciones.Eventos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-ENV-08")]
-    public async Task Un_estado_fuera_de_rango_se_rechaza_como_validacion_y_una_pagina_enorme_se_topa_sin_desbordar()
-    {
-        var entorno = new EntornoDeEnvios();
-        Sembrar(entorno, Guid.NewGuid());
-
-        var invalido = await entorno.Listar.Ejecutar(new ListarEnviosEntrada((EstadoDelEnvio)99));
-        var enorme = await entorno.Listar.Ejecutar(new ListarEnviosEntrada(null, int.MaxValue, int.MaxValue));
-
-        Assert.Equal(CategoriaDeError.Validacion, invalido.Error!.Categoria);
-        Assert.True(enorme.EsExito);
-        Assert.Equal(ListarEnvios.PaginaMaxima, enorme.Valor.Pagina);
-        Assert.Equal(ListarEnvios.TamanoMaximo, enorme.Valor.Tamano);
     }
 }

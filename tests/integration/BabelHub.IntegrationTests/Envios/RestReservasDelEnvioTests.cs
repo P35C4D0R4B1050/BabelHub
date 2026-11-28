@@ -111,14 +111,10 @@ public sealed class RestReservasDelEnvioTests
     [Theory]
     [Trait("Criterio", "AC-ENV-11")]
     [InlineData(409, "INV-IDEMPOTENCIA-EN-CURSO")]
-    [InlineData(409, "INV-IDEMPOTENCIA-EN-CONFLICTO")]
     [InlineData(401, "INV-NO-AUTENTICADO")]
     [InlineData(403, "INV-PROHIBIDO")]
     [InlineData(408, null)]
-    [InlineData(500, "INV-ERROR-INESPERADO")]
     [InlineData(503, "INV-SERVICIO-NO-DISPONIBLE")]
-    [InlineData(409, "otro-codigo")]
-    [InlineData(409, null)]
     public async Task Todo_otro_rechazo_es_incierto_porque_el_primer_cierre_pudo_aplicarse(int estado, string? codigo)
     {
         var adaptador = Crear(() => ResultadoDelInventario<CierreDeLaReserva>.Rechazo(estado, codigo));

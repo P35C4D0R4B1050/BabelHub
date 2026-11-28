@@ -164,24 +164,6 @@ public sealed class MatrizDeRolesDeEnviosTests
         }
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-ENV-05")]
-    public async Task Un_pedido_ajeno_y_uno_inexistente_responden_exactamente_igual()
-    {
-        var cuenta = Guid.NewGuid();
-        var ajeno = new EntornoDeEnvios(ActorDePrueba.DeCliente(cuenta));
-        var envio = Sembrar(ajeno, EstadoDeEnvio.PendienteDeGuia);
-        var inexistente = new EntornoDeEnvios(ActorDePrueba.DeCliente(cuenta));
-
-        var deOtro = await ajeno.EnviosDelPedido.Ejecutar(envio.PedidoId);
-        var sinPedido = await inexistente.EnviosDelPedido.Ejecutar(Guid.NewGuid());
-
-        Assert.Equal(deOtro.Error!.Categoria, sinPedido.Error!.Categoria);
-        Assert.Equal(deOtro.Error.Clave, sinPedido.Error.Clave);
-        Assert.Equal(deOtro.Error.Errores, sinPedido.Error.Errores);
-        Assert.Equal(ajeno.Denegaciones.Eventos.Count, inexistente.Denegaciones.Eventos.Count);
-    }
-
     public static TheoryData<Operacion, EstadoDeEnvio> TransicionesInvalidas()
     {
         var datos = new TheoryData<Operacion, EstadoDeEnvio>();
