@@ -11,6 +11,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// Y los archivos que lo hacen posible: la imagen de PostgreSQL trae los scripts, el Compose archiva los cambios y todo está en POSIX sh.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class RespaldarAhoraTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "ahora-" + Guid.NewGuid().ToString("N"));

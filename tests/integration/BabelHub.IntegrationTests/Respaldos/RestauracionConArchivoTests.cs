@@ -16,6 +16,8 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// destino» es un contenedor de la imagen publicada; los scripts de restauración son los del repositorio.
 /// </summary>
 [Collection(RespaldosCollection.Nombre)]
+[Trait("Categoria", Categorias.Lanzamiento)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class RestauracionConArchivoTests(RespaldosFixture entorno) : IAsyncLifetime
 {
     private static readonly TimeSpan Limite = TimeSpan.FromSeconds(2);

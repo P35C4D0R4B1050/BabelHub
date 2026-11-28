@@ -12,6 +12,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// PostgreSQL de <c>infra/postgres</c> tal como se publica; la parte de arriba con archivos de prueba y la de abajo con PostgreSQL real.
 /// </summary>
 [Collection(RespaldosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class EspacioReservadoTests(RespaldosFixture entorno)
 {
     private const int Mib = 1024 * 1024;
@@ -285,6 +286,7 @@ public sealed class EspacioReservadoTests(RespaldosFixture entorno)
 
     [Fact]
     [Trait("Criterio", "AC-PLA-21")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public async Task ConElAlmacenCaido_LaBaseSigueOperandoYAcumulaLoPendiente_AvisaAlOchentaYSeDeclaraRotoAlAgotarse_YUnRespaldoLoRepara()
     {
         // Segmentos de 1 MiB y una reserva de 24 MiB para que unos pocos cambios la agoten; el almacén «no responde» (nadie escucha en el puerto 9).

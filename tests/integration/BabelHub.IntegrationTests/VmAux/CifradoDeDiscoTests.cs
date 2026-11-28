@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.VmAux;
 /// de la nube; contra la nube real no se verificó (requiere la cuenta de Oracle).
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class CifradoDeDiscoTests : IDisposable
 {
     private const string Instancia = "ocid1.instance.oc1.sa-saopaulo-1.aaaaaaaainstanciadeprueba";

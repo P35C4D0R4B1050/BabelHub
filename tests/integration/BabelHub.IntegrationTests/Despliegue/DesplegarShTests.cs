@@ -15,6 +15,7 @@ namespace BabelHub.IntegrationTests.Despliegue;
 /// reales de cada VM, y con <c>docker</c> de verdad sobre una VM mínima para comprobar la espera de la salud.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class DesplegarShTests : IDisposable
 {
     private const string Digest = "@sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -1774,6 +1775,7 @@ public sealed class DesplegarShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void ConDockerDeVerdad_UnaVmSanaQuedaEnMarchaYRepetirElComandoNoLaCambia()
     {
         var infra = VmMinima("[\"CMD\", \"redis-cli\", \"ping\"]");
@@ -1795,6 +1797,7 @@ public sealed class DesplegarShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void ConDockerDeVerdad_UnComponenteQueNoResponde_HaceFallarElDespliegue()
     {
         var infra = VmMinima("[\"CMD\", \"false\"]");

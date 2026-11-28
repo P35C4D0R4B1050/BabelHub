@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.Almacen;
 /// distinto). El CLI se sustituye por un doble que responde con archivos de prueba; la sintaxis real la confirma el spike T02.
 /// </summary>
 [Collection(BabelHub.IntegrationTests.Imagenes.ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class AlmacenShTests : IDisposable
 {
     private const string Pasado = "2020-01-01T00:00:00Z";

@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.Almacen;
 /// sustituye por un doble que guarda lo que se le envía; el comportamiento real de R2 lo comprueba la constancia T47 en la cuenta.
 /// </summary>
 [Collection(BabelHub.IntegrationTests.Imagenes.ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class AlmacenR2ShTests : IDisposable
 {
     private const string Cuenta = "0123456789abcdef0123456789abcdef";

@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.VmAux;
 /// proceso desconocido avisan por correo. Los valores secretos de las pruebas se generan en cada ejecución y nunca deben aparecer en la salida.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class EndurecimientoDeVmAuxTests : IDisposable
 {
     private const string Salto = "salto";

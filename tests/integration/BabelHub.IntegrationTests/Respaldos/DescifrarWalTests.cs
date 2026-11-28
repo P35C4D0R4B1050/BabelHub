@@ -14,6 +14,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// miden 1 KiB (<c>BABELHUB_TAMANO_DE_SEGMENTO</c>).
 /// </summary>
 [Collection(RespaldosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class DescifrarWalTests(RespaldosFixture entorno) : IAsyncLifetime
 {
     private const string Uno = "000000010000000000000001";

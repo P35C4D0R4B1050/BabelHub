@@ -14,6 +14,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// <c>pg_hba.conf</c>). La «otra máquina» es un contenedor aparte con GNU tar; la clave que descifra solo existe en la prueba.
 /// </summary>
 [Collection(RespaldosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsyncLifetime
 {
     private IContainer _maquina = null!;

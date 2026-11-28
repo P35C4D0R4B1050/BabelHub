@@ -208,6 +208,7 @@ public sealed partial class ImagenesDeContenedorTests
     [Theory]
     [MemberData(nameof(Terceros))]
     [Trait("Criterio", "AC-PLA-03")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void UnaImagenDeTerceros_ExisteParaArm64YX86OConstaComoExcepcionRegistrada(string imagen)
     {
         var (codigo, indice) = Docker("buildx", "imagetools", "inspect", "--raw", imagen);

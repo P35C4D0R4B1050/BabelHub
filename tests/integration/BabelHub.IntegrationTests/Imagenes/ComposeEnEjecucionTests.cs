@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.Imagenes;
 /// Los de imagen propia se prueban en <c>ImagenesDeContenedorTests</c> y se resuelven con <c>ComposePorVmTests</c>.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Lanzamiento)]
 public sealed class ComposeEnEjecucionTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "compose-ejec-" + Guid.NewGuid().ToString("N"));

@@ -12,6 +12,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// Con el estado que deja el ciclo de vida sobre 100 días de respaldos simulados no hay alerta; con un ciclo de vida que no retira, sí.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class VigilarRetencionTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "vigilar-" + Guid.NewGuid().ToString("N"));
