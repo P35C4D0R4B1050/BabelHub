@@ -4,7 +4,7 @@
 #   docker buildx build --platform linux/amd64,linux/arm64 -t babelhub/postgres infra/postgres
 # La imagen base va fijada por etiqueta y por digest del índice multi-arquitectura, y los paquetes por versión exacta (PLA-26): si el
 # repositorio de Alpine ya no ofrece esa versión, la construcción falla y se actualiza con un cambio revisado.
-FROM postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065
+FROM postgres:19-alpine@sha256:cac45fb483caee3668946088a1c0532db89d5285c28dbfeac889b4068296e06f
 
 USER root
 RUN apk add --no-cache age=1.3.2-r1 rclone=1.75.2-r0 zstd=1.5.7-r2
