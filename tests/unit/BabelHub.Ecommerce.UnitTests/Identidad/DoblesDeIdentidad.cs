@@ -898,14 +898,14 @@ internal sealed class BajasEnMemoria(BdIdentidad bd) : IRepositorioDeBajas
 }
 
 /// <summary>Un módulo receptor de la cancelación de prueba: anota lo que se le pidió o falla.</summary>
-internal sealed class AplicadorDePrueba(string modulo) : IAplicadorDeCancelacion
+internal sealed class AplicadorDePrueba(string modulo, List<string> ordenDeLlamada) : IAplicadorDeCancelacion
 {
     public string Modulo => modulo;
 
     public List<(Guid UsuarioId, Guid Opaco)> Aplicados { get; } = [];
 
-    /// <summary>El orden global de llamada (para comprobar el orden de los receptores).</summary>
-    public static List<string> OrdenDeLlamada { get; } = [];
+    /// <summary>El orden de llamada de los receptores de un mismo entorno (nunca compartido entre pruebas, que corren a la vez).</summary>
+    public List<string> OrdenDeLlamada => ordenDeLlamada;
 
     public bool Falla { get; set; }
 

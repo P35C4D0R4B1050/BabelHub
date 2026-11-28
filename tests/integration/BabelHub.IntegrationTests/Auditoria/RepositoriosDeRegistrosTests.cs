@@ -362,12 +362,13 @@ public sealed class RepositoriosDeRegistrosTests(PostgresDeAuditoriaFixture bd) 
         }
 
         async Task<List<Guid>> Buscar(FiltroDeAuditoria f) => [.. (await e.Consulta.Consultar(new ConsultaDeAuditoria(f))).Registros.Select(r => r.Id)];
-        var rango = new FiltroDeAuditoria { Desde = instante.AddDays(-1), Hasta = instante.AddDays(1) };
+        // Ventanas de un minuto: los instantes de las demás pruebas caen al azar en rangos que se solapan en días.
+        var rango = new FiltroDeAuditoria { Desde = instante.AddMinutes(-1), Hasta = instante.AddMinutes(1) };
 
         Assert.Equal(new[] { anulacion.Id, otroUsuario.Id }.Order(), (await Buscar(rango with { Accion = "PedidoAnulado" })).Order());
         Assert.Equal(new List<Guid> { anulacion.Id }, await Buscar(rango with { Accion = "PedidoAnulado", UsuarioId = admin }));
         Assert.Equal(new List<Guid> { anulacion.Id }, await Buscar(rango with { Texto = "duplicado-100%_lit" }));
-        Assert.Contains(fueraDeRango.Id, await Buscar(new FiltroDeAuditoria { Accion = "PedidoAnulado", Desde = instante.AddDays(-6), Hasta = instante.AddDays(-4) }));
+        Assert.Contains(fueraDeRango.Id, await Buscar(new FiltroDeAuditoria { Accion = "PedidoAnulado", Desde = instante.AddDays(-5).AddMinutes(-1), Hasta = instante.AddDays(-5).AddMinutes(1) }));
         Assert.DoesNotContain(fueraDeRango.Id, await Buscar(rango with { Accion = "PedidoAnulado" }));
     }
 

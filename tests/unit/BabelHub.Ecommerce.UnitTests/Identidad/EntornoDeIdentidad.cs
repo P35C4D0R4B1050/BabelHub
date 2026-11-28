@@ -108,7 +108,13 @@ internal sealed class EntornoDeIdentidad
 
     public Plataforma.RegistroDeSupresionesEnMemoria Supresiones { get; } = new();
 
-    public List<AplicadorDePrueba> Aplicadores { get; } = [new("pedidos"), new("pagos"), new("devoluciones"), new("biblioteca"), new("reclamaciones"), new("carrito")];
+    public List<AplicadorDePrueba> Aplicadores { get; } = CrearAplicadores();
+
+    private static List<AplicadorDePrueba> CrearAplicadores()
+    {
+        var ordenDeLlamada = new List<string>();
+        return [.. new[] { "pedidos", "pagos", "devoluciones", "biblioteca", "reclamaciones", "carrito" }.Select(modulo => new AplicadorDePrueba(modulo, ordenDeLlamada))];
+    }
 
     public EjecutorDeCancelacionDePrueba Ejecutor { get; }
 

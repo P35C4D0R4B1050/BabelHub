@@ -252,12 +252,20 @@ public sealed class TrabajoDeUmbralesDeAlertaTests
         _contador.Conteos["accesos-denegados"] = 15;
         using var fuente = new CancellationTokenSource();
 
+        var transcurrido = System.Diagnostics.Stopwatch.StartNew();
         var corrida = trabajo.Correr(fuente.Token);
-        await Task.Delay(500);
+        // Se espera a ver tres corridas (no un lapso fijo): en un equipo cargado, un lapso puede durar mucho más de lo pedido.
+        while (_registro.Corridas.Count < 3 && transcurrido.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            await Task.Delay(20);
+        }
+
         await fuente.CancelAsync();
         await corrida.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.InRange(_registro.Corridas.Count, 3, 12);
+        transcurrido.Stop();
+        // Nunca más de una corrida inicial y una por intervalo transcurrido (con una de margen).
+        Assert.InRange(_registro.Corridas.Count, 3, (int)(transcurrido.Elapsed / TimeSpan.FromMilliseconds(60)) + 2);
         Assert.Single(_alertas.Publicadas);
         Assert.True(corrida.IsCompletedSuccessfully);
     }

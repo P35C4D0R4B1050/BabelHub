@@ -384,16 +384,10 @@ public sealed class EjecucionDeLaCancelacionTests
         var id = cliente.Usuario.Id;
         e.ConSegundoFactor(cliente);
         var codigo = new ValorSecreto(e.Totp(e.Secretos.SecretoDelSegundoFactor()));
-        lock (AplicadorDePrueba.OrdenDeLlamada)
-        {
-            AplicadorDePrueba.OrdenDeLlamada.Clear();
-        }
+        var orden = e.Aplicadores[0].OrdenDeLlamada;
 
         await cancelacion.Solicitar(id, Contrasena, codigo);
 
-        lock (AplicadorDePrueba.OrdenDeLlamada)
-        {
-            Assert.Equal(["pedidos", "devoluciones", "pagos", "carrito", "biblioteca", "reclamaciones"], AplicadorDePrueba.OrdenDeLlamada);
-        }
+        Assert.Equal(["pedidos", "devoluciones", "pagos", "carrito", "biblioteca", "reclamaciones"], orden);
     }
 }
