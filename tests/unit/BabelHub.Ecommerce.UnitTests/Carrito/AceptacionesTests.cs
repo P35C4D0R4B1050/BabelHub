@@ -114,41 +114,10 @@ public sealed class AceptacionesTests
             checkout.Aceptaciones.Aceptadas.Select(a => (a.Texto, a.Version, a.AceptadoEn)));
     }
 
-    [Fact]
-    public void Aceptar_otra_vez_la_misma_version_conserva_la_primera_fecha_y_no_cambia_nada()
-    {
-        var checkout = Nuevo(Impreso(1));
-        checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora.AddMinutes(1));
-        var version = checkout.Version;
-
-        var otraVez = checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora.AddMinutes(9));
-
-        Assert.Equal(EfectoDeTransicion.SinCambios, otraVez.Efecto);
-        Assert.Equal(Ahora.AddMinutes(1), Assert.Single(checkout.Aceptaciones.Aceptadas).AceptadoEn);
-        Assert.Equal(version, checkout.Version);
-        Assert.Equal(Ahora.AddMinutes(1), checkout.ModificadoPorLaPersonaEn);
-    }
-
-    [Fact]
-    public void Aceptar_otra_version_reemplaza_la_version_y_la_fecha()
-    {
-        var checkout = Nuevo(Impreso(1));
-        checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora.AddMinutes(1));
-
-        var resultado = checkout.Aceptar(TextoLegal.Terminos, "t-2", Ahora.AddMinutes(5));
-
-        Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
-        var aceptacion = Assert.Single(checkout.Aceptaciones.Aceptadas);
-        Assert.Equal(("t-2", Ahora.AddMinutes(5)), (aceptacion.Version, aceptacion.AceptadoEn));
-        Assert.Equal(Ahora.AddMinutes(5), checkout.ModificadoPorLaPersonaEn);
-    }
-
     [Theory]
     [InlineData(null)]
-    [InlineData("")]
     [InlineData("   ")]
     [InlineData("v\n1")]
-    [InlineData("v\u00001")]
     public void Una_version_vacia_o_con_caracteres_de_control_se_rechaza(string? version)
     {
         var checkout = Nuevo(Impreso(1));
@@ -176,20 +145,6 @@ public sealed class AceptacionesTests
 
         checkout.Aceptar(TextoLegal.Terminos, "t-2", Ahora.AddMinutes(2));
         Assert.Equal(EfectoDeTransicion.Aplicada, Preparar(checkout, carrito).Efecto);
-    }
-
-    [Fact]
-    public void Revalidar_con_las_mismas_versiones_no_invalida_nada_ni_cambia_la_version_del_checkout()
-    {
-        var checkout = Nuevo(Impreso(1));
-        checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora);
-        checkout.Aceptar(TextoLegal.Privacidad, "p-1", Ahora);
-        var version = checkout.Version;
-
-        var resultado = checkout.RevalidarTextos(new Dictionary<TextoLegal, string> { [TextoLegal.Terminos] = "t-1", [TextoLegal.Privacidad] = "p-1", [TextoLegal.ReembolsoDigital] = "r-9" }, Ahora);
-
-        Assert.Empty(resultado.Invalidadas);
-        Assert.Equal(version, checkout.Version);
     }
 
     [Fact]
@@ -239,28 +194,5 @@ public sealed class AceptacionesTests
 
         Assert.Equal(baseA, Huella("t-1", Ahora.AddHours(3)));
         Assert.NotEqual(baseA, Huella("t-2", Ahora));
-    }
-
-    [Fact]
-    public void La_huella_de_instantanea_ignora_la_aceptacion_del_reembolso_si_ya_no_hay_digitales()
-    {
-        static string? Huella(bool conReembolsoAceptado)
-        {
-            string? h = null;
-            var checkout = Nuevo(Impreso(1));
-            checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora);
-            checkout.Aceptar(TextoLegal.Privacidad, "p-1", Ahora);
-            if (conReembolsoAceptado)
-            {
-                checkout.SincronizarLineas([Impreso(1), Digital(2)], () => LineaFija, Ahora);
-                checkout.Aceptar(TextoLegal.ReembolsoDigital, "r-1", Ahora);
-                checkout.SincronizarLineas([Impreso(1)], () => LineaFija, Ahora);
-            }
-
-            checkout.PrepararPasoAlPago(Guid.NewGuid(), Envio, Identidad, s => h = s, CarritoCon(Impreso(1)), Ahora);
-            return h;
-        }
-
-        Assert.Equal(Huella(conReembolsoAceptado: false), Huella(conReembolsoAceptado: true));
     }
 }

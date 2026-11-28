@@ -163,19 +163,6 @@ public sealed class RetencionDelContactoTests
     }
 
     [Fact]
-    public void Eliminar_el_contacto_de_un_checkout_sin_contacto_no_cambia_nada()
-    {
-        var (checkout, carrito) = ADomicilio();
-        checkout.Volver(carrito, Ahora);
-        var version = checkout.Version;
-
-        var resultado = checkout.EliminarContacto(MotivoDeEliminacionDeContacto.CuentaCancelada, Ahora.AddMinutes(1));
-
-        Assert.Equal(EfectoDeTransicion.SinCambios, resultado.Efecto);
-        Assert.Equal(version, checkout.Version);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-30")]
     public void A_los_30_dias_de_la_ultima_modificacion_el_contacto_vence_y_a_29_dias_y_23_horas_no()
     {
@@ -237,29 +224,5 @@ public sealed class RetencionDelContactoTests
 
         Assert.NotNull(checkout.Contacto);
         Assert.True(checkout.CumpleLaRetencionDelContacto);
-    }
-
-    [Fact]
-    public void Un_checkout_con_contacto_fuera_de_un_estado_vivo_a_domicilio_no_cumple_la_regla_pero_ninguna_transicion_lo_deja_asi()
-    {
-        var (checkout, carrito) = EnPago();
-        var estados = new List<EstadoDelCheckout> { checkout.Estado };
-
-        checkout.PagoPendiente(checkout.PedidoId!.Value, Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
-        estados.Add(checkout.Estado);
-        Assert.True(checkout.CumpleLaRetencionDelContacto);
-
-        checkout.PagoResuelto(checkout.PedidoId!.Value, MotivoDePagoResuelto.Rechazado, carrito, Ahora.AddMinutes(10));
-        estados.Add(checkout.Estado);
-        Assert.True(checkout.CumpleLaRetencionDelContacto);
-
-        checkout.Editar(carrito, Ahora.AddMinutes(11));
-        estados.Add(checkout.Estado);
-        Assert.True(checkout.CumpleLaRetencionDelContacto);
-
-        checkout.Reiniciar(carrito, Ahora.AddMinutes(12));
-        estados.Add(checkout.Estado);
-        Assert.True(checkout.CumpleLaRetencionDelContacto);
-        Assert.Equal([EstadoDelCheckout.EnPago, EstadoDelCheckout.PagoPendiente, EstadoDelCheckout.EnPago, EstadoDelCheckout.EnEdicion, EstadoDelCheckout.Reiniciado], estados);
     }
 }

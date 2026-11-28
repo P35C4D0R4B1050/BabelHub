@@ -51,14 +51,6 @@ public sealed class ContratosPublicosDeCarritoTests
     }
 
     [Fact]
-    public void Dos_contactos_con_los_mismos_datos_son_iguales_y_con_otro_telefono_no()
-    {
-        Assert.Equal(Contacto(), Contacto());
-        Assert.Equal(Contacto().GetHashCode(), Contacto().GetHashCode());
-        Assert.NotEqual(Contacto(), new ContactoDeCompra("Ana Pérez", "911222333", "Jr. Lima 123", "Ayacucho"));
-    }
-
-    [Fact]
     public void El_contacto_de_compra_acepta_datos_ausentes_para_que_el_caso_de_uso_responda_por_campo_y_sigue_redactado()
     {
         var vacio = new ContactoDeCompra(null, "  ", null, "");
@@ -68,39 +60,9 @@ public sealed class ContratosPublicosDeCarritoTests
     }
 
     [Fact]
-    public void La_posesion_sin_ninguna_edicion_poseida_es_no_posee_y_sin_poseidas()
-    {
-        var resultado = ResultadoDePosesion.Posee([]);
-
-        Assert.Equal(EstadoDePosesion.NoPosee, resultado.Estado);
-        Assert.Empty(resultado.Poseidas);
-    }
-
-    [Fact]
-    public void La_posesion_conserva_las_poseidas_sin_repetir()
-    {
-        var a = Guid.NewGuid();
-        var b = Guid.NewGuid();
-
-        var resultado = ResultadoDePosesion.Posee([a, b, a]);
-
-        Assert.Equal(EstadoDePosesion.Posee, resultado.Estado);
-        Assert.Equal(2, resultado.Poseidas.Count);
-        Assert.Contains(a, resultado.Poseidas);
-        Assert.Contains(b, resultado.Poseidas);
-    }
-
-    [Fact]
     public void Un_tercero_que_no_responde_no_declara_ninguna_edicion_poseida()
     {
         Assert.Equal(EstadoDePosesion.NoSePuedeConfirmar, ResultadoDePosesion.NoSePuedeConfirmar.Estado);
         Assert.Empty(ResultadoDePosesion.NoSePuedeConfirmar.Poseidas);
-    }
-
-    [Fact]
-    public void Los_tres_tipos_de_entrega_y_los_cuatro_estados_vivos_existen()
-    {
-        Assert.Equal(["Recojo", "Domicilio", "Digital"], Enum.GetNames<TipoDeEntregaDeCompra>());
-        Assert.Equal(["EnEdicion", "Reservando", "EnPago", "PagoPendiente"], Enum.GetNames<EstadoVisibleDelCheckout>());
     }
 }

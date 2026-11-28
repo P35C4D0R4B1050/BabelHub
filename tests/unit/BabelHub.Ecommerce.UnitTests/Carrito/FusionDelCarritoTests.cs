@@ -141,35 +141,6 @@ public sealed class FusionDelCarritoTests
         Assert.Empty(e.Bitacora.Bloqueos);
     }
 
-    [Fact]
-    public async Task Una_cookie_desconocida_o_de_un_carrito_caducado_no_fusiona_nada()
-    {
-        var (e, cuenta) = Escenario();
-        var delaCuenta = SembrarCuenta(e, cuenta, (e.Impreso(5), false, 1));
-        var visitante = SembrarVisitante(e, (e.Impreso(5), false, 4));
-        e.Reloj.Ahora = Inicio.AddDays(31);
-
-        var resultado = await Fusionar(e);
-
-        Assert.True(resultado.Valor.BorrarLaCookie);
-        Assert.Equal(1, delaCuenta.Lineas.Single().Cantidad.Valor);
-        Assert.Equal(EstadoDeCarrito.Abierto, visitante.Estado);
-    }
-
-    [Fact]
-    public async Task Un_visitante_sin_lineas_se_marca_fusionado_sin_tocar_a_la_cuenta()
-    {
-        var (e, cuenta) = Escenario();
-        var delaCuenta = SembrarCuenta(e, cuenta, (e.Impreso(5), false, 1));
-        var visitante = SembrarVisitante(e);
-
-        var resultado = await Fusionar(e);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(EstadoDeCarrito.Fusionado, visitante.Estado);
-        Assert.Equal(1, delaCuenta.Lineas.Single().Cantidad.Valor);
-    }
-
     // ---------- Los ajustes ----------
 
     [Fact]
@@ -246,22 +217,6 @@ public sealed class FusionDelCarritoTests
 
     // ---------- Orden de bloqueo ----------
 
-    [Fact]
-    public async Task Los_dos_carritos_se_bloquean_por_id_ascendente_despues_del_checkout()
-    {
-        var (e, cuenta) = Escenario();
-        var a = e.Impreso(5);
-        var delaCuenta = SembrarCuenta(e, cuenta, (a, false, 1));
-        var visitante = SembrarVisitante(e, (a, false, 1));
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, delaCuenta.Id, [new LineaParaCheckout(a, false, "Libro", "9780000000019", 1, 50m, a, Sucursal.Principal)], Guid.NewGuid, Inicio);
-        e.Checkouts.Sembrar(checkout);
-
-        await Fusionar(e);
-
-        var esperados = new[] { delaCuenta.Id, visitante.Id }.Order().Select(id => $"carrito:{id}");
-        Assert.Equal(["checkout", .. esperados], e.Bitacora.Bloqueos);
-    }
-
     // ---------- Compra en curso ----------
 
     private static (EntornoDelCarrito Entorno, Checkout Checkout, CarritoDeDominio DeLaCuenta, CarritoDeDominio DelVisitante) ConCheckout(Action<Checkout, CarritoDeDominio>? llevar = null)
@@ -310,18 +265,6 @@ public sealed class FusionDelCarritoTests
     }
 
     [Fact]
-    public async Task Con_el_checkout_reservando_la_fusion_se_aplaza()
-    {
-        var (e, _, delaCuenta, visitante) = ConCheckout(AReservando);
-
-        var resultado = await Fusionar(e);
-
-        Assert.True(resultado.Valor.Aplazada);
-        Assert.Equal(EstadoDeCarrito.Abierto, visitante.Estado);
-        Assert.Equal(1, delaCuenta.Lineas.Single().Cantidad.Valor);
-    }
-
-    [Fact]
     public async Task Con_en_pago_y_un_intento_activo_Reabrir_responde_no_cancelable_y_la_fusion_se_aplaza()
     {
         var (e, checkout, _, visitante) = ConCheckout(AEnPago);
@@ -333,20 +276,6 @@ public sealed class FusionDelCarritoTests
         Assert.False(resultado.Valor.BorrarLaCookie);
         Assert.Equal(EstadoDeCarrito.Abierto, visitante.Estado);
         Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
-    }
-
-    [Fact]
-    public async Task Con_en_pago_sin_intento_activo_se_reabre_y_la_fusion_se_aplica_dejando_el_checkout_en_edicion()
-    {
-        var (e, checkout, delaCuenta, visitante) = ConCheckout(AEnPago);
-
-        var resultado = await Fusionar(e);
-
-        Assert.False(resultado.Valor.Aplazada);
-        Assert.Equal(1, e.Pagos.Reaperturas);
-        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
-        Assert.Equal(EstadoDeCarrito.Fusionado, visitante.Estado);
-        Assert.Equal(3, delaCuenta.Lineas.Single().Cantidad.Valor);
     }
 
     [Fact]

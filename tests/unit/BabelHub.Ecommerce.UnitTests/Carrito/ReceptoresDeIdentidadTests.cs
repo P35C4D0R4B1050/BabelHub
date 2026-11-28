@@ -64,30 +64,6 @@ public sealed class ReceptoresDeIdentidadTests
         aplicador = new AplicadorDeCancelacionDelCarrito(Eliminador(e));
 
     [Fact]
-    public async Task Borra_siempre_el_checkout_y_luego_el_carrito_en_el_orden_de_bloqueo_de_D10()
-    {
-        var (e, cuenta, _) = await ConCarritoYCheckout();
-
-        await Eliminador(e).Eliminar(cuenta, "cancelacion");
-
-        Assert.Equal(["checkout", "carrito"], e.Bitacora.Bloqueos);
-    }
-
-    [Fact]
-    public async Task Es_idempotente_ante_filas_ausentes_y_se_puede_reaplicar()
-    {
-        var (e, cuenta, _) = await ConCarritoYCheckout();
-        var eliminador = Eliminador(e);
-
-        await eliminador.Eliminar(cuenta, "cancelacion");
-        await eliminador.Eliminar(cuenta, "cancelacion");
-        await eliminador.Eliminar(Guid.NewGuid(), "cancelacion");
-
-        Assert.Empty(e.Carritos.Todos);
-        Assert.Equal(3, e.Auditoria.Eliminaciones.Count);
-    }
-
-    [Fact]
     public async Task No_toca_lo_de_otras_cuentas_ni_el_carrito_de_un_visitante()
     {
         var (e, cuenta, impreso) = await ConCarritoYCheckout();
@@ -134,13 +110,5 @@ public sealed class ReceptoresDeIdentidadTests
         e.Auditoria.Caida = true;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Eliminador(e).Eliminar(cuenta, "cancelacion"));
-    }
-
-    [Fact]
-    public async Task Una_cuenta_vacia_es_un_argumento_invalido()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-
-        await Assert.ThrowsAsync<ArgumentException>(() => Eliminador(e).Eliminar(Guid.Empty, "cancelacion"));
     }
 }

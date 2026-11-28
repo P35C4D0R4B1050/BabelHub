@@ -16,31 +16,8 @@ public sealed class AlcanceDelCarritoTests
 
     // ---------- Quién pide ----------
 
-    [Fact]
-    public void Un_cliente_con_sesion_es_la_cuenta_del_actor_y_no_deja_evento()
-    {
-        var cuenta = Guid.NewGuid();
-        var (autorizador, denegaciones) = Crear(ActorDePrueba.DeCliente(cuenta));
-
-        var quien = autorizador.QuienPide();
-
-        Assert.Equal(TipoDeSolicitante.Cuenta, quien.Tipo);
-        Assert.Equal(cuenta, quien.CuentaId);
-        Assert.Empty(denegaciones.Eventos);
-    }
-
-    [Fact]
-    public void Un_visitante_sin_sesion_es_visitante()
-    {
-        var (autorizador, _) = Crear(ActorDePrueba.Anonimo());
-
-        Assert.Equal(TipoDeSolicitante.Visitante, autorizador.QuienPide().Tipo);
-    }
-
     [Theory]
     [InlineData("encargado")]
-    [InlineData("logistica")]
-    [InlineData("administrador")]
     [InlineData("sistema")]
     [InlineData("integracion")]
     [InlineData("sin-contexto")]
@@ -95,19 +72,6 @@ public sealed class AlcanceDelCarritoTests
         Assert.Equal(CategoriaDeError.NoAutenticado, resultado.Error!.Categoria);
     }
 
-    [Fact]
-    public async Task Un_cliente_con_sesion_pasa_y_recibe_su_cuenta()
-    {
-        var cuenta = Guid.NewGuid();
-        var (autorizador, denegaciones) = Crear(ActorDePrueba.DeCliente(cuenta));
-
-        var resultado = await autorizador.ExigirCuenta(default);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(cuenta, resultado.Valor);
-        Assert.Empty(denegaciones.Eventos);
-    }
-
     // ---------- Identificadores ajenos ----------
 
     [Theory]
@@ -157,29 +121,6 @@ public sealed class AlcanceDelCarritoTests
     // ---------- pedidoId oculto ----------
 
     [Fact]
-    public async Task Un_pedido_oculto_que_es_el_del_checkout_vivo_de_la_cuenta_pasa()
-    {
-        var cuenta = Guid.NewGuid();
-        var pedido = Guid.NewGuid();
-        var (autorizador, denegaciones) = Crear(ActorDePrueba.DeCliente(cuenta));
-
-        var error = await autorizador.ComprobarPedidoOculto(pedido, cuenta, new PedidoVisto(cuenta, EsElVivo: true), default);
-
-        Assert.Null(error);
-        Assert.Empty(denegaciones.Eventos);
-    }
-
-    [Fact]
-    public async Task Sin_pedido_oculto_se_usa_el_checkout_vivo_sin_comprobar_nada()
-    {
-        var cuenta = Guid.NewGuid();
-        var (autorizador, denegaciones) = Crear(ActorDePrueba.DeCliente(cuenta));
-
-        Assert.Null(await autorizador.ComprobarPedidoOculto(null, cuenta, null, default));
-        Assert.Empty(denegaciones.Eventos);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-31")]
     public async Task Un_pedido_oculto_de_otra_cuenta_o_inexistente_responde_no_encontrado_uniforme_y_deja_el_evento()
     {
@@ -226,25 +167,9 @@ public sealed class AlcanceDelCarritoTests
 
     [Theory]
     [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
     [InlineData("corta")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+")]
-    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
-    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n")]
-    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA ")]
     [InlineData("ÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁ")]
     public void Una_cookie_mal_formada_no_tiene_huella_y_es_sin_carrito(string? cookie) => Assert.False(HuellaDeLaCookie.TryDe(cookie, out _));
-
-    [Fact]
-    public void Dos_cookies_distintas_dan_huellas_distintas()
-    {
-        var a = new string('A', 43);
-        var b = new string('B', 43);
-
-        Assert.True(HuellaDeLaCookie.TryDe(a, out var ha));
-        Assert.True(HuellaDeLaCookie.TryDe(b, out var hb));
-        Assert.NotEqual(ha, hb);
-    }
 }

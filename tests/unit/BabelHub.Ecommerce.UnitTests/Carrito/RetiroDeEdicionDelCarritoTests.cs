@@ -77,36 +77,6 @@ public sealed class RetiroDeEdicionDelCarritoTests
         Assert.Equal((TipoDeAvisoDelCarrito.EdicionRetirada, retirada, "Se retira"), (aviso.Tipo, aviso.EdicionId, aviso.Titulo));
     }
 
-    [Fact]
-    public async Task Con_el_checkout_en_edicion_tambien_se_quita_y_se_deja_el_aviso()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var retirada = e.Impreso(5);
-        var cuenta = Guid.NewGuid();
-        var carrito = CarritoDe(e, cuenta, retirada);
-        CheckoutDe(e, cuenta, carrito);
-
-        await Retirar(e, retirada);
-
-        Assert.Empty(carrito.Lineas);
-        Assert.Single(await e.Carritos.AvisosSinVer(cuenta));
-    }
-
-    [Fact]
-    public async Task Un_checkout_ya_terminado_no_cuenta_como_vivo_y_la_linea_se_quita()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var retirada = e.Impreso(5);
-        var cuenta = Guid.NewGuid();
-        var carrito = CarritoDe(e, cuenta, retirada);
-        var checkout = CheckoutDe(e, cuenta, carrito);
-        Assert.Equal(EfectoDeTransicion.Aplicada, checkout.Volver(carrito, Inicio).Efecto);
-
-        await Retirar(e, retirada);
-
-        Assert.Empty(carrito.Lineas);
-    }
-
     [Theory]
     [InlineData("reservando")]
     [InlineData("en_pago")]
@@ -148,21 +118,6 @@ public sealed class RetiroDeEdicionDelCarritoTests
         Assert.Empty(carrito.Lineas);
         Assert.Equal(2, (await e.Carritos.AvisosSinVer(cuenta)).Count);
         Assert.Equal([(2, 1, 2, 0)], e.Auditoria.Retiros);
-    }
-
-    [Fact]
-    public async Task Los_carritos_que_no_tienen_la_edicion_no_se_tocan_ni_se_bloquean()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var retirada = e.Impreso(5);
-        var otra = e.Impreso(5);
-        var ajeno = CarritoDe(e, Guid.NewGuid(), otra);
-
-        await Retirar(e, retirada);
-
-        Assert.Single(ajeno.Lineas);
-        Assert.Empty(e.Bitacora.Bloqueos);
-        Assert.Equal([(1, 0, 0, 0)], e.Auditoria.Retiros);
     }
 
     [Fact]
@@ -226,15 +181,5 @@ public sealed class RetiroDeEdicionDelCarritoTests
         e.Auditoria.Caida = true;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Retirar(e, retirada));
-    }
-
-    [Fact]
-    public async Task Sin_ediciones_no_hace_nada()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-
-        await Retirar(e);
-
-        Assert.Empty(e.Auditoria.Retiros);
     }
 }

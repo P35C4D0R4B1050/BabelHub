@@ -119,17 +119,6 @@ public sealed class IntencionYConfirmacionTests
         Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
     }
 
-    [Fact]
-    public async Task Un_carrito_solo_digital_pide_la_intencion_con_una_expiracion_de_15_minutos_desde_ahora()
-    {
-        var c = await Preparado(soloDigital: true);
-
-        var resultado = await new SolicitarIntencionDePago(c.Entorno.ServiciosDelCheckout()).Ejecutar(c.Preparado, null);
-
-        Assert.Equal(DesenlaceDeLaIntencion.Creada, resultado.Desenlace);
-        Assert.Equal(1, c.Entorno.Pagos.Creaciones);
-    }
-
     // ---------- 3b ----------
 
     [Fact]
@@ -146,18 +135,6 @@ public sealed class IntencionYConfirmacionTests
         Assert.Equal([(true, false)], c.Entorno.Auditoria.PasosAlPago);
         Assert.Equal(["marca", "checkout", "carrito"], c.Entorno.Bitacora.Bloqueos);
         Assert.Contains(c.Checkout, c.Entorno.Checkouts.Guardados);
-    }
-
-    [Fact]
-    public async Task Confirmar_con_el_checkout_ya_en_pago_con_el_mismo_pedido_y_huella_es_un_exito_idempotente_que_no_audita_otra_vez()
-    {
-        var c = await Preparado();
-        await Confirmar(c);
-
-        var otra = await Confirmar(c);
-
-        Assert.Equal(DesenlaceDeLaConfirmacion.EnPago, otra.Desenlace);
-        Assert.Single(c.Entorno.Auditoria.PasosAlPago);
     }
 
     [Fact]

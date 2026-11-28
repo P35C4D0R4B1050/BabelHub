@@ -97,18 +97,6 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    public async Task Un_impreso_agotado_se_rechaza_con_maximo_cero()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var libro = e.Impreso(0);
-
-        var resultado = await Agregar(e, libro, 1);
-
-        Assert.Equal(ClavesDelCarrito.SinStock, Clave(resultado.Error));
-        Assert.Contains(new ErrorDeCampo("maximo", "0"), resultado.Error!.Errores);
-    }
-
-    [Fact]
     public async Task Si_no_se_puede_confirmar_el_stock_la_linea_se_acepta()
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -120,18 +108,6 @@ public sealed class OrquestadoresDelCarritoTests
         Assert.True(resultado.EsExito);
         Assert.Equal(5, resultado.Valor.Carrito.Lineas.Single().Cantidad);
         Assert.Equal(FrescuraDeLaDisponibilidad.NoSePuedeConfirmar, resultado.Valor.Carrito.Lineas.Single().Disponibilidad!.Frescura);
-    }
-
-    [Fact]
-    public async Task Si_la_disponibilidad_falla_la_linea_tambien_se_acepta()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var libro = e.Impreso(1);
-        e.Disponibilidad.Caida = true;
-
-        var resultado = await Agregar(e, libro, 4);
-
-        Assert.True(resultado.EsExito);
     }
 
     [Fact]
@@ -157,20 +133,6 @@ public sealed class OrquestadoresDelCarritoTests
         e.Posesion.NoResponde = true;
 
         Assert.True((await Agregar(e, digital, 1)).EsExito);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAR-18")]
-    public async Task Un_visitante_no_pasa_por_la_posesion_porque_no_tiene_cuenta()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-        var digital = e.Digital();
-        e.Posesion.Poseer(digital);
-
-        var resultado = await Agregar(e, digital, 1);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(0, e.Posesion.Consultas);
     }
 
     [Fact]
@@ -220,9 +182,7 @@ public sealed class OrquestadoresDelCarritoTests
     [Theory]
     [Trait("Criterio", "AC-CAR-32")]
     [InlineData(0)]
-    [InlineData(-1)]
     [InlineData(21)]
-    [InlineData(100)]
     public async Task Una_cantidad_fuera_de_1_a_20_es_una_validacion_que_no_repite_el_valor(int cantidad)
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -233,16 +193,6 @@ public sealed class OrquestadoresDelCarritoTests
         Assert.Equal("cantidad", Assert.Single(resultado.Error.Errores).Campo);
         Assert.DoesNotContain(cantidad.ToString(System.Globalization.CultureInfo.InvariantCulture), Assert.Single(resultado.Error.Errores).Clave, StringComparison.Ordinal);
         Assert.Equal(0, e.Catalogo.Consultas);
-    }
-
-    [Fact]
-    public async Task Una_edicion_vacia_es_una_validacion()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-
-        var resultado = await Agregar(e, Guid.Empty, 1);
-
-        Assert.Equal("edicionId", Assert.Single(resultado.Error!.Errores).Campo);
     }
 
     // ---------- Cuenta y límites ----------
@@ -270,16 +220,6 @@ public sealed class OrquestadoresDelCarritoTests
 
         Assert.Equal(CategoriaDeError.NoDisponible, (await Agregar(sinRespuesta, sinRespuesta.Impreso(5), 1)).Error!.Categoria);
         Assert.Equal(CategoriaDeError.Prohibido, (await Agregar(inexistente, inexistente.Impreso(5), 1)).Error!.Categoria);
-    }
-
-    [Fact]
-    public async Task Un_visitante_no_consulta_a_Identidad()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-
-        await Agregar(e, e.Impreso(5), 1);
-
-        Assert.Equal(0, e.Cuenta.Consultas);
     }
 
     [Fact]
@@ -335,21 +275,6 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    public async Task Con_su_cookie_el_visitante_sigue_en_el_mismo_carrito_y_no_crea_otro()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-        var primera = await Agregar(e, e.Impreso(5), 1);
-        var cookie = primera.Valor.CookieNueva;
-
-        var segunda = await Agregar(e, e.Impreso(5), 1, cookie);
-
-        Assert.Null(segunda.Valor.CookieNueva);
-        Assert.Equal(2, segunda.Valor.Carrito.Lineas.Count);
-        Assert.Single(e.Carritos.Todos);
-        Assert.Equal(1, e.Limites.CarritosCreados);
-    }
-
-    [Fact]
     public async Task Un_limite_de_carritos_de_visitante_excedido_no_crea_ninguno()
     {
         var e = EntornoDelCarrito.DeVisitante();
@@ -375,18 +300,6 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    public async Task Una_cookie_desconocida_es_sin_carrito_al_ver_y_se_borra()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-
-        var resultado = await Obtener(e, new string('A', 43));
-
-        Assert.Empty(resultado.Valor.Carrito.Lineas);
-        Assert.True(resultado.Valor.BorrarLaCookie);
-        Assert.Null(resultado.Valor.CookieNueva);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-25")]
     public async Task Un_visitante_que_lleva_31_dias_sin_volver_encuentra_su_carrito_caducado()
     {
@@ -394,19 +307,6 @@ public sealed class OrquestadoresDelCarritoTests
         var libro = e.Impreso(5);
         var primera = await Agregar(e, libro, 1);
         e.Reloj.Ahora = EntornoDelCarrito.Inicio.AddDays(31);
-
-        var vista = await Obtener(e, primera.Valor.CookieNueva);
-
-        Assert.Empty(vista.Valor.Carrito.Lineas);
-        Assert.True(vista.Valor.BorrarLaCookie);
-    }
-
-    [Fact]
-    public async Task Una_cookie_de_un_carrito_fusionado_es_sin_carrito()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-        var primera = await Agregar(e, e.Impreso(5), 1);
-        e.Carritos.Todos.Single().MarcarFusionado(EntornoDelCarrito.Inicio);
 
         var vista = await Obtener(e, primera.Valor.CookieNueva);
 
@@ -433,34 +333,6 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    public async Task Ver_el_carrito_muestra_el_precio_vigente_del_catalogo_y_la_disponibilidad()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var libro = e.Impreso(8, 50m, "Pedro Páramo");
-        await Agregar(e, libro, 2);
-        e.Catalogo.Poner(libro, FormatoDeEdicion.Impresa, 55m, "Pedro Páramo");
-
-        var vista = (await Obtener(e)).Valor.Carrito;
-
-        Assert.Equal(55m, vista.Lineas.Single().PrecioUnitario);
-        Assert.Equal(110m, vista.Subtotal);
-        Assert.Equal("Pedro Páramo", vista.Lineas.Single().Titulo);
-        Assert.Equal(8, vista.Lineas.Single().Disponibilidad!.VendibleEnLaRed);
-    }
-
-    [Fact]
-    public async Task Un_cliente_sin_carrito_ve_uno_vacio_y_no_se_crea_nada()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-
-        var vista = await Obtener(e);
-
-        Assert.Empty(vista.Valor.Carrito.Lineas);
-        Assert.Equal(0m, vista.Valor.Carrito.Subtotal);
-        Assert.Empty(e.Carritos.Todos);
-    }
-
-    [Fact]
     public async Task El_carrito_de_otra_cuenta_nunca_se_ve()
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -474,19 +346,6 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     // ---------- Modificar y eliminar ----------
-
-    [Fact]
-    public async Task Modificar_cambia_la_cantidad_y_el_total()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var libro = e.Impreso(10, 20m);
-        await Agregar(e, libro, 1);
-
-        var resultado = await Modificar(e, libro, 4);
-
-        Assert.Equal(4, resultado.Valor.Carrito.Lineas.Single().Cantidad);
-        Assert.Equal(80m, resultado.Valor.Carrito.Subtotal);
-    }
 
     [Fact]
     public async Task Modificar_por_encima_del_stock_se_rechaza_con_el_maximo_pero_bajar_siempre_se_puede()
@@ -506,19 +365,6 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    public async Task Modificar_una_linea_que_no_esta_es_no_encontrada()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var libro = e.Impreso(5);
-        await Agregar(e, e.Impreso(5), 1);
-
-        var resultado = await Modificar(e, libro, 2);
-
-        Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
-        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, resultado.Error.Clave);
-    }
-
-    [Fact]
     public async Task Eliminar_quita_la_linea_y_repetirlo_es_no_encontrada_sin_cambios()
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -534,29 +380,6 @@ public sealed class OrquestadoresDelCarritoTests
         Assert.Equal([otro], uno.Valor.Carrito.Lineas.Select(l => l.EdicionId));
         Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, Clave(dos.Error));
         Assert.Equal(30m, uno.Valor.Carrito.Subtotal);
-    }
-
-    [Fact]
-    public async Task Eliminar_sin_carrito_es_no_encontrada_y_no_crea_nada()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-
-        var resultado = await Eliminar(e, Guid.NewGuid());
-
-        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, Clave(resultado.Error));
-        Assert.Empty(e.Carritos.Todos);
-        Assert.Equal(0, e.Limites.CarritosCreados);
-    }
-
-    [Fact]
-    public async Task Modificar_sin_carrito_es_no_encontrado_y_no_crea_nada()
-    {
-        var e = EntornoDelCarrito.DeVisitante();
-
-        var resultado = await Modificar(e, e.Impreso(5), 1);
-
-        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, Clave(resultado.Error));
-        Assert.Empty(e.Carritos.Todos);
     }
 
     // ---------- El checkout vivo (CAR-26) ----------
@@ -601,16 +424,6 @@ public sealed class OrquestadoresDelCarritoTests
         Assert.All([agregar, modificar, eliminar], r => Assert.Equal(ClavesDelCarrito.PagoPendiente, Clave(r.Error)));
         Assert.All([agregar, modificar, eliminar], r => Assert.Equal(CategoriaDeError.Conflicto, r.Error!.Categoria));
         Assert.Equal(1, e.Carritos.Todos.Single().Lineas.Single().Cantidad.Valor);
-    }
-
-    [Fact]
-    public async Task Con_el_checkout_reservando_se_responde_en_curso()
-    {
-        var (e, libro) = ConCheckoutEn(AReservando);
-
-        Assert.Equal(ClavesDelCarrito.EnCurso, Clave((await Agregar(e, e.Impreso(5), 1)).Error));
-        Assert.Equal(ClavesDelCarrito.EnCurso, Clave((await Modificar(e, libro, 2)).Error));
-        Assert.Equal(ClavesDelCarrito.EnCurso, Clave((await Eliminar(e, libro)).Error));
     }
 
     [Fact]

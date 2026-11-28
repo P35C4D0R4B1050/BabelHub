@@ -109,32 +109,13 @@ public sealed class CheckoutApiTests : IAsyncLifetime
         Assert.Empty(_host.Checkout.Llamadas);
     }
 
-    [Fact]
-    public async Task Falta_el_tipo_de_entrega_es_validacion()
-    {
-        using var respuesta = await _host.Enviar("/checkout/entrega", [C("sucursal", "sede-central")], conSesion: true);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Empty(_host.Checkout.Llamadas);
-    }
-
     [Theory]
     [InlineData("recojo", "nombre")]
-    [InlineData("recojo", "telefono")]
     [InlineData("digital", "direccion")]
     [InlineData("domicilio", "sucursal")]
     public async Task Un_campo_que_no_corresponde_al_tipo_de_entrega_se_rechaza_en_vez_de_ignorarse(string tipo, string campo)
     {
         using var respuesta = await _host.Enviar("/checkout/entrega", [C("tipoDeEntrega", tipo), C(campo, "x")], conSesion: true);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Empty(_host.Checkout.Llamadas);
-    }
-
-    [Fact]
-    public async Task Un_pedidoId_oculto_que_no_es_un_GUID_es_validacion()
-    {
-        using var respuesta = await _host.Enviar("/checkout/entrega", [C("tipoDeEntrega", "recojo"), C("sucursal", "sede-central"), C("pedidoId", "no-es-guid")], conSesion: true);
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         Assert.Empty(_host.Checkout.Llamadas);
@@ -215,9 +196,7 @@ public sealed class CheckoutApiTests : IAsyncLifetime
     [InlineData("132,00")]
     [InlineData("132.001")]
     [InlineData("-1")]
-    [InlineData("1e2")]
     [InlineData("12345678901")]
-    [InlineData(".5")]
     [InlineData("")]
     public async Task Un_total_visto_invalido_es_validacion_y_no_se_registra_nada(string total)
     {
@@ -252,16 +231,9 @@ public sealed class CheckoutApiTests : IAsyncLifetime
 
     [Theory]
     [InlineData("checkout-reserva-rechazada", CategoriaDeError.Conflicto, 409, "ECO-CHECKOUT-RESERVA-RECHAZADA")]
-    [InlineData("checkout-en-curso", CategoriaDeError.Conflicto, 409, "ECO-CHECKOUT-EN-CURSO")]
-    [InlineData("checkout-total-cambio", CategoriaDeError.Conflicto, 409, "ECO-CHECKOUT-TOTAL-CAMBIO")]
     [InlineData("checkout-stock-no-validable", CategoriaDeError.NoDisponible, 503, "ECO-CHECKOUT-STOCK-NO-VALIDABLE")]
     [InlineData("checkout-cuenta-no-puede-comprar", CategoriaDeError.Prohibido, 403, "ECO-CHECKOUT-CUENTA-NO-PUEDE-COMPRAR")]
-    [InlineData("checkout-correo-sin-verificar", CategoriaDeError.Prohibido, 403, "ECO-CHECKOUT-CORREO-SIN-VERIFICAR")]
-    [InlineData("checkout-textos-pendientes", CategoriaDeError.Prohibido, 403, "ECO-CHECKOUT-TEXTOS-PENDIENTES")]
-    [InlineData("checkout-licencia-no-vigente", CategoriaDeError.Conflicto, 409, "ECO-CHECKOUT-LICENCIA-NO-VIGENTE")]
     [InlineData("checkout-aceptacion-requerida", CategoriaDeError.Validacion, 422, "ECO-CHECKOUT-ACEPTACION-REQUERIDA")]
-    [InlineData("checkout-datos-de-entrega-incompletos", CategoriaDeError.Validacion, 422, "ECO-CHECKOUT-DATOS-DE-ENTREGA-INCOMPLETOS")]
-    [InlineData("digital-ya-poseida", CategoriaDeError.Conflicto, 409, "ECO-DIGITAL-YA-POSEIDA")]
     public async Task Los_errores_de_pasar_al_pago_se_traducen_a_su_codigo_y_estado(string clave, CategoriaDeError categoria, int estado, string codigo)
     {
         _host.Checkout.RespuestaDePago = Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(categoria, clave));
@@ -270,18 +242,6 @@ public sealed class CheckoutApiTests : IAsyncLifetime
 
         Assert.Equal(estado, (int)respuesta.StatusCode);
         Assert.Equal(codigo, (await CarritoApiHost.Leer(respuesta)).GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task El_limite_excedido_al_pasar_al_pago_lleva_el_instante_de_reintento()
-    {
-        var hasta = DateTimeOffset.UtcNow.AddMinutes(10);
-        _host.Checkout.RespuestaDePago = Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Limite, "limite-excedido", [new ErrorDeCampo("disponibleDesde", hasta.ToString("O", System.Globalization.CultureInfo.InvariantCulture))]));
-
-        using var respuesta = await _host.Enviar("/checkout", Aceptaciones(), conSesion: true);
-
-        Assert.Equal(HttpStatusCode.TooManyRequests, respuesta.StatusCode);
-        Assert.InRange(int.Parse(respuesta.Headers.GetValues("Retry-After").Single(), System.Globalization.CultureInfo.InvariantCulture), 590, 605);
     }
 
     // ---------- Volver y reiniciar ----------

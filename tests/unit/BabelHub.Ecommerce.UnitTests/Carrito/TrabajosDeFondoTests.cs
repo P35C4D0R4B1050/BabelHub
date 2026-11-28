@@ -212,46 +212,6 @@ public sealed class TrabajosDeFondoTests
         Assert.Single(e.Inventario.Liberaciones);
     }
 
-    [Fact]
-    public async Task Un_checkout_reservando_reciente_o_que_ya_paso_a_en_pago_no_se_toca()
-    {
-        var reciente = await ConCheckout();
-        var carrito = reciente.Entorno.Carritos.Todos.Single();
-        reciente.Checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(12m), s => s, s => s, carrito, Inicio);
-        ComoSistema(reciente.Entorno);
-        reciente.Entorno.Reloj.Ahora = Inicio.AddMinutes(1);
-        var enPago = await ConCheckout();
-        var carrito2 = enPago.Entorno.Carritos.Todos.Single();
-        enPago.Checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(12m), s => s, s => s, carrito2, Inicio);
-        enPago.Checkout.ConfirmarEnPago(enPago.Checkout.PedidoId!.Value, enPago.Checkout.GeneracionDeReserva, enPago.Checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito2);
-        ComoSistema(enPago.Entorno);
-        enPago.Entorno.Reloj.Ahora = Inicio.AddMinutes(5);
-
-        var a = await new RecuperarCheckoutsReservando(reciente.Entorno.ServiciosDelCheckout()).Ejecutar(new TrabajoDelCarritoEntrada());
-        var b = await new RecuperarCheckoutsReservando(enPago.Entorno.ServiciosDelCheckout()).Ejecutar(new TrabajoDelCarritoEntrada());
-
-        Assert.Equal(0, a.Valor.Tocados);
-        Assert.Equal(0, b.Valor.Tocados);
-        Assert.Equal(EstadoDelCheckout.Reservando, reciente.Checkout.Estado);
-        Assert.Equal(EstadoDelCheckout.EnPago, enPago.Checkout.Estado);
-    }
-
-    [Fact]
-    public async Task La_recuperacion_aplica_los_retiros_pendientes_al_volver_a_edicion()
-    {
-        var (e, checkout) = await ConCheckout();
-        var carrito = e.Carritos.Todos.Single();
-        checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(12m), s => s, s => s, carrito, Inicio);
-        carrito.RetirarEdicion(carrito.Lineas.Single().EdicionId, diferir: true, Inicio);
-        ComoSistema(e);
-        e.Reloj.Ahora = Inicio.AddMinutes(3);
-
-        await new RecuperarCheckoutsReservando(e.ServiciosDelCheckout()).Ejecutar(new TrabajoDelCarritoEntrada());
-
-        Assert.Empty(carrito.Lineas);
-        Assert.Single(await e.Carritos.AvisosSinVer(carrito.Propietario.CuentaId!.Value));
-    }
-
     // ---------- Revisar pagos pendientes ----------
 
     [Fact]

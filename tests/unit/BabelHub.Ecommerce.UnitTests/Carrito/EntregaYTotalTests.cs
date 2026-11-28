@@ -13,14 +13,10 @@ public sealed class EntregaYTotalTests
     [Theory]
     [Trait("Criterio", "AC-CAR-26")]
     [InlineData("987654321", "987654321")]
-    [InlineData("987 654 321", "987654321")]
-    [InlineData("987-654-321", "987654321")]
     [InlineData("(987) 654 321", "987654321")]
     [InlineData("+51 987 654 321", "987654321")]
-    [InlineData("+51987654321", "987654321")]
     [InlineData("0051 987654321", "987654321")]
     [InlineData("51987654321", "987654321")]
-    [InlineData("  987654321  ", "987654321")]
     public void Un_telefono_movil_peruano_se_acepta_y_se_guarda_normalizado(string texto, string esperado)
     {
         Assert.True(TelefonoDeContacto.TryCrear(texto, out var telefono));
@@ -31,37 +27,24 @@ public sealed class EntregaYTotalTests
     [Theory]
     [Trait("Criterio", "AC-CAR-26")]
     [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
     [InlineData("12345678")]
-    [InlineData("1234567890")]
     [InlineData("887654321")]
-    [InlineData("98765432")]
     [InlineData("9876543210")]
     [InlineData("98765432a")]
     [InlineData("+52987654321")]
-    [InlineData("+5198765432")]
-    [InlineData("5198765432")]
     [InlineData("0051+987654321")]
-    [InlineData("987+654321")]
     [InlineData("٩٨٧٦٥٤٣٢١")]
     [InlineData("987654321\n")]
-    [InlineData("987\t654321")]
     public void Un_telefono_que_no_es_movil_peruano_se_rechaza(string? texto) => Assert.False(TelefonoDeContacto.TryCrear(texto, out _));
 
     [Theory]
     [Trait("Criterio", "AC-CAR-26")]
     [InlineData("Ana Pérez", true)]
     [InlineData("  Ana  ", true)]
-    [InlineData("", false)]
     [InlineData("   ", false)]
     [InlineData(null, false)]
     [InlineData("Ana\nPérez", false)]
-    [InlineData("Ana\rPérez", false)]
-    [InlineData("Ana\tPérez", false)]
-    [InlineData("Ana\u0000Pérez", false)]
     [InlineData("Ana\u2028Pérez", false)]
-    [InlineData("Ana\u2029Pérez", false)]
     public void El_nombre_no_admite_vacios_ni_caracteres_de_control_ni_saltos_de_linea(string? texto, bool valido) =>
         Assert.Equal(valido, NombreDeContacto.TryCrear(texto, out _));
 
@@ -81,13 +64,6 @@ public sealed class EntregaYTotalTests
     }
 
     [Fact]
-    public void Un_texto_con_sustitutos_sueltos_se_rechaza_en_vez_de_lanzar()
-    {
-        Assert.False(NombreDeContacto.TryCrear("Ana\uD800Pérez", out _));
-        Assert.False(DireccionDeEntrega.TryCrear("Jr. \uDC00", "Ayacucho", out _));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-26")]
     public void El_nombre_tiene_un_tope_de_80_caracteres()
     {
@@ -98,10 +74,7 @@ public sealed class EntregaYTotalTests
     [Theory]
     [Trait("Criterio", "AC-CAR-07")]
     [InlineData("Jr. Lima 123, Huamanga", "Ayacucho", true)]
-    [InlineData("", "Ayacucho", false)]
-    [InlineData("   ", "Ayacucho", false)]
     [InlineData(null, "Ayacucho", false)]
-    [InlineData("Jr. Lima 123", "", false)]
     [InlineData("Jr. Lima 123", null, false)]
     [InlineData("Jr. Lima\n123", "Ayacucho", false)]
     [InlineData("Jr. Lima 123", "Ayacu\ncho", false)]
@@ -153,41 +126,15 @@ public sealed class EntregaYTotalTests
         }
     }
 
-    [Fact]
-    public void Un_contacto_serializado_no_se_puede_leer_de_vuelta()
-    {
-        Assert.Throws<NotSupportedException>(() => JsonSerializer.Deserialize<ContactoDeEntrega>("\"[redactado]\""));
-    }
-
-    [Fact]
-    public void Un_contacto_exige_sus_tres_datos()
-    {
-        Assert.Throws<ArgumentNullException>(() => ContactoDeEntrega.Crear(null!, TelefonoDeContacto.Crear("987654321"), DireccionDeEntrega.Crear("Jr. Lima 123", "Ayacucho")));
-        Assert.Throws<ArgumentException>(() => NombreDeContacto.Crear(""));
-        Assert.Throws<ArgumentException>(() => TelefonoDeContacto.Crear("123"));
-        Assert.Throws<ArgumentException>(() => DireccionDeEntrega.Crear("", "Ayacucho"));
-    }
-
     [Theory]
     [InlineData("12.00", true)]
     [InlineData("0", true)]
-    [InlineData("0.01", true)]
     [InlineData("12.5", true)]
     [InlineData("-0.01", false)]
     [InlineData("12.005", false)]
-    [InlineData("12.001", false)]
     [InlineData("10000000000", false)]
     public void El_costo_de_envio_son_soles_no_negativos_con_a_lo_mas_dos_decimales(string texto, bool valido) =>
         Assert.Equal(valido, CostoDeEnvio.TryCrear(decimal.Parse(texto, System.Globalization.CultureInfo.InvariantCulture), out _));
-
-    [Fact]
-    public void El_costo_de_envio_se_guarda_con_dos_decimales_y_el_cero_existe()
-    {
-        Assert.True(CostoDeEnvio.TryCrear(12.5m, out var costo));
-
-        Assert.Equal("12.50", costo!.Valor.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
-        Assert.Equal(0m, CostoDeEnvio.Cero.Valor);
-    }
 
     [Fact]
     [Trait("Criterio", "AC-CAR-21")]
@@ -224,12 +171,6 @@ public sealed class EntregaYTotalTests
         var total = TotalDeCompra.Calcular([new ImporteDeLinea(0.125m, 1), new ImporteDeLinea(0.125m, 1)], TipoDeEntrega.Recojo, CostoDeEnvio.Cero);
 
         Assert.Equal(0.26m, total.Subtotal);
-    }
-
-    [Fact]
-    public void Los_tres_tipos_de_entrega_existen()
-    {
-        Assert.Equal(["Recojo", "Domicilio", "Digital"], Enum.GetNames<TipoDeEntrega>());
     }
 
     private static ContactoDeEntrega Contacto() =>

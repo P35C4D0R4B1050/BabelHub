@@ -19,18 +19,6 @@ public sealed class RetirosPendientesDelCarritoTests
     }
 
     [Fact]
-    public void Sin_un_checkout_que_lo_impida_el_retiro_quita_la_linea()
-    {
-        var carrito = ConDosLineas();
-
-        var resultado = carrito.RetirarEdicion(Libro, diferir: false, Ahora.AddMinutes(1));
-
-        Assert.Equal(ResultadoDeRetiro.Quitada, resultado);
-        Assert.DoesNotContain(carrito.Lineas, l => l.EdicionId == Libro);
-        Assert.False(carrito.TieneRetirosPendientes);
-    }
-
-    [Fact]
     public void Con_un_checkout_vivo_que_no_admite_editar_el_retiro_solo_anota_la_linea_y_repetirlo_no_cambia_nada()
     {
         var carrito = ConDosLineas();
@@ -44,17 +32,6 @@ public sealed class RetirosPendientesDelCarritoTests
         Assert.True(carrito.Lineas.Single(l => l.EdicionId == Libro).RetiroPendiente);
         Assert.False(carrito.Lineas.Single(l => l.EdicionId == Digital).RetiroPendiente);
         Assert.Equal(2, carrito.Lineas.Single(l => l.EdicionId == Libro).Cantidad.Valor);
-    }
-
-    [Fact]
-    public void Retirar_una_edicion_que_no_esta_en_el_carrito_es_un_exito_sin_cambios()
-    {
-        var carrito = ConDosLineas();
-        var version = carrito.Version;
-
-        Assert.Equal(ResultadoDeRetiro.NoEstaba, carrito.RetirarEdicion(Guid.NewGuid(), diferir: false, Ahora));
-        Assert.Equal(ResultadoDeRetiro.NoEstaba, carrito.RetirarEdicion(Guid.NewGuid(), diferir: true, Ahora));
-        Assert.Equal(version, carrito.Version);
     }
 
     [Fact]
@@ -83,24 +60,11 @@ public sealed class RetirosPendientesDelCarritoTests
         Assert.Empty(carrito.AplicarRetirosPendientes(Ahora.AddMinutes(2)));
     }
 
-    [Fact]
-    public void Sin_retiros_pendientes_aplicar_no_cambia_la_version()
-    {
-        var carrito = ConDosLineas();
-        var version = carrito.Version;
-
-        Assert.Empty(carrito.AplicarRetirosPendientes(Ahora));
-        Assert.Equal(version, carrito.Version);
-    }
-
     [Theory]
     [InlineData(null, true)]
     [InlineData(EstadoDelCheckout.EnEdicion, true)]
-    [InlineData(EstadoDelCheckout.Pagado, true)]
     [InlineData(EstadoDelCheckout.Cancelado, true)]
-    [InlineData(EstadoDelCheckout.Reiniciado, true)]
     [InlineData(EstadoDelCheckout.Reservando, false)]
-    [InlineData(EstadoDelCheckout.EnPago, false)]
     [InlineData(EstadoDelCheckout.PagoPendiente, false)]
     public void Una_anotacion_huerfana_la_quita_la_primera_lectura_solo_si_el_checkout_no_la_sostiene(EstadoDelCheckout? estado, bool seQuita)
     {

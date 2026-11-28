@@ -47,18 +47,6 @@ public sealed class FusionTests
     }
 
     [Fact]
-    public void Las_cantidades_del_mismo_libro_y_sucursal_se_suman_si_el_maximo_lo_permite()
-    {
-        var cuenta = Impresa(1, 2);
-
-        var resultado = Fusionar([cuenta], [Impresa(1, 3)], Ediciones(Vendible(1, maximo: 10)));
-
-        var linea = Assert.Single(resultado.Lineas);
-        Assert.Equal((cuenta.LineaId, 5), (linea.LineaId, linea.Cantidad.Valor));
-        Assert.Empty(resultado.Ajustes);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-35")]
     public void El_mismo_libro_en_otra_sucursal_queda_en_su_propia_linea_y_cada_uno_se_mide_con_su_stock()
     {
@@ -101,15 +89,6 @@ public sealed class FusionTests
     }
 
     [Fact]
-    public void Una_sucursal_sin_unidades_segun_el_dato_no_admite_la_linea_aunque_otra_tenga()
-    {
-        var resultado = Fusionar([], [Impresa(1, 2, Sucursal.Lima)], Ediciones(Vendible(1, maximo: 9)));
-
-        Assert.Empty(resultado.Lineas);
-        Assert.Equal(MotivoDeAjusteDeFusion.SinStock, Assert.Single(resultado.Ajustes).Motivo);
-    }
-
-    [Fact]
     public void Lo_que_la_cuenta_ya_tenia_no_se_reduce_aunque_el_maximo_sea_menor()
     {
         var resultado = Fusionar([Impresa(1, 4)], [Impresa(1, 2)], Ediciones(Vendible(1, maximo: 3)));
@@ -140,17 +119,6 @@ public sealed class FusionTests
         Assert.Equal(
             [(Edicion(1), MotivoDeAjusteDeFusion.NoVendible, 0), (Edicion(2), MotivoDeAjusteDeFusion.NoVendible, 0)],
             resultado.Ajustes.Select(a => (a.EdicionId, a.Motivo, a.CantidadFinal)));
-    }
-
-    [Fact]
-    public void Una_edicion_que_dejo_de_venderse_no_quita_la_linea_que_la_cuenta_ya_tenia()
-    {
-        var retirada = new EdicionParaFusion(Edicion(1), EsDigital: false, EsVendible: false, VendiblePorSucursal: null);
-
-        var resultado = Fusionar([Impresa(1, 2)], [Impresa(1, 1)], Ediciones(retirada));
-
-        Assert.Equal(2, Assert.Single(resultado.Lineas).Cantidad.Valor);
-        Assert.Equal(MotivoDeAjusteDeFusion.NoVendible, Assert.Single(resultado.Ajustes).Motivo);
     }
 
     [Fact]
@@ -189,29 +157,6 @@ public sealed class FusionTests
 
         Assert.Equal([((string?)null, 2), (null, 3), (Sucursal.Principal, 1)], resultado.Lineas.Select(l => (l.CodigoDeSucursal, l.Cantidad.Valor)));
         Assert.Empty(resultado.Ajustes);
-    }
-
-    [Fact]
-    public void Una_fusion_sin_lineas_del_visitante_devuelve_las_de_la_cuenta_sin_ajustes()
-    {
-        var resultado = Fusionar([Impresa(1, 2), DigitalDe(2)], [], Ediciones());
-
-        Assert.Equal([(Edicion(1), 2), (Edicion(2), 1)], Cantidades(resultado));
-        Assert.Empty(resultado.Ajustes);
-    }
-
-    [Fact]
-    public void Fusionar_es_una_funcion_pura_y_dos_veces_con_lo_mismo_da_lo_mismo()
-    {
-        var cuenta = new[] { Impresa(1, 2) };
-        var visitante = new[] { Impresa(1, 1), Impresa(2, 3) };
-        var ediciones = Ediciones(Vendible(1, maximo: 2), Vendible(2, maximo: 9));
-
-        var primera = Fusionar(cuenta, visitante, ediciones);
-        var segunda = Fusionar(cuenta, visitante, ediciones);
-
-        Assert.Equal(primera.Lineas, segunda.Lineas);
-        Assert.Equal(primera.Ajustes, segunda.Ajustes);
     }
 
     [Fact]

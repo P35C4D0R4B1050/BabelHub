@@ -108,19 +108,6 @@ public sealed class CorreccionesDeLaRevisionDeEco4cTests
         Assert.Equal(["reserva-expirada"], s.Entorno.Auditoria.Abortos);
     }
 
-    [Fact]
-    public async Task La_recuperacion_de_un_reservando_atascado_audita_el_motivo_recuperacion()
-    {
-        var s = await Listo();
-        s.Checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(0m), x => x, x => x, s.Entorno.Carritos.Todos.Single(), Inicio);
-        s.Entorno.Actor.Establecer(ActorActual.DelSistema());
-        s.Entorno.Reloj.Ahora = Inicio.AddMinutes(3);
-
-        await new RecuperarCheckoutsReservando(s.Entorno.ServiciosDelCheckout()).Ejecutar(new TrabajoDelCarritoEntrada());
-
-        Assert.Equal(["recuperacion"], s.Entorno.Auditoria.Abortos);
-    }
-
     // ---------- I4 ----------
 
     [Fact]

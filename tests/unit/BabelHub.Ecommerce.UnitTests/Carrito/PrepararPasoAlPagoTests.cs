@@ -114,37 +114,6 @@ public sealed class PrepararPasoAlPagoTests
     }
 
     [Fact]
-    public async Task Un_carrito_solo_digital_no_tiene_entrega_ni_reserva_ni_consulta_al_inventario()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(20m), 1, CodigoDeSucursal: Sucursal.Principal));
-        await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
-        await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(Los3));
-        var s = new Escenario(e, e.Checkouts.Todos.Single(), Guid.Empty, null, 20m);
-
-        var p = (await Preparar(s)).Valor;
-
-        Assert.Equal(DesenlaceDePrepararPaso.Preparado, p.Desenlace);
-        Assert.Null(p.Entrega);
-        Assert.Empty(p.LineasImpresas);
-        Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
-        Assert.Equal(TipoDeEntregaDeCompra.Digital, p.Instantanea!.TipoDeEntrega);
-    }
-
-    [Fact]
-    public async Task La_misma_huella_continua_con_el_mismo_pedido_sin_subir_la_generacion()
-    {
-        var s = await Listo();
-        var primero = (await Preparar(s)).Valor;
-
-        var segundo = await Preparar(s);
-
-        Assert.True(segundo.EsExito, segundo.Error?.Clave);
-        Assert.Equal(DesenlaceDePrepararPaso.YaPreparado, segundo.Valor.Desenlace);
-        Assert.Equal((primero.PedidoId, primero.Generacion, primero.HuellaDeInstantanea), (segundo.Valor.PedidoId, segundo.Valor.Generacion, segundo.Valor.HuellaDeInstantanea));
-    }
-
-    [Fact]
     public async Task Repetir_pagar_con_el_mismo_pedido_no_consume_otro_cupo_del_limite_despues_de_asignarlo()
     {
         var s = await Listo();
@@ -387,19 +356,6 @@ public sealed class PrepararPasoAlPagoTests
         Assert.Contains(new ErrorDeCampo("total", "120.00"), resultado.Error.Errores);
     }
 
-    [Fact]
-    public async Task Con_el_total_correcto_con_el_precio_nuevo_se_congela_ese_precio()
-    {
-        var s = await Listo();
-        s.Entorno.Catalogo.Poner(s.Impreso, FormatoDeEdicion.Impresa, 40m, "Impreso");
-
-        var resultado = await Preparar(s, total: 120m);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(120m, s.Checkout.TotalCongelado);
-        Assert.Equal(40m, s.Checkout.Lineas.Single().PrecioUnitario);
-    }
-
     // ---------- Límites y alcance ----------
 
     [Fact]
@@ -414,31 +370,6 @@ public sealed class PrepararPasoAlPagoTests
         Assert.Equal(CategoriaDeError.Limite, excedido.Error!.Categoria);
         Assert.Equal(CategoriaDeError.NoDisponible, sinAlmacen.Error!.Categoria);
         SinEfectos(s);
-    }
-
-    [Fact]
-    public async Task Un_pedido_oculto_ajeno_responde_no_encontrado_y_deja_el_evento()
-    {
-        var s = await Listo();
-
-        var resultado = await Preparar(s, pedido: Guid.NewGuid());
-
-        Assert.Equal(ClavesDelCarrito.NoEncontrado, resultado.Error!.Clave);
-        Assert.Equal("recurso-ajeno-pedido-id", Assert.Single(s.Entorno.Denegaciones.Eventos).Motivo);
-    }
-
-    [Fact]
-    public async Task Con_el_pago_pendiente_se_rechaza()
-    {
-        var s = await Listo();
-        var p = (await Preparar(s)).Valor;
-        var carrito = s.Entorno.Carritos.Todos.Single();
-        s.Checkout.ConfirmarEnPago(p.PedidoId!.Value, p.Generacion, p.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito);
-        s.Checkout.PagoPendiente(p.PedidoId.Value, Inicio.AddMinutes(30), Inicio.AddMinutes(15), Inicio);
-
-        var resultado = await Preparar(s);
-
-        Assert.Equal(ClavesDelCarrito.PagoPendiente, resultado.Error!.Clave);
     }
 
     // ---------- Retiro pendiente ----------

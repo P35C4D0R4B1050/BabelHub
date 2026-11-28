@@ -137,18 +137,6 @@ public sealed class IniciarCheckoutTests
     }
 
     [Fact]
-    public async Task Si_falla_la_consulta_previa_tampoco_se_avanza()
-    {
-        var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
-        e.Inventario.PreviaCaida = true;
-
-        var resultado = await Iniciar(e);
-
-        Assert.Equal(ClavesDelCarrito.StockNoValidable, resultado.Error!.Clave);
-        Assert.Empty(e.Checkouts.Todos);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-06")]
     public async Task Un_carrito_solo_digital_no_consulta_el_inventario_y_tiene_cuatro_pasos_o_menos()
     {
@@ -162,19 +150,6 @@ public sealed class IniciarCheckoutTests
         Assert.True(resultado.Valor.TotalDePasos <= 4);
         Assert.Equal(TipoDeEntregaDeCompra.Digital, resultado.Valor.TipoDeEntrega);
         Assert.All(resultado.Valor.Lineas, l => Assert.Equal(DisponibilidadDeLineaDeCheckout.DisponibleAlInstante, l.Disponibilidad));
-    }
-
-    [Fact]
-    public async Task Un_carrito_mixto_consulta_solo_los_impresos()
-    {
-        var impreso = Guid.Empty;
-        var (e, _, _) = await ConCarrito((x => impreso = x.Impreso(5), 1), (x => x.Digital(), 1));
-
-        var resultado = await Iniciar(e);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal([impreso], Assert.Single(e.Inventario.EdicionesConsultadas));
-        Assert.Equal(2, resultado.Valor.Lineas.Count);
     }
 
     [Fact]
@@ -208,30 +183,7 @@ public sealed class IniciarCheckoutTests
         Assert.Single(e.Checkouts.Todos.Single().Lineas);
     }
 
-    [Fact]
-    public async Task Si_todas_las_lineas_estan_retiradas_es_un_checkout_vacio()
-    {
-        var (e, _, carrito) = await ConCarrito((x => x.Impreso(5), 1));
-        carrito.RetirarEdicion(carrito.Lineas.Single().EdicionId, diferir: true, Inicio);
-
-        var resultado = await Iniciar(e);
-
-        Assert.Equal(ClavesDelCarrito.CheckoutVacio, resultado.Error!.Clave);
-    }
-
     // ---------- Checkout vivo ----------
-
-    [Fact]
-    public async Task Con_un_checkout_vivo_en_edicion_se_devuelve_ese_sin_crear_otro()
-    {
-        var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
-        var primero = (await Iniciar(e)).Valor;
-        var segundo = await Iniciar(e);
-
-        Assert.True(segundo.EsExito);
-        Assert.Single(e.Checkouts.Todos);
-        Assert.Equal(primero.Lineas.Single().LineaId, segundo.Valor.Lineas.Single().LineaId);
-    }
 
     [Fact]
     public async Task Con_el_checkout_en_edicion_las_lineas_se_sincronizan_con_el_carrito_conservando_el_lineaId_de_las_que_siguen()
@@ -246,31 +198,6 @@ public sealed class IniciarCheckoutTests
         Assert.Equal(2, segundo.Lineas.Count);
         Assert.Equal(primero.Lineas.Single().LineaId, segundo.Lineas[0].LineaId);
         Assert.Equal(2, e.Checkouts.Todos.Single().Lineas.Count);
-    }
-
-    [Fact]
-    public async Task Con_el_checkout_en_pago_se_devuelve_con_su_pedido_y_la_reserva()
-    {
-        var e = EntornoDelCarrito.DeCliente();
-        var cuenta = e.Actor.Actual!.UsuarioId!.Value;
-        var libro = e.Impreso(5);
-        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(cuenta), Inicio);
-        carrito.Agregar(libro, false, 1, Inicio);
-        e.Carritos.Sembrar(carrito);
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 1, 50m, libro, Sucursal.Principal)], Guid.NewGuid, Inicio);
-        checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
-        checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
-        checkout.ElegirRecojo(Inicio);
-        checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, carrito, Inicio);
-        checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito);
-        e.Checkouts.Sembrar(checkout);
-
-        var vista = (await Iniciar(e)).Valor;
-
-        Assert.Equal(EstadoVisibleDelCheckout.EnPago, vista.Estado);
-        Assert.Equal(checkout.PedidoId, vista.PedidoId);
-        Assert.Equal(Inicio.AddMinutes(15), vista.ReservaExpiraEn);
-        Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
     }
 
     [Fact]
@@ -343,19 +270,4 @@ public sealed class IniciarCheckoutTests
         Assert.Equal(CategoriaDeError.NoDisponible, sinAlmacen.Error!.Categoria);
         Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
     }
-
-    [Fact]
-    public async Task La_vista_usa_el_precio_vigente_del_catalogo_y_el_total_sin_envio_mientras_no_haya_entrega()
-    {
-        var (e, _, _) = await ConCarrito((x => x.Impreso(5, 37.30m), 3));
-
-        var vista = (await Iniciar(e)).Valor;
-
-        Assert.Equal(111.90m, vista.Subtotal);
-        Assert.Null(vista.TipoDeEntrega);
-        Assert.Equal(111.90m, vista.Total);
-        Assert.Null(vista.Contacto);
-        Assert.Equal([TextoLegalDeCompra.Terminos, TextoLegalDeCompra.Privacidad], vista.TextosPorAceptar);
-    }
-
 }

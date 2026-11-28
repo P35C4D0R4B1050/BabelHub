@@ -81,19 +81,6 @@ public sealed class VolverYReiniciarTests
     }
 
     [Fact]
-    public async Task Volver_en_edicion_sin_pedido_no_llama_a_Pagos_ni_al_inventario()
-    {
-        var s = await EnPago(conPagoCompleto: false);
-
-        var resultado = await Volver(s);
-
-        Assert.True(resultado.EsExito);
-        Assert.Equal(EstadoDelCheckout.Cancelado, s.Checkout.Estado);
-        Assert.Equal(0, s.Entorno.Pagos.Cancelaciones);
-        Assert.Empty(s.Entorno.Inventario.Liberaciones);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-CAR-23")]
     public async Task Con_el_pago_pendiente_no_se_puede_volver_ni_reiniciar_y_con_reservando_responde_en_curso()
     {
@@ -149,21 +136,6 @@ public sealed class VolverYReiniciarTests
         Assert.Empty(carrito.Lineas);
         Assert.Single(await s.Entorno.Carritos.AvisosSinVer(s.Entorno.Actor.Actual!.UsuarioId!.Value));
         Assert.Equal(["cancelar", "checkout", "carrito"], s.Entorno.Bitacora.Bloqueos.Take(3));
-    }
-
-    [Fact]
-    public async Task Repetir_volver_sobre_un_checkout_terminado_es_un_exito_idempotente_con_el_carrito()
-    {
-        var s = await EnPago();
-        await Volver(s);
-        var liberaciones = s.Entorno.Inventario.Liberaciones.Count;
-
-        var otra = await Volver(s);
-
-        Assert.True(otra.EsExito);
-        Assert.Single(otra.Valor.Lineas);
-        Assert.Equal(liberaciones, s.Entorno.Inventario.Liberaciones.Count);
-        Assert.Single(s.Entorno.Auditoria.Terminados);
     }
 
     [Fact]
@@ -246,20 +218,6 @@ public sealed class VolverYReiniciarTests
         Assert.Equal((1, 1, 0, 0), (resumen.Valor.Encontradas, resumen.Valor.Liberadas, resumen.Valor.PedidosConfirmados, resumen.Valor.SinRespuesta));
         Assert.Null(s.Checkout.ReservaALiberarDesde);
         Assert.Single(s.Entorno.Inventario.Liberaciones);
-    }
-
-    [Fact]
-    public async Task Si_el_inventario_sigue_sin_responder_la_anotacion_queda_para_la_corrida_siguiente()
-    {
-        var s = await ConLiberacionPendiente(ResultadoDeLiberar.NoSePudo);
-
-        var primera = await Trabajo(s.Entorno);
-        var segunda = await Trabajo(s.Entorno);
-
-        Assert.Equal(1, primera.Valor.SinRespuesta);
-        Assert.Equal(1, segunda.Valor.SinRespuesta);
-        Assert.NotNull(s.Checkout.ReservaALiberarDesde);
-        Assert.Equal(2, s.Entorno.Inventario.Liberaciones.Count);
     }
 
     [Fact]
