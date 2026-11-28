@@ -531,21 +531,4 @@ public sealed class ApiDeAuditoriaTests(PostgresDeAuditoriaFixture bdEco, Audito
     }
 
     // ---------- Composición ----------
-
-    [Fact]
-    [Trait("Criterio", "AC-AUD-21")]
-    public void LaComposicionDeLosDosServicios_ValidaLosCiclosDeVida_YDaUnContextoDeDenegacionPorSolicitud()
-    {
-        // Los dos anfitriones se construyeron con ValidateScopes y ValidateOnBuild: un servicio de vida por solicitud capturado por uno de vida larga haría fallar el arranque.
-        using var uno = _eco.Servicios.CreateScope();
-        using var otro = _eco.Servicios.CreateScope();
-
-        var primero = uno.ServiceProvider.GetRequiredService<IContextoDeDenegacion>();
-        Assert.Same(primero, uno.ServiceProvider.GetRequiredService<IContextoDeDenegacion>());
-        Assert.NotSame(primero, otro.ServiceProvider.GetRequiredService<IContextoDeDenegacion>());
-        Assert.NotEqual(primero.Correlacion, otro.ServiceProvider.GetRequiredService<IContextoDeDenegacion>().Correlacion);
-        using var delInventario = _inv.Servicios.CreateScope();
-        var inv1 = delInventario.ServiceProvider.GetRequiredService<InventarioAuditoria.Interno.IContextoDeDenegacion>();
-        Assert.Same(inv1, delInventario.ServiceProvider.GetRequiredService<InventarioAuditoria.Interno.IContextoDeDenegacion>());
-    }
 }

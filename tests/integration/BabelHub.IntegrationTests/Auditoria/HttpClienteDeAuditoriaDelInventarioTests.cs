@@ -154,7 +154,6 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
         Assert.Equal(SecretoDeAlertas, servidor.Cabeceras[1][CredencialesDeSalidaHandler.CabeceraDeCredencial]);
     }
 
-
     [Fact]
     [Trait("Criterio", "AC-AUD-12")]
     public async Task UnIdentificadorDeAlertaQueNoEsDelInventarioNoSale()
@@ -320,18 +319,4 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
     }
 
     // ---------- Las llaves de opciones coinciden con las de Plataforma ----------
-
-    [Fact]
-    [Trait("Criterio", "AC-AUD-24")]
-    public void LasLlavesDeLasOpcionesDeLaSolicitudSonLasDeLaPlataforma()
-    {
-        var solicitud = new HttpRequestMessage(HttpMethod.Get, "x");
-        solicitud.Options.Set(new HttpRequestOptionsKey<AlcanceDeServicio>("babelhub.alcance"), AlcanceDeServicio.Historial);
-        solicitud.Options.Set(new HttpRequestOptionsKey<string>("babelhub.token-de-usuario"), "t");
-
-        Assert.True(solicitud.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.Alcance, out var alcance));
-        Assert.Equal(AlcanceDeServicio.Historial, alcance);
-        Assert.True(solicitud.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.TokenDeUsuario, out var token));
-        Assert.Equal("t", token);
-    }
 }

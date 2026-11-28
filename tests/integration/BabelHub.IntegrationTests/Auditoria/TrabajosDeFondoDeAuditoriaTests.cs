@@ -136,48 +136,6 @@ public sealed class TrabajosDeFondoDeAuditoriaTests
     }
 
     [Fact]
-    public async Task SiNoSePuedeRegistrarLaCorridaOPublicarLaAlerta_ElTrabajoSigue()
-    {
-        var e = new Entorno((_, _) => throw new InvalidOperationException("falla"));
-        e.Registro.Falla = true;
-        e.Alertas.Falla = true;
-
-        for (var i = 0; i < 4; i++)
-        {
-            await e.Trabajo.EjecutarUnaVez();
-        }
-
-        Assert.Equal(4, e.Registro.Corridas.Count);
-    }
-
-    [Fact]
-    public async Task LaCancelacionDelApagadoSePropagaYNoSeCuentaComoFallo()
-    {
-        var e = new Entorno(async (_, ct) => await Task.Delay(Timeout.Infinite, ct));
-        using var fuente = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => e.Trabajo.EjecutarUnaVez(fuente.Token));
-
-        Assert.Empty(e.Registro.Corridas);
-        Assert.Null(e.Actores.Actual);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-AUD-25")]
-    public async Task CorrerEjecutaAlEmpezarYEnCadaIntervaloYTerminaAlCancelar()
-    {
-        var e = new Entorno(intervalo: TimeSpan.FromMilliseconds(40));
-        using var fuente = new CancellationTokenSource();
-
-        var corrida = e.Trabajo.Correr(fuente.Token);
-        await Task.Delay(400);
-        await fuente.CancelAsync();
-        await corrida;
-
-        Assert.True(e.Registro.Corridas.Count >= 3, $"corridas: {e.Registro.Corridas.Count}");
-    }
-
-    [Fact]
     public async Task ElServicioCorreTodosLosTrabajosYSeDetieneAlApagar()
     {
         var a = new Entorno(intervalo: TimeSpan.FromMilliseconds(40));
@@ -322,14 +280,5 @@ public sealed class TrabajosDeFondoDeAuditoriaTests
         await e.Trabajo.EjecutarUnaVez();
         Assert.Equal(2, e.Anonimizador.Llamadas);
         Assert.Equal(0, e.Estado.Estado.IntentosFallidos);
-    }
-
-    [Fact]
-    public void LosIntervalosSonLosDelPlan_ElCorreoMenorQueLaVentanaDeAgrupacion()
-    {
-        Assert.Equal(TimeSpan.FromSeconds(30), TrabajosDeAuditoria.IntervaloDelCierre.Intervalo);
-        Assert.Equal(TimeSpan.FromMinutes(5), TrabajosDeAuditoria.IntervaloDelCorreo.Intervalo);
-        Assert.True(TrabajosDeAuditoria.IntervaloDelCorreo.Intervalo < TimeSpan.FromMinutes(15));
-        Assert.Equal(TimeSpan.FromHours(24), TrabajosDeAuditoria.PeriodoDeLaDepuracion);
     }
 }

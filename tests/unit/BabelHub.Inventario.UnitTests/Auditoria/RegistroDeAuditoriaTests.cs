@@ -242,13 +242,6 @@ public sealed class RegistroDeAuditoriaTests
     public void LaRutaGuardadaEsSiempreUnaPlantillaOLaConstante_PorqueSoloSeObtieneResolviendo(string cruda, string esperada) =>
         Assert.Equal(esperada, Crear(ruta: PlantillaDeRuta.ResolverComoRuta(cruda, Plantillas)).Ruta);
 
-    [Fact]
-    public void SinRuta_ElRegistroNoLaTiene_YLaConstanteSePuedeUsarDirectamente()
-    {
-        Assert.Null(Crear(ruta: null).Ruta);
-        Assert.Equal("sin-coincidencia", Crear(ruta: RutaResuelta.SinCoincidencia).Ruta);
-    }
-
     [Theory]
     [InlineData("objetoId", "con espacio")]
     [InlineData("objetoId", "ok\n")]

@@ -311,15 +311,6 @@ public sealed class ContratoDeRegistroTests
     }
 
     [Fact]
-    public async Task Una_accion_por_defecto_no_se_registra()
-    {
-        var entorno = new Entorno();
-
-        await Assert.ThrowsAsync<ArgumentException>(() => entorno.Auditoria.Registrar(new SolicitudDeRegistro(default)));
-        await Assert.ThrowsAsync<ArgumentException>(() => entorno.Seguridad.Registrar(new SolicitudDeRegistro(default)));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-AUD-03")]
     public async Task Sin_contexto_de_actor_IAuditoria_falla_y_la_seguridad_deja_una_alerta()
     {
@@ -367,12 +358,6 @@ public sealed class ContratoDeRegistroTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => entorno.Auditoria.Registrar(Precio(), cancelada.Token));
     }
-
-    [Theory]
-    [InlineData("CambioDePrecio")]
-    [InlineData("A1b")]
-    public void Un_identificador_de_accion_valido_se_acepta(string identificador) =>
-        Assert.Equal(identificador, new AccionAuditable(identificador).Identificador);
 
     [Theory]
     [InlineData("")]

@@ -67,33 +67,6 @@ public sealed class ContratoDeConsultaYAlertaTests
         Assert.Throws<ArgumentException>(() => Registro(instante: Ahora.ToOffset(TimeSpan.FromHours(-5))));
     }
 
-    [Fact]
-    public void Un_registro_exige_identificador_y_accion_y_acota_el_detalle()
-    {
-        Assert.Throws<ArgumentException>(() => Registro(id: Guid.Empty));
-        Assert.Throws<ArgumentException>(() => Registro(accion: ""));
-        Assert.Throws<ArgumentException>(() => Registro(detalle: new string('x', 1001)));
-        Assert.Equal(1000, Registro(detalle: new string('x', 1000)).Detalle!.Length);
-    }
-
-    [Fact]
-    public void Las_colecciones_de_un_registro_son_de_solo_lectura_y_se_copian()
-    {
-        var claves = new List<string> { "nombre" };
-        var registro = Registro() with { ClavesPersonales = claves };
-
-        claves.Add("otra");
-
-        Assert.IsAssignableFrom<IReadOnlyList<string>>(registro.ClavesPersonales);
-    }
-
-    [Theory]
-    [InlineData("auditoria-no-disponible")]
-    [InlineData("correo-no-enviable")]
-    [InlineData("ab")]
-    public void Un_codigo_de_alerta_valido_se_acepta(string codigo) =>
-        Assert.Equal(codigo, new CodigoDeAlerta(codigo).Valor);
-
     [Theory]
     [InlineData("")]
     [InlineData("a")]

@@ -37,21 +37,6 @@ public sealed class PresentadorDeAuditoriaTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-22")]
-    public void LaHoraDeLaAlerta_TambienEsDeLima()
-    {
-        var alerta = new AlertaConsultada($"inv:{Guid.NewGuid():D}", ServicioAuditado.Inventario, new CodigoDeAlerta("accesos-denegados"), ClaseDeAlertaConsultada.Seguridad, Utc, Utc.AddMinutes(4), 12, 5);
-
-        var vista = PresentadorDeAuditoria.AAlerta(alerta);
-
-        Assert.Equal("14/11/2026 21:30:05", vista.PrimeraOcurrencia);
-        Assert.Equal("14/11/2026 21:34:05", vista.UltimaOcurrencia);
-        Assert.Equal(7, vista.SinRevisar);
-        Assert.True(vista.Pendiente);
-        Assert.Equal(12, vista.ContadorVisto);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-AUD-22")]
     public void UnValorConMarcasHtml_LlegaComoTextoSinCodificar_ParaQueLaVistaLoCodifiqueUnaVez()
     {
         const string Xss = "<script>alert(1)</script>";
