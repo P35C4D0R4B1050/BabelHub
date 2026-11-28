@@ -9,7 +9,7 @@ Punto de partida de los carriles que la especifican e implementan. **Son requisi
 - Se puede pedir, por ejemplo, 18 unidades de una sucursal y 6 de otra: **son compras separadas, no se combinan**, y cada sucursal gestiona su envío.
 - El carrito muestra en cada tarjeta de qué sucursal se pide y se actualiza al cambiar la cantidad, sin pulsar «Actualizar».
 - «No lo quiero para v0.2.0»: entra en `v0.1.3` si puede terminarse.
-- El código que no es solo UI/UX lo desarrolla Claude, con una interfaz funcional y sencilla; **Codex mejora la UI/UX después**.
+- El código que no es solo UI/UX lo desarrolla Claude, con una interfaz funcional y sencilla; la mejora de la UI/UX viene después (desde el 2026-11-28 también la hace Claude).
 
 ## Reglas aprobadas
 

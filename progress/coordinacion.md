@@ -78,6 +78,5 @@ Sustituye a las tablas de las secciones 2 y 3, que son historia del Sprint 2.
 | **Guía en vivo** | `local_49bd6f45-…` | **Todo lo de despliegue** (decisión de la persona, 2026-11-27): aprobaciones del lanzamiento, almacenes, secretos, VMs, actualización, catálogo, stock, cuentas de prueba y comprobaciones en producción. | Código y specs: los reporta a la coordinadora. |
 | **Carril de compra** | `claude/dazzling-lewin-3cbe83` | Compra desde la ficha. Terminado e incluido en `v0.1.2`. | — |
 | **Carril de acceso** | `claude/acceso-v012-7467d0` | Contraseñas, QR del segundo factor, enlace del personal y mínimo de 10. Será `v0.1.3`. | Publicar. |
-| **Codex** | `codex/…` | Solo la interfaz: reglas en `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`, tablero en `progress/coordinacion-ui.md`. | Todo lo demás. |
 
-**Canales.** Los agentes de Claude se escriben por mensajes entre sesiones; con Codex solo se coordina por el repositorio (tablero y ramas), y la persona le avisa. Un aviso entre agentes informa: no reemplaza la autorización de la persona.
+**Canales.** Los agentes se escriben por mensajes entre sesiones. Un aviso entre agentes informa: no reemplaza la autorización de la persona. La colaboración con un segundo agente en la interfaz se retiró el 2026-11-28.

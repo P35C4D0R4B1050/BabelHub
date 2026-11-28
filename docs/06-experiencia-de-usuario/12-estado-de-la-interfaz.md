@@ -1,6 +1,6 @@
 # Estado de la interfaz: qué cambió en `v0.1.3` y qué no se revierte
 
-Punto de partida para quien mejore la interfaz (Codex). Describe la aplicación **desde `v0.1.2` hasta `v0.1.3`** (2026-11-27). Las reglas de trabajo, las rutas permitidas y la entrega están en [colaboración en la interfaz](../07-proceso-de-desarrollo/10-colaboracion-ui.md); las tareas, en el [tablero](../../progress/coordinacion-ui.md). Si algo de aquí contradice una spec o la aplicación, ganan ellas y se anota en «Peticiones».
+Punto de partida para rediseñar la interfaz. Describe la aplicación **desde `v0.1.2` hasta `v0.1.3`** (2026-11-27). Si algo de aquí contradice una spec o la aplicación, ganan ellas.
 
 `Api/` abrevia `src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/`.
 
@@ -51,11 +51,9 @@ Punto de partida para quien mejore la interfaz (Codex). Describe la aplicación 
 3. Pantallas (unos 2 minutos): `dotnet test tests/integration/BabelHub.IntegrationTests --filter "(FullyQualifiedName~Pantallas|FullyQualifiedName~.Web.)&Categoria!=Lanzamiento&Categoria!=Guiones"`.
 4. Corrida de cada cambio (unos 9 minutos): `dotnet test BabelHub.sln --filter "Categoria!=Lanzamiento&Categoria!=Guiones"`.
 5. Recorridos con Playwright y axe, en escritorio y teléfono, para lo que toques. Revisa también el teléfono: ahí aparecieron fallos que en escritorio no se ven.
-6. `bash scripts/guardia-ui.sh codex/<tarea> main` y `dotnet run --project tools/SpecCheck`.
+6. `dotnet run --project tools/SpecCheck`.
 
 ## 5. Qué queda por mejorar en la interfaz
 
 - La persona ve la interfaz **«muy estática»** (animaciones, por detallar) y el panel de la gestión distinto del [prototipo](../../prototype/ui-v2/): títulos gigantes y menú superior que se parte en dos filas.
 - Las pantallas nuevas (venta por sucursal, costos de envío, ayudas de contraseña, QR) son funcionales y **no tienen diseño fino**.
-- **La identidad visual se reconstruye completa** (decisión de la persona, 2026-11-27): lo de esta página sobre decisiones, atributos, textos y accesibilidad sigue valiendo; la paleta, la tipografía y la composición actuales ya no hay que conservarlas.
-- Las tareas y su estado están en el tablero (UI-6 a UI-9).

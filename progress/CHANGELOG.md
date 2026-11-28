@@ -2,6 +2,14 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-28 — Interfaz: se retira la colaboración con Codex
+
+### Cubierto
+- Decisión de la persona: la interfaz la trabaja Claude; se eliminan la guía de colaboración, su tablero y el control de rutas. El historial anterior de esta bitácora queda como estaba.
+
+### Pendiente
+- Instrucciones e imágenes de la persona para un prototipo completo v3 sobre `prototype/ui-v2/`; corregir el acceso del encargado en la gestión (`hallazgos.md`).
+
 ## 2026-11-27 — Integración para la versión 0.1.3
 
 ### Cubierto

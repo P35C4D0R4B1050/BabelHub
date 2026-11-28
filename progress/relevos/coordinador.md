@@ -41,8 +41,8 @@ Nuevas en `Done`: identidad-seguridad, inventario-ajustes, inventario-seleccion-
 
 - **Publicación:** rama → PR → CI en verde → `main` por avance directo; etiqueta `v*` solo si la persona lo pide. El lanzamiento pide **dos** aprobaciones suyas.
 - **Despliegue:** lo lleva entero la sesión «Guía en vivo» (`local_49bd6f45-…`). La coordinadora le entrega versión, digests y avisos; no guía a la persona.
-- **Versiones:** `v0.1.1` y `v0.1.2` publicadas. `v0.1.3` (pedida por la persona): acceso, venta por sucursal (`venta-por-sucursal.md`), accesos pendientes e interfaz de Codex. Se etiqueta solo cuando esté verificada; si no llega a la entrega, puede salir antes con el acceso.
+- **Versiones:** `v0.1.1`, `v0.1.2` y `v0.1.3` (acceso, venta por sucursal y accesos pendientes) publicadas; el despliegue de `v0.1.3` sigue la guía §15.5.
 - **Antes de Culqi (B14):** `v0.1.2` desplegada, catálogo y stock cargados y recorrido hasta el paso de pago.
-- **Interfaz:** Codex según `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md` y `progress/coordinacion-ui.md`.
-- **Abierto:** observaciones O-5 a O-12 del tablero de interfaz; huecos sin enlace en `hallazgos.md`; prueba de restauración desde R2; correos de recuperación y verificación en producción.
+- **Interfaz (2026-11-28):** la trabaja Claude (la persona indicó Opus 5.5) sobre `prototype/ui-v2/` para un prototipo completo v3, a partir de sus instrucciones e imágenes, aún por entregar. Se retiró la colaboración con Codex.
+- **Abierto:** instrucciones del prototipo v3; fallos de pantallas del 2026-11-28 en `hallazgos.md` (el encargado cae en una página sin permiso); prueba de restauración desde R2; correos de recuperación y verificación en producción.
 - Bitácora: `progress/log/2026-11-27-despliegue-observaciones-y-colaboracion.md`.
