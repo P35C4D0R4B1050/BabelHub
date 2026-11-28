@@ -36,8 +36,9 @@ jobs:
         run: dotnet build BabelHub.sln -warnaserror --nologo
       - name: Probar Dominio y Aplicación sin red ni base de datos (docker run --network none)
         run: bash scripts/pruebas-sin-red.sh
-      - name: Probar con cobertura (unitarias, integración, arquitectura y herramientas)
-        run: dotnet test BabelHub.sln --no-build --nologo --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
+      # Los guiones de operación y lo que exige Docker de verdad corren en operacion.yml (al tocar scripts/ o infra/ y antes de cada versión).
+      - name: Probar con cobertura (unitarias, integración sin guiones ni lanzamiento, arquitectura y herramientas)
+        run: dotnet test BabelHub.sln --no-build --nologo --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults --filter "Categoria!=Lanzamiento&Categoria!=Guiones"
       # Informe por módulo frente a su referencia (PLA-14), que es orientativa: solo falla si no puede leer los informes o falta un servicio (PLA-45).
       - name: Informar la cobertura de cada módulo
         run: dotnet run --project tools/CoverageCheck -- TestResults --html TestResults/reporte-de-cobertura/index.html

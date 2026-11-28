@@ -11,7 +11,8 @@ name: lanzamiento
 # privilegios y secretos en las capas con scripts/escanear-secretos.sh, la misma puerta que secretos.yml) y solo entonces se sube por digest. Solo si todas pasan se arma el
 # índice multi-arquitectura con la etiqueta de la versión (nunca «latest»), se firma su procedencia y se imprime el digest del índice.
 # Alcance: es la publicación de PLA-03, PLA-26 y PLA-28. NO cubre todavía las puertas de T34 (ensayo de restauración vigente, PLA-11), T35 (Trivy como puerta) ni T37
-# (compilación, pruebas, carga y análisis dentro del propio flujo, PLA-31 y PLA-32): hoy se exige que ci.yml y secretos.yml estén en verde para el commit.
+# (compilación, carga y análisis dentro del propio flujo, PLA-32): hoy se exige que ci.yml y secretos.yml estén en verde para el commit y, antes de
+# construir, se corren aquí las pruebas que ci.yml aparta (operacion.yml), para que un lanzamiento pase todas las pruebas (PLA-31).
 on:
   push:
     tags: ["v*"]
@@ -60,7 +61,7 @@ jobs:
           # Solo se publica lo que está en la rama principal: una etiqueta puesta sobre una rama sin revisar no sale a producción.
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "El commit $GITHUB_SHA no está en la rama principal: no se publica." >&2; exit 1; }
-          # Y solo lo que ya pasó la verificación: compilación, pruebas, arquitectura (con el informe de cobertura) y escáner de secretos (PLA-31).
+          # Y solo lo que ya pasó la verificación: compilación, pruebas de cada cambio, arquitectura (con el informe de cobertura) y escáner de secretos (PLA-31).
           for flujo in ci.yml secretos.yml; do
             conclusion="$(gh run list --repo "$REPOSITORIO" --workflow "$flujo" --commit "$GITHUB_SHA" --status completed --json conclusion --jq '[.[].conclusion] | join(",")')"
             [[ ",$conclusion," == *",success,"* ]] \
@@ -70,9 +71,15 @@ jobs:
           echo "propietario=${PROPIETARIO,,}" >> "$GITHUB_OUTPUT"
           echo "Se publica la versión $version del commit $GITHUB_SHA."
 
+  # Los guiones de operación y las pruebas con Docker de verdad, apartados de cada cambio (PLA-31).
+  operacion:
+    name: Pruebas de operación
+    needs: verificar
+    uses: ./.github/workflows/operacion.yml
+
   construir:
     name: Construir ${{ matrix.imagen }} (${{ matrix.plataforma }})
-    needs: verificar
+    needs: [verificar, operacion]
     runs-on: ${{ matrix.ejecutor }}
     timeout-minutes: 45
     # El entorno «lanzamiento» (Settings → Environments) lleva como revisora obligatoria a la persona responsable: nada se construye ni se publica sin su aprobación (guía 08, paso 1).

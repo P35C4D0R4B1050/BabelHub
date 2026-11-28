@@ -112,9 +112,12 @@ Fusionar casos repetidos es válido si la prueba resultante **informa todos los 
 | Puerta | Qué debe pasar |
 | :--- | :--- |
 | Antes de cada commit | `dotnet run --project tools/SpecCheck`; compilación sin advertencias; pruebas afectadas. |
-| Integración continua | SpecCheck, compilación, todas las pruebas y arquitectura; análisis estático y escaneos cuando estén configurados. |
+| Integración continua (cada cambio) | SpecCheck, compilación, pruebas y arquitectura, **sin las categorías `Guiones` y `Lanzamiento`**; análisis estático y escaneos cuando estén configurados. |
+| Pruebas de operación (`operacion.yml`) | Las categorías `Guiones` (los guiones de `scripts/`) y `Lanzamiento` (imágenes y Docker de verdad): al tocar `scripts/`, `infra/`, un Dockerfile o esas pruebas, a mano, y **siempre antes de publicar una versión** (el lanzamiento no construye si fallan). Decisión de la persona responsable (2026-11-27). |
 | Antes de pasar una spec a `Done` | `spec-verify` con resultado *Converge*; cobertura de criterios; revisión de arquitectura y de seguridad. |
 | Antes de cada despliegue (cada versión que se despliega en producción) | Carga con k6, ZAP baseline, restauración de respaldo y lista manual de accesibilidad. |
+
+En local, la corrida de cada cambio es `dotnet test BabelHub.sln --filter "Categoria!=Lanzamiento&Categoria!=Guiones"`; antes de una versión, o al tocar la operación, se corre la suite sin filtro. Riesgo aceptado: un cambio fuera de esas rutas que rompa un guion se descubre al preparar la versión.
 
 ## 7. Riesgos de la estrategia
 
