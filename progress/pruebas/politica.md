@@ -53,6 +53,10 @@ El ahorro de tiempo está en la de secretos; las otras dos solo reducen el núme
 | Codificación | `Html.Raw` en una vista, un valor del modelo en `onclick` en otra y `HtmlString` en un `.cs` del Inventario | Falla e informa los 3 |
 | Copias | Una línea de más en dos copias del Inventario y una copia ausente | Falla e informa las 3, con la línea |
 
+### Suite completa «antes» (medida por la coordinadora)
+
+Sobre `d96d9873`, una corrida sola y en verde, sin cobertura ni `trx`: integración 45 min 33 s, `SpecCheck.Tests` 10 min 32 s, arquitectura 1 min 8 s, unitarias 17 s y 12 s. No habrá línea base con cobertura aparte; la medición «después» la hace la coordinadora con los tres carriles integrados.
+
 ## 4. Aprobación y verificación
 
 | Puerta | Auditor | Arquitectura | Seguridad | Graves / Menores | Huella |
