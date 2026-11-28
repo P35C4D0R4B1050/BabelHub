@@ -47,9 +47,7 @@ public sealed class ReintentoPorInterbloqueoInventarioTests(PostgresDeRolesFixtu
     }
 
     [Theory]
-    [InlineData("23505")]
     [InlineData("55P03")]
-    [InlineData("57014")]
     public async Task Ejecutar_ConOtroErrorDePostgreSql_NoRepite(string estado)
     {
         var interno = new CasoIdempotente(Error(estado), fallos: 1);

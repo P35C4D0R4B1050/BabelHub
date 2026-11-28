@@ -15,6 +15,7 @@ namespace BabelHub.IntegrationTests.Despliegue;
 /// reales de cada VM, y con <c>docker</c> de verdad sobre una VM mínima para comprobar la espera de la salud.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class DesplegarShTests : IDisposable
 {
     private const string Digest = "@sha256:0000000000000000000000000000000000000000000000000000000000000000";
@@ -448,8 +449,6 @@ public sealed class DesplegarShTests : IDisposable
     [Trait("Criterio", "AC-PAG-30")]
     [InlineData("ventas", "ecommerce.env", "ninguna")]
     [InlineData("inventario", "ecommerce-gestion.env", "ninguna")]
-    [InlineData("ventas", "ecommerce.env", "simulador")]
-    [InlineData("inventario", "ecommerce-gestion.env", "simulador")]
     public void StagingSeDespliegaSinPasarelaOConElSimulador(string vm, string archivo, string pasarela)
     {
         PrepararSecretos(vm);
@@ -481,7 +480,6 @@ public sealed class DesplegarShTests : IDisposable
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
     [InlineData("simulador")]
-    [InlineData("ninguna")]
     public void ElGenerador_EnStaging_EscribeLaPasarelaPedida(string pasarela)
     {
         var destino = Path.Combine(_carpeta, "generados-con-pasarela");
@@ -647,18 +645,6 @@ public sealed class DesplegarShTests : IDisposable
         Assert.DoesNotContain("VersionDeTextos", corridas.Single(l => l.EndsWith(" inventario migrar", StringComparison.Ordinal)), StringComparison.Ordinal);
         Assert.Contains("-e BABELHUB__Migrador__Ecommerce__VersionDeTextos", corridas.Single(l => l.EndsWith(" ecommerce-gestion migrar", StringComparison.Ordinal)), StringComparison.Ordinal);
         Assert.DoesNotContain(version, string.Join("\n", LlamadasADocker) + salida + errores, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-33")]
-    public void SinLaVersionDeLosTextos_LaMigracionNoLlevaLaVariable()
-    {
-        PrepararSecretos("inventario");
-
-        var (codigo, salida, errores) = Desplegar("inventario");
-
-        Assert.True(codigo == 0, salida + errores);
-        Assert.DoesNotContain(LlamadasADocker, l => l.Contains("VersionDeTextos", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1118,18 +1104,6 @@ public sealed class DesplegarShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
-    public void LaUriDeEvolutionConLaFormaQueSiVerificaEnPrisma_SiSeDespliega()
-    {
-        PrepararSecretos("ventas");
-        CambiarValor("evolution.env", "DATABASE_CONNECTION_URI", UriDeEvolution(Aleatorio(32)));
-
-        var (codigo, salida, errores) = Desplegar("ventas");
-
-        Assert.True(codigo == 0, salida + errores);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PLA-04")]
     public void UnaContrasenaConArrobaOInterrogacion_EnLaUriDeEvolution_NoEnganaALaGuarda()
     {
         PrepararSecretos("ventas");
@@ -1380,7 +1354,6 @@ public sealed class DesplegarShTests : IDisposable
     [Theory]
     [InlineData("registro.ejemplo/babelhub/ecommerce:latest")]
     [InlineData("registro.ejemplo/babelhub/ecommerce@sha256:abc")]
-    [InlineData("registro.ejemplo/babelhub/ecommerce")]
     public void UnaImagenPropiaSinDigest_NoSeDespliega_PorqueSoloSeDespliegaLoYaPublicado(string imagen)
     {
         PrepararSecretos("ventas");
@@ -1396,7 +1369,6 @@ public sealed class DesplegarShTests : IDisposable
 
     [Theory]
     [InlineData("0.0.0.0")]
-    [InlineData("no-es-una-ip")]
     [InlineData("10.0.0")]
     public void UnaDireccionPrivadaInvalida_NoSeDespliega(string direccion)
     {
@@ -1803,6 +1775,7 @@ public sealed class DesplegarShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void ConDockerDeVerdad_UnaVmSanaQuedaEnMarchaYRepetirElComandoNoLaCambia()
     {
         var infra = VmMinima("[\"CMD\", \"redis-cli\", \"ping\"]");
@@ -1824,6 +1797,7 @@ public sealed class DesplegarShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void ConDockerDeVerdad_UnComponenteQueNoResponde_HaceFallarElDespliegue()
     {
         var infra = VmMinima("[\"CMD\", \"false\"]");

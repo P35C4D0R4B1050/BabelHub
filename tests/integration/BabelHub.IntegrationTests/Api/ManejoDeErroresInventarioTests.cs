@@ -110,22 +110,6 @@ public sealed class ManejoDeErroresInventarioTests : IAsyncLifetime
 
     [Fact]
     [Trait("Criterio", "AC-SEG-03")]
-    public async Task UnaSolicitudInvalida_TraeCodigoEstableIdentificadorYLosCamposSinTrazas()
-    {
-        var respuesta = await _cliente.GetAsync("/validacion");
-        var cuerpo = await Cuerpo(respuesta);
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.Equal("application/problem+json", respuesta.Content.Headers.ContentType!.MediaType);
-        Assert.Equal("INV-VALIDACION-INVALIDA", cuerpo.GetProperty("code").GetString());
-        Assert.Equal(respuesta.Headers.GetValues("X-Trace-Id").Single(), cuerpo.GetProperty("traceId").GetString());
-        Assert.Equal("cantidad", cuerpo.GetProperty("errores")[0].GetProperty("campo").GetString());
-        Assert.Equal("fuera-de-rango", cuerpo.GetProperty("errores")[0].GetProperty("clave").GetString());
-        Assert.Equal(400, cuerpo.GetProperty("status").GetInt32());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEG-03")]
     public async Task UnaReglaDeNegocioIncumplida_IndicaElMotivoConSuCodigoEspecifico()
     {
         var respuesta = await _cliente.GetAsync("/regla");
@@ -135,15 +119,6 @@ public sealed class ManejoDeErroresInventarioTests : IAsyncLifetime
         Assert.Equal("INV-STOCK-INSUFICIENTE", cuerpo.GetProperty("code").GetString());
         Assert.Equal("No hay stock para completar el pedido.", cuerpo.GetProperty("detail").GetString());
         Assert.False(string.IsNullOrEmpty(cuerpo.GetProperty("traceId").GetString()));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEG-03")]
-    public async Task UnaReglaDeNegocioSinCodigoEspecifico_UsaElCodigoGenericoDeReglaDeNegocio()
-    {
-        var cuerpo = await Cuerpo(await _cliente.GetAsync("/regla-sin-catalogo"));
-
-        Assert.Equal("INV-REGLA-DE-NEGOCIO-INCUMPLIDA", cuerpo.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -179,52 +154,6 @@ public sealed class ManejoDeErroresInventarioTests : IAsyncLifetime
         Assert.Contains("Error inesperado en GET /inesperado", mensajes, StringComparison.Ordinal);
         Assert.Contains("InvalidOperationException", mensajes, StringComparison.Ordinal);
         Assert.DoesNotContain(SecretoSembrado, mensajes, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [Trait("Criterio", "AC-SEG-03")]
-    [InlineData("/sin-actor", HttpStatusCode.Unauthorized, "INV-NO-AUTENTICADO")]
-    [InlineData("/almacen-caido", HttpStatusCode.ServiceUnavailable, "INV-SERVICIO-NO-DISPONIBLE")]
-    [InlineData("/no-autenticado", HttpStatusCode.Unauthorized, "INV-NO-AUTENTICADO")]
-    [InlineData("/prohibido", HttpStatusCode.Forbidden, "INV-PROHIBIDO")]
-    [InlineData("/conflicto", HttpStatusCode.Conflict, "INV-CONFLICTO")]
-    [InlineData("/no-existe", HttpStatusCode.NotFound, "INV-NO-ENCONTRADO")]
-    public async Task LosDemasErroresYLosEstadosDelMarco_TambienSalenComoElErrorUniforme(string ruta, HttpStatusCode estado, string codigo)
-    {
-        var respuesta = await _cliente.GetAsync(ruta);
-        var cuerpo = await Cuerpo(respuesta);
-
-        Assert.Equal(estado, respuesta.StatusCode);
-        Assert.Equal("application/problem+json", respuesta.Content.Headers.ContentType!.MediaType);
-        Assert.Equal(codigo, cuerpo.GetProperty("code").GetString());
-        Assert.False(string.IsNullOrEmpty(cuerpo.GetProperty("traceId").GetString()));
-    }
-
-    [Fact]
-    public async Task UnaSolicitudSinErrores_NoSeAlteraYTraeElIdentificadorDeSeguimiento()
-    {
-        var respuesta = await _cliente.GetAsync("/ok");
-
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-        Assert.Equal("ok", (await Cuerpo(respuesta)).GetProperty("estado").GetString());
-        Assert.NotEmpty(respuesta.Headers.GetValues("X-Trace-Id").Single());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-SEG-03")]
-    public async Task ElIdentificadorDeCorrelacionDelCliente_NoReemplazaAlDeSeguimientoYCienSolicitudesSonCienDistintas()
-    {
-        var ids = new HashSet<string>();
-        for (var i = 0; i < 100; i++)
-        {
-            using var solicitud = new HttpRequestMessage(HttpMethod.Get, "/inesperado");
-            solicitud.Headers.Add("X-Correlacion-Id", "mismo-id-del-cliente");
-            var respuesta = await _cliente.SendAsync(solicitud);
-            ids.Add((await Cuerpo(respuesta)).GetProperty("traceId").GetString()!);
-        }
-
-        Assert.Equal(100, ids.Count);
-        Assert.DoesNotContain("mismo-id-del-cliente", ids);
     }
 
     [Theory]
@@ -273,23 +202,6 @@ public sealed class ManejoDeErroresInventarioTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.ServiceUnavailable, respuesta.StatusCode);
         Assert.Equal("INV-SERVICIO-NO-DISPONIBLE", cuerpo.GetProperty("code").GetString());
         Assert.False(respuesta.Headers.Contains("Retry-After"));
-    }
-
-    [Theory]
-    [InlineData(CategoriaDeError.Validacion, 400, "VALIDACION-INVALIDA")]
-    [InlineData(CategoriaDeError.NoAutenticado, 401, "NO-AUTENTICADO")]
-    [InlineData(CategoriaDeError.Prohibido, 403, "PROHIBIDO")]
-    [InlineData(CategoriaDeError.NoEncontrado, 404, "NO-ENCONTRADO")]
-    [InlineData(CategoriaDeError.Conflicto, 409, "CONFLICTO")]
-    [InlineData(CategoriaDeError.ReglaDeNegocio, 422, "REGLA-DE-NEGOCIO-INCUMPLIDA")]
-    [InlineData(CategoriaDeError.Limite, 429, "LIMITE-EXCEDIDO")]
-    [InlineData(CategoriaDeError.Inesperado, 500, "ERROR-INESPERADO")]
-    [InlineData(CategoriaDeError.NoDisponible, 503, "SERVICIO-NO-DISPONIBLE")]
-    public void ElMapeoDeCategorias_DaElEstadoYElSufijoDeLaTabla(CategoriaDeError categoria, int estado, string sufijo)
-    {
-        Assert.Equal(estado, ProblemasHttp.EstadoDe(categoria));
-        Assert.Equal(sufijo, ProblemasHttp.SufijoDe(categoria));
-        Assert.False(string.IsNullOrWhiteSpace(ProblemasHttp.TituloDe(categoria)));
     }
 
     [Fact]

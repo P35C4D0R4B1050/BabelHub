@@ -12,6 +12,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// negocio, la imagen publicada de <c>infra/postgres</c> y un almacén compatible con S3. La clave que descifra solo existe en la prueba.
 /// </summary>
 [Collection(RespaldosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed partial class RespaldosTests(RespaldosFixture entorno)
 {
     private static readonly Regex NombreDelRespaldo = NombreDeBase();

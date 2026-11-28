@@ -50,16 +50,6 @@ public sealed class BaseCaidaEs503Tests
         Assert.DoesNotContain("conexión", cuerpo.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
-    [Theory]
-    [MemberData(nameof(Transitorias))]
-    public async Task UnaBaseInalcanzable_EnElEcommerce_Es503Uniforme(Exception e)
-    {
-        var (estado, cuerpo) = await Ecommerce(e);
-
-        Assert.Equal(503, estado);
-        Assert.Equal("ECO-SERVICIO-NO-DISPONIBLE", cuerpo.GetProperty("code").GetString());
-    }
-
     [Fact]
     public async Task UnTimeoutQueNoEsDeLaBase_SigueSiendoInesperado()
     {

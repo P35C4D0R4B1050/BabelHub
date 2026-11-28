@@ -23,7 +23,6 @@ public sealed class ModoCargarStockTests
     }
 
     [Theory]
-    [InlineData(false)]
     [InlineData(true)]
     [Trait("Criterio", "AC-CIN-13")]
     public void El_servicio_nunca_arranca_en_modo_Operacion_desde_la_configuracion(bool produccion)

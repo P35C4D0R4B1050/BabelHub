@@ -9,6 +9,7 @@ namespace BabelHub.IntegrationTests.Imagenes;
 /// responde su comprobación de salud y da el mismo resultado en las dos arquitecturas, sin privilegios. ARM64 corre en emulación
 /// (QEMU de Docker Desktop o <c>docker/setup-qemu-action</c> en CI). Construyen imágenes de verdad: tardan unos minutos la primera vez.
 /// </summary>
+[Trait("Categoria", Categorias.Lanzamiento)]
 public sealed class HumoDeImagenesTests : IDisposable
 {
     private static readonly string[] Arquitecturas = ["amd64", "arm64"];

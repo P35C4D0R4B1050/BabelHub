@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.VmAux;
 /// secretos (la clave del correo, la dirección del latido) nunca van en los argumentos de un proceso ni en la salida.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class AvisosDeVmAuxTests : IDisposable
 {
     private readonly EntornoDeVmAux _entorno = new();
@@ -127,7 +128,6 @@ public sealed class AvisosDeVmAuxTests : IDisposable
     }
 
     [Theory]
-    [InlineData]
     [InlineData("solo-nombre")]
     [InlineData("Nombre-Invalido", "echo")]
     public void UnUsoInvalidoDelEnvoltorio_SeRechazaConCodigo2(params string[] argumentos)

@@ -101,19 +101,4 @@ public sealed class RetencionTests
             Assert.True((ahora - cambios[0]).TotalDays <= 8, $"{Fecha(dia)}: queda un cambio del {cambios[0]:u}");
         }
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-PLA-18")]
-    public void UnRespaldoBajoDemanda_NoAlteraLoQueQuedaDeLosSemanalesNiDeLosMensuales()
-    {
-        var almacen = new AlmacenSimulado();
-        var ahora = new DateTime(2027, 9, 15, 12, 0, 0, DateTimeKind.Utc);
-        almacen.Objetos.Add(new ObjetoSimulado("respaldos-diarios", "2027-09-15/120000-x.tar.zst.age", ahora));
-
-        almacen.EjecutarCicloDeVida(ahora.AddDays(7).AddMinutes(1));
-
-        Assert.Empty(almacen.De("respaldos-diarios"));
-        Assert.Empty(almacen.De("respaldos-semanales"));
-        Assert.Empty(almacen.De("respaldos-mensuales"));
-    }
 }

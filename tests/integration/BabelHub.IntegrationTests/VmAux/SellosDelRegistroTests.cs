@@ -12,6 +12,7 @@ namespace BabelHub.IntegrationTests.VmAux;
 /// usa solo lo que su credencial permite (el almacén de prueba aplica <c>credenciales.txt</c>).
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class SellosDelRegistroTests : IDisposable
 {
     private static readonly DateTime Hoy = DateTime.UtcNow;

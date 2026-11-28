@@ -124,6 +124,7 @@ public sealed class PruebasSinRedTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-01")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void LasPruebasAutonomas_PasanSinRed()
     {
         var ensamblado = Compilar(
@@ -151,6 +152,7 @@ public sealed class PruebasSinRedTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-01")]
+    [Trait("Categoria", Categorias.Lanzamiento)]
     public void UnaPruebaQueIntentaConectarseAlaRedOAUnaBaseDeDatos_HaceFallarLaEjecucionYSeNombra()
     {
         var ensamblado = Compilar(

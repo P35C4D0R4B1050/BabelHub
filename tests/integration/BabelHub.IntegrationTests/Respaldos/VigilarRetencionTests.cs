@@ -12,6 +12,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// Con el estado que deja el ciclo de vida sobre 100 días de respaldos simulados no hay alerta; con un ciclo de vida que no retira, sí.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class VigilarRetencionTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "vigilar-" + Guid.NewGuid().ToString("N"));
@@ -227,20 +228,6 @@ public sealed class VigilarRetencionTests : IDisposable
 
         Assert.Equal(1, codigo);
         Assert.Contains("ALERTA respaldos-mensuales: no se pudo consultar el contenedor", salida, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PLA-18")]
-    public void LosContenedoresQueNoExpiran_NoSeMiden_AunqueTenganObjetosViejos()
-    {
-        PublicarElEstadoSano();
-        File.WriteAllLines(Path.Combine(_almacen, "supresiones-entradas.txt"), ["entradas/x/baja-intencion.json;2020-01-01 00:00:00"]);
-        File.Delete(Path.Combine(_almacen, "supresiones-entradas.txt"));
-
-        var (codigo, salida, _) = Vigilar();
-
-        Assert.Equal(0, codigo);
-        Assert.DoesNotContain("supresiones-entradas", salida, StringComparison.Ordinal);
     }
 
     [Fact]

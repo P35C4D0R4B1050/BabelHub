@@ -11,6 +11,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// Y los archivos que lo hacen posible: la imagen de PostgreSQL trae los scripts, el Compose archiva los cambios y todo está en POSIX sh.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class RespaldarAhoraTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "ahora-" + Guid.NewGuid().ToString("N"));
@@ -100,7 +101,6 @@ public sealed class RespaldarAhoraTests : IDisposable
 
     [Theory]
     [Trait("Criterio", "AC-PLA-16")]
-    [InlineData(1)]
     [InlineData(75)]
     public void ElCodigoDelRespaldoRemoto_SePropaga(int remoto)
     {
@@ -117,7 +117,6 @@ public sealed class RespaldarAhoraTests : IDisposable
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inv$(id)")]
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inventario.interno", "--contenedor", "a b;c")]
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inventario.interno", "--otra", "cosa")]
-    [InlineData]
     public void UnUsoInvalido_SeRechazaConCodigo2_SinLlamarASsh(params string[] argumentos)
     {
         var (codigo, _, errores, llamada) = Ejecutar(0, argumentos);

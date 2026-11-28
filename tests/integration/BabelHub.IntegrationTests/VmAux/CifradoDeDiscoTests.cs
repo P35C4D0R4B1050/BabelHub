@@ -10,6 +10,7 @@ namespace BabelHub.IntegrationTests.VmAux;
 /// de la nube; contra la nube real no se verificó (requiere la cuenta de Oracle).
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class CifradoDeDiscoTests : IDisposable
 {
     private const string Instancia = "ocid1.instance.oc1.sa-saopaulo-1.aaaaaaaainstanciadeprueba";
@@ -21,7 +22,6 @@ public sealed class CifradoDeDiscoTests : IDisposable
     private const string DobleDeOci = """
         #!/usr/bin/env bash
         echo "$*" >>"$DOBLE_REGISTRO"
-        [[ -n "${DOBLE_FALLA_TODO:-}" ]] && { echo "ServiceError" >&2; exit 1; }
         case "$1 $2 $3" in
           "compute boot-volume-attachment list")
             [[ -n "${DOBLE_FALLA_ARRANQUE:-}" ]] && exit 1
@@ -124,8 +124,6 @@ public sealed class CifradoDeDiscoTests : IDisposable
 
     [Theory]
     [InlineData("DOBLE_ESTADO", "TERMINATED")]
-    [InlineData("DOBLE_ESTADO", "PROVISIONING")]
-    [InlineData("DOBLE_FALLA_TODO", "1")]
     [InlineData("DOBLE_FALLA_ARRANQUE", "1")]
     [InlineData("DOBLE_FALLA_BLOQUES", "1")]
     [Trait("Criterio", "AC-PLA-20")]

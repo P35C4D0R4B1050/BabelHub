@@ -13,6 +13,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 /// cifra no es el registrado. Las claves de las pruebas se generan en cada ejecución.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class CustodiaDeLaClaveTests : IDisposable
 {
     private const string Hoy = "2026-11-14";

@@ -8,6 +8,7 @@ namespace BabelHub.IntegrationTests.VmAux;
 /// <c>respaldos-vigilante</c> (R2) y, para la copia del registro, <c>registro-vigilante</c> (Oracle).
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
+[Trait("Categoria", Categorias.Guiones)]
 public sealed class ComprobarRespaldosTests : IDisposable
 {
     private readonly EntornoDeVmAux _entorno = new();

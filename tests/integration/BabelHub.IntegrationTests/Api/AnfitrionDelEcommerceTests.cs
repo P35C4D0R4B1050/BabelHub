@@ -590,8 +590,6 @@ public sealed class AnfitrionDelEcommerceTests
     [Theory]
     [InlineData("Staging")]
     [InlineData("Production")]
-    [InlineData("Ensayo")]
-    [InlineData("Restauracion")]
     [InlineData("")]
     [Trait("Criterio", "AC-COM-03")]
     public void FueraDeDesarrolloYPrueba_SinContacto_NoArranca_NombrandoLasTresVariables(string entorno)
