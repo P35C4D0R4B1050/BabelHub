@@ -57,4 +57,5 @@ Punto de partida para quien mejore la interfaz (Codex). Describe la aplicación 
 
 - La persona ve la interfaz **«muy estática»** (animaciones, por detallar) y el panel de la gestión distinto del [prototipo](../../prototype/ui-v2/): títulos gigantes y menú superior que se parte en dos filas.
 - Las pantallas nuevas (venta por sucursal, costos de envío, ayudas de contraseña, QR) son funcionales y **no tienen diseño fino**.
-- Las tareas y su estado están en el tablero (UI-0 a UI-5).
+- **La identidad visual se reconstruye completa** (decisión de la persona, 2026-11-27): lo de esta página sobre decisiones, atributos, textos y accesibilidad sigue valiendo; la paleta, la tipografía y la composición actuales ya no hay que conservarlas.
+- Las tareas y su estado están en el tablero (UI-6 a UI-9).

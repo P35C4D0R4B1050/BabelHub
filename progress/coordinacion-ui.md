@@ -10,14 +10,20 @@ Estados: `Pendiente` (no empezar) → `Asignada` → `En curso` → `Entregada` 
 
 ## Tareas
 
+**Decisión de la persona (2026-11-27): Codex reconstruye la identidad visual completa** (reglas en el §2 ter de la guía de colaboración). Va por fases, UI-6 a UI-9; las tareas UI-1 a UI-5 quedan incluidas en ellas.
+
 | N.º | Tarea | Responsable | Estado | Notas |
 | :--- | :--- | :--- | :--- | :--- |
 | UI-0 | **Propuesta de rediseño y animaciones** de la tienda y los paneles: solo en `prototype/ui-v2/` y en un documento nuevo, `docs/06-experiencia-de-usuario/11-propuesta-de-rediseno.md`. No toca la aplicación. | Codex | Entregada fuera de rama (carpeta `prototype/v/`), sin revisar | Cubre O-6, O-7 y O-8; O-9 solo como alternativa marcada «requiere decisión». El documento separa lo que es solo apariencia de lo que cambia comportamiento (necesita spec) y dice cómo hacer cada cosa en la aplicación sin estilos ni scripts en línea, con movimiento reducido y contraste AA. El prototipo debe seguir funcionando. La persona aprueba la propuesta antes de trasladarla; no se publica en la aplicación antes de la entrega ni durante la revisión de Culqi. |
-| UI-1 | Títulos gigantes en los paneles: `.bh-display` ocupa media pantalla; comparar con `prototype/ui-v2` y revisar también la tienda. | Codex | Asignada (2026-11-27) | Desde `main` con `v0.1.3`. |
-| UI-2 | Menú de los paneles: el prototipo usa menú lateral y la aplicación uno superior que se parte en dos filas. | Codex | Asignada (2026-11-27) | Conservar destinos por rol; si cambia el recorrido, pedirlo antes. |
-| UI-3 | Animaciones (la persona ve la interfaz «muy estática»). | Codex | Asignada (2026-11-27) | Con `prefers-reduced-motion`; pedir a la persona sus observaciones concretas. |
-| UI-4 | Trasladar a la aplicación la apariencia del prototipo (tienda, inicio, paneles, ingreso y cuenta), según UI-0 aprobada por la persona. | Codex | Asignada (2026-11-27) | Incluye las ayudas de contraseña y el código QR. Se publica solo lo revisado. |
-| UI-5 | Apariencia de la venta por sucursal: ficha, carrito, checkout, pedidos y la pantalla de costos de envío. | Codex | Asignada (2026-11-27), después de UI-1 a UI-3 | La función ya está en `v0.1.3`. Contexto: documento 12 y `progress/relevos/venta-por-sucursal.md`. |
+| UI-1 | Títulos gigantes en los paneles (`.bh-display`). | Codex | Incluida en UI-9 | — |
+| UI-2 | Menú de los paneles (lateral en el prototipo, superior en la aplicación). | Codex | Incluida en UI-9 | Conservar destinos por rol. |
+| UI-3 | Animaciones (la interfaz se ve «muy estática»). | Codex | Incluida en UI-6 a UI-9 | Con `prefers-reduced-motion`. |
+| UI-4 | Trasladar la apariencia a tienda, inicio, paneles, ingreso y cuenta. | Codex | Incluida en UI-8 y UI-9 | — |
+| UI-5 | Apariencia de la venta por sucursal: ficha, carrito, checkout, pedidos y la pantalla de costos de envío. | Codex | Incluida en UI-8 | La función ya está en `v0.1.3`. Contexto: documento 12 y `progress/relevos/venta-por-sucursal.md`. |
+| UI-6 | **Fase 1 · Propuesta de identidad completa:** concepto, paleta de los dos temas con su contraste medido, tipografía, logotipo e icono del sitio, componentes, estados, movimiento y maqueta de inicio, catálogo, ficha, carrito, checkout, ingreso y un panel, en escritorio y teléfono. Solo `prototype/ui-v3/` y `docs/06-experiencia-de-usuario/11-propuesta-de-rediseno.md`. | Codex | Asignada (2026-11-27) | La entrega UI-0 (`prototype/v/`) sirve de insumo. **La persona aprueba antes de pasar a la fase 2.** |
+| UI-7 | **Fase 2 · Fundamentos:** tokens de los temas, tipografía, logotipo, componentes compartidos, cabecera, pie y plantilla; actualiza el documento de identidad (01). | Codex | Pendiente (tras aprobar UI-6) | Las fuentes nuevas se piden en «Peticiones». |
+| UI-8 | **Fase 3 · Tienda:** inicio, catálogo, ficha, carrito, checkout, pago, pedidos, biblioteca, devoluciones, reclamaciones, ingreso, registro y cuenta. | Codex | Pendiente (tras revisar UI-7) | Por tandas pequeñas, cada una revisable. |
+| UI-9 | **Fase 4 · Gestión:** paneles de sucursal, logística y administración. | Codex | Pendiente (tras revisar UI-8) | Incluye menú y títulos. |
 
 ## Reservado (Codex no lo toca)
 

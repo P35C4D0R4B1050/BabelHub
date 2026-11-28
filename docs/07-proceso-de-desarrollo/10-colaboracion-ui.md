@@ -25,7 +25,7 @@ No hay un canal directo entre agentes: se coordinan con [`progress/coordinacion-
 | `Api/wwwroot/js/*.js` (no `lib/`) | JavaScript de la interfaz. Prefiere archivos nuevos `ui-*.js`; cambiar uno existente se revisa a mano. |
 | `Api/wwwroot/img/**` | Imágenes de la interfaz (`svg`, `png`, `webp`). |
 | `docs/06-experiencia-de-usuario/**` | Documentación de experiencia de usuario. |
-| `prototype/ui-v2/**` | Prototipo de referencia. |
+| `prototype/ui-v2/**`, `prototype/ui-v3/**` | Prototipo de referencia y el de la nueva identidad. |
 | `progress/coordinacion-ui.md` | Solo las secciones «Entregas» y «Peticiones». |
 
 **Excepciones dentro de las vistas (no se tocan):** `_ViewImports.cshtml`, `_ViewStart.cshtml`, `_TokenAntifalsificacion.cshtml`, `Views/Legal/**` y `Views/Textos/**`.
@@ -49,6 +49,21 @@ Ambos agentes parten de la misma información. Si dos fuentes se contradicen, ga
 El trabajo de ramas sin integrar todavía no está en `main`: se consulta en «Reservado».
 
 El resumen vigente de la interfaz (decisiones que no se revierten, cambios por pantalla, lo que no se puede romper y cómo verificar) está en [`docs/06-experiencia-de-usuario/12-estado-de-la-interfaz.md`](../06-experiencia-de-usuario/12-estado-de-la-interfaz.md); quien publique cambios de interfaz lo actualiza.
+
+## 2 ter. Reconstrucción de la identidad visual
+
+Decisión de la persona responsable (2026-11-27): Codex **reconstruye la identidad visual completa**.
+
+| Puede rehacer | Se mantiene |
+| :--- | :--- |
+| Concepto, paleta (valores de los tokens en los dos temas), tipografía, logotipo, icono del sitio, ilustraciones e iconos propios. | El nombre **BabelHub** y los temas `babelhub` (predeterminado) y `babelhub-dark` (el del dispositivo oscuro), con los mismos nombres de token; ningún color suelto (`AGENTS.md` §6). |
+| Composición, jerarquía, navegación visual (por ejemplo, menú lateral en los paneles) y componentes. | Los mismos destinos, datos, acciones, formularios, recorridos y textos que las pruebas buscan. |
+| Animaciones y transiciones. | Contraste AA, foco visible, teclado, `prefers-reduced-motion`, estados con texto e icono, y los estados estándar. |
+| El prototipo (`prototype/ui-v3/`, nuevo) y los documentos de `docs/06-experiencia-de-usuario/`. | Tailwind CSS y daisyUI, la CSP sin recursos externos ni estilos o scripts en línea, y la meta de carga (WEB-21). |
+
+- **Tipografía e imágenes:** las fuentes se alojan en el proyecto con licencia libre y huella fijada (`wwwroot/lib/` y `Web/versiones.json`, que Codex no edita) y una prueba exige hoy las actuales. Para cambiarlas, indica en «Peticiones» la fuente, su licencia y su origen; Claude las incorpora y ajusta la prueba. Las imágenes propias van en `wwwroot/img/` (`svg`, `png`, `webp`), livianas.
+- **Por fases** (UI-6 a UI-9 del tablero): nada se traslada a la aplicación sin la propuesta aprobada, y cada fase se revisa antes de seguir.
+- La propuesta aprobada reemplaza a `prototype/ui-v2/` como referencia visual.
 
 ## 3. Reglas de la interfaz
 
@@ -88,4 +103,23 @@ El control detecta rutas y patrones conocidos; **no sustituye la revisión**.
 
 ## 6. Mensaje para iniciar a Codex
 
-> Lee `AGENTS.md`, `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md` y `docs/06-experiencia-de-usuario/12-estado-de-la-interfaz.md`. Trabajas solo la interfaz, dentro de las rutas permitidas. La primera versión de la interfaz que se te haya compartido está retirada: la referencia es la del §2 bis. Lee `git show main:progress/coordinacion-ui.md`, toma la tarea asignada y sigue el flujo del §4. Responde en español. Si algo requiere salir de tus rutas o cambiar el comportamiento, no lo hagas: anótalo en «Peticiones» y avísame.
+Se copia tal cual, después de que `v0.1.3` esté en `main`:
+
+```text
+Vas a reconstruir por completo la identidad visual de BabelHub. Responde en español.
+
+1. Lee, en este orden: AGENTS.md; docs/07-proceso-de-desarrollo/10-colaboracion-ui.md (en especial 2, 2 ter, 3 y 4);
+   docs/06-experiencia-de-usuario/12-estado-de-la-interfaz.md; y `git show main:progress/coordinacion-ui.md`.
+2. Trabaja solo en tu propia copia: git worktree add ../BabelHub-codex -b codex/identidad main
+   Genera los estilos con `bash scripts/construir-estilos.sh` y mira la aplicación actual antes de proponer
+   (entorno local: tests/e2e/README.md, con datos ficticios).
+3. Haz solo la fase 1 (UI-6): la propuesta de identidad completa, en prototype/ui-v3/ y en
+   docs/06-experiencia-de-usuario/11-propuesta-de-rediseno.md. Antes de dibujar, pregúntame lo que necesites sobre
+   gustos, referencias y tono; no supongas. Ofrece dos o tres direcciones distintas y recomienda una.
+   Incluye la tabla de contraste de los dos temas y maquetas en escritorio y teléfono.
+4. No toques la aplicación hasta que yo apruebe la propuesta. Después sigue UI-7, UI-8 y UI-9, una fase por entrega.
+5. Solo apariencia y solo en tus rutas. Si algo exige cambiar comportamiento, textos que buscan las pruebas,
+   una prueba, una fuente o cualquier archivo prohibido, anótalo en «Peticiones» y avísame.
+6. Antes de entregar: las verificaciones del apartado 4 de la guía y `bash scripts/guardia-ui.sh codex/identidad main`.
+   Anota la entrega en el tablero y haz commit. Sin push, PR, etiquetas ni fusiones.
+```

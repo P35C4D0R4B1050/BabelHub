@@ -35,6 +35,7 @@ permitida() {
   [[ "$ruta" =~ ^$API/wwwroot/img/.+\.(svg|png|webp)$ ]] && return 0
   [[ "$ruta" == docs/06-experiencia-de-usuario/* ]] && return 0
   [[ "$ruta" == prototype/ui-v2/* ]] && return 0
+  [[ "$ruta" == prototype/ui-v3/* ]] && return 0
   [[ "$ruta" == progress/coordinacion-ui.md ]] && return 0
   return 1
 }
