@@ -1,6 +1,6 @@
 # Estrategia de pruebas
 
-Define qué se prueba, con qué herramienta, en qué capa y con qué umbrales. Parte de la regla del proyecto: **cada criterio de aceptación (`AC-XXX-NN`) tiene al menos una prueba que lo nombra** (RNF10), y la lógica de negocio se prueba primero (AGENTS.md, regla 7). Respalda RNF28 y AC05.
+Define qué se prueba, con qué herramienta, en qué capa y con qué criterio. Parte de la regla del proyecto: **cada criterio de aceptación (`AC-XXX-NN`) tiene al menos una prueba que lo nombra** (RNF10), y la lógica de negocio se prueba primero (AGENTS.md, regla 7). Respalda RNF28 y AC05.
 
 ## 1. Pirámide de pruebas
 
@@ -29,14 +29,14 @@ La base de la pirámide (Dominio y Aplicación) es la más numerosa; las lentas 
 7. **Concurrencia real:** las reglas de stock, límites y descargas se prueban con solicitudes simultáneas sobre la base real ([estados y concurrencia](../03-diseno-de-software/06-estados-y-concurrencia.md)).
 8. **Datos de prueba** de ejemplo, nunca datos reales (salvo el ensayo de restauración aislado, PLA-22); secretos de prueba generados y descartables.
 
-## 3. Cobertura por criticidad (RNF28)
+## 3. Cobertura y recorte de pruebas (RNF28)
 
-El 2026-11-27 la persona responsable decidió recortar las pruebas: la exigencia alta queda solo en lo crítico, y fijó 60 % y 40 % para el resto, con el Libro de Reclamaciones y la interfaz web entre los críticos (DD-150 y DD-151). La cobertura de líneas se mide **por módulo**:
+El 2026-11-27 la persona responsable decidió recortar las pruebas y dejar los porcentajes de cobertura **solo como referencia, nunca como obligación** (DD-150 a DD-152). Se recorta por el valor de cada prueba (§3.3), no por un mínimo. La cobertura de líneas se informa **por módulo**, junto a la referencia de su criticidad, para ver qué funcionalidades quedan poco abordadas y orientar las mejoras futuras:
 
-| Criticidad del módulo | Dominio y Aplicación | Total del módulo (cuatro capas) |
+| Referencia (no obligatoria) | Dominio y Aplicación | Total del módulo (cuatro capas) |
 | :--- | :---: | :---: |
-| **Crítico** (y todo módulo sin clasificar) | **≥ 85 %** | **≥ 70 %** |
-| **No crítico** | **≥ 60 %** | **≥ 40 %** |
+| Módulo **crítico** (y todo módulo sin clasificar) | 85 % | 70 % |
+| Módulo **no crítico** | 60 % | 40 % |
 
 ### 3.1 Clasificación
 
@@ -51,25 +51,28 @@ El 2026-11-27 la persona responsable decidió recortar las pruebas: la exigencia
 
 **No críticos:** Catálogo, Carrito, Envíos, Devoluciones, Notificaciones y Asistente.
 
-La clasificación la fija RNF28 y esta tabla la detalla; `tools/CoverageCheck/PoliticaDeCobertura.cs` la aplica en un solo sitio y una prueba de la herramienta comprueba sus listas. Un módulo es la carpeta de primer nivel de cada capa; las carpetas `Areas`, `Controllers` y `Views` cuentan como Web, y la raíz del proyecto, `Composicion` y `Migracion`, como Plataforma. Un módulo nuevo se exige como crítico hasta que se clasifique (una prueba de la herramienta obliga a clasificarlo). Pasar un módulo a no crítico es una decisión de la persona responsable.
+La clasificación la fija RNF28 y esta tabla la detalla; `tools/CoverageCheck/PoliticaDeCobertura.cs` la aplica en un solo sitio y una prueba de la herramienta comprueba sus listas. Un módulo es la carpeta de primer nivel de cada capa; las carpetas `Areas`, `Controllers` y `Views` cuentan como Web, y la raíz del proyecto, `Composicion` y `Migracion`, como Plataforma. Un módulo nuevo toma la referencia de crítico hasta que se clasifique (una prueba de la herramienta obliga a clasificarlo). La clasificación y las referencias solo las cambia la persona responsable.
 
-### 3.2 La puerta
+### 3.2 El informe
 
-La cobertura (RNF28, PLA-14) es una **puerta**: la verificación automática falla si un módulo baja de sus mínimos o si un servicio o un módulo crítico no tiene datos. Los totales por servicio son informativos: el resto del servicio no compensa a un módulo. Se mide con `coverlet.collector` y se verifica con `tools/CoverageCheck`, que une los informes de todas las pruebas (una línea cuenta si alguna ejecución la cubre), no cuenta migraciones ni código generado, compara sin redondear (84,99 % no es 85 %) y no permite cambiar los mínimos desde la línea de órdenes:
+`tools/CoverageCheck` (RNF28, PLA-14) muestra por módulo la cobertura y su referencia, y avisa de lo que queda por debajo; **ningún porcentaje hace fallar** la verificación, la integración continua ni un lanzamiento. Falla solo si no puede leer los informes o si no tienen datos de un servicio (PLA-45), porque entonces no informa nada. Se mide con `coverlet.collector`; la herramienta une los informes de todas las pruebas (una línea cuenta si alguna ejecución la cubre), no cuenta migraciones ni código generado y compara sin redondear (84,99 % no es 85 %):
 
 ```bash
 dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
 dotnet run --project tools/CoverageCheck -- TestResults
 ```
 
-Aun así, la cobertura no es el objetivo: no se escriben pruebas vacías para subir el número, y los mínimos son un piso, no la meta a la que recortar. Opcionalmente, una pasada de pruebas de mutación sobre el Dominio (por ejemplo, con Stryker.NET) valida que las pruebas detecten errores reales.
+La cobertura no es el objetivo: no se escriben pruebas vacías para subir el número, y la referencia tampoco es la meta a la que recortar. Opcionalmente, una pasada de pruebas de mutación sobre el Dominio (por ejemplo, con Stryker.NET) valida que las pruebas detecten errores reales.
 
 ### 3.3 Criterio para recortar pruebas
 
-Antes de quitar o fusionar una prueba se contestan dos preguntas:
+Una prueba se queda por lo que aporta. Antes de quitarla o fusionarla se contesta:
 
-1. **¿Qué fallo detecta?** Se nombra el defecto concreto que la haría fallar. Si no hay ninguno (comprueba el marco o una constante contra sí misma), sobra.
-2. **¿Otra prueba ya lo detecta?** Si la respuesta es sí, se nombra esa prueba y queda la más barata que lo detecte (unitaria antes que integración, integración antes que E2E). Si la respuesta es no, se queda, aunque el módulo siga por encima de su mínimo.
+1. **¿Sigue vigente?** Comprueba un comportamiento que el sistema todavía tiene y pide.
+2. **¿Qué fallo detecta?** Se nombra el defecto concreto que la haría fallar. Si no hay ninguno (comprueba el marco o una constante contra sí misma), sobra.
+3. **¿Otra prueba ya lo detecta?** Si repite o se asemeja a otra, se nombra esa otra y queda la más barata que detecte el fallo (unitaria antes que integración, integración antes que E2E).
+
+Lo que muestre poco aporte (sin vigencia, sin sentido, repetida, ajena a lo crítico) se descarta, aunque baje la cobertura. Un módulo crítico cuya cobertura ya esté por debajo de 70 % no se recorta: se deja como se validó; los que estén por encima sí se recortan.
 
 No se quita, en ningún módulo:
 
@@ -132,5 +135,5 @@ Cada [atributo de calidad](../01-analisis-de-sistema/04-atributos-de-calidad.md)
 | **AC02 Rendimiento y eficiencia** | p95 < 500 ms con 50 usuarios, checkout p95 < 3 s, LCP ≤ 2,5 s, memoria y CPU < 70 % por VM. | k6, Lighthouse, `docker stats` |
 | **AC03 Disponibilidad y recuperabilidad** | Apagar el contenedor de Inventario: el catálogo sigue y el checkout informa; restaurar un respaldo con RPO ≤ 24 h y RTO ≤ 4 h. | Prueba de caos manual y guion de restauración |
 | **AC04 Seguridad y privacidad** | 100 % de accesos fuera de alcance rechazados; 0 descargas ajenas; límites aplicados; 0 hallazgos críticos en ZAP, Trivy y CodeQL. | xUnit, ZAP baseline, Trivy, CodeQL |
-| **AC05 Mantenibilidad y evolucionabilidad** | Reglas de dependencia y de módulos cumplidas; cada módulo en o sobre los mínimos de cobertura de su criticidad (§3); una sucursal nueva sin cambiar código. | `tests/architecture`, cobertura |
+| **AC05 Mantenibilidad y evolucionabilidad** | Reglas de dependencia y de módulos cumplidas; cobertura por módulo informada frente a su referencia (§3); una sucursal nueva sin cambiar código. | `tests/architecture`, cobertura |
 | **AC06 Usabilidad y accesibilidad** | Compra en ≤ 5 pasos, SUS ≥ 68, 0 incumplimientos AA críticos, recorrido exitoso en cuatro navegadores. | Playwright + axe, sesiones con personas |

@@ -1,34 +1,36 @@
 # Recorte de pruebas — carril 1: política y comprobaciones estáticas (2026-11-27)
 
-Rama `claude/pruebas-politica-fd6970`. La persona responsable decidió el 2026-11-27 (comunicado por la sesión coordinadora) mantener la cobertura de 85 % y 70 % solo en lo crítico, con una base «40-60» en el resto.
+Rama `claude/pruebas-politica-fd6970`. Decisiones de la persona responsable del 2026-11-27, con sus palabras en `progress/decisiones-delegadas.md` (DD-150 a DD-153).
 
 ## 1. Política
 
-| Criticidad | Dominio y Aplicación | Total del módulo | Módulos |
+- **La cobertura es referencia, no obligación:** ningún porcentaje bloquea un cambio ni un lanzamiento.
+- **Se recorta por el valor de cada prueba** (vigencia, qué fallo detecta, si otra ya lo detecta), no por un mínimo. Un módulo crítico por debajo de 70 % se deja como está.
+- Se mantiene: al menos una prueba por criterio de aceptación, concurrencia real de stock, límites y descargas, y los controles de seguridad y datos personales que ninguna otra prueba detecte.
+
+| Referencia | Dominio y Aplicación | Total del módulo | Módulos |
 | :--- | :---: | :---: | :--- |
-| Crítico (y sin clasificar) | ≥ 85 % | ≥ 70 % | Inventario: Reservas, Fuentes, Traslados, Ajustes, Auditoría, Plataforma. E-commerce: Pagos, Pedidos, Identidad, Biblioteca, Auditoría, Plataforma, Web, Reclamaciones |
-| No crítico | ≥ 60 % | ≥ 40 % | E-commerce: Catálogo, Carrito, Envíos, Devoluciones, Notificaciones, Asistente |
+| Crítico (y sin clasificar) | 85 % | 70 % | Inventario: Reservas, Fuentes, Traslados, Ajustes, Auditoría, Plataforma. E-commerce: Pagos, Pedidos, Identidad, Biblioteca, Auditoría, Plataforma, Web, Reclamaciones |
+| No crítico | 60 % | 40 % | E-commerce: Catálogo, Carrito, Envíos, Devoluciones, Notificaciones, Asistente |
 
-- Detalle y criterio para recortar: `docs/07-proceso-de-desarrollo/03-estrategia-de-pruebas.md` §3.
-- Lista que se hace cumplir: `tools/CoverageCheck/PoliticaDeCobertura.cs`.
-- La persona decidió el 2026-11-27 los mínimos (DD-150) y que Web y Reclamaciones son críticos (DD-151). Pendientes de ratificar, por ser el mecanismo: DD-152 (medición por módulo) y DD-153 (comprobaciones fusionadas), en `progress/decisiones-delegadas.md`.
+Detalle: `docs/07-proceso-de-desarrollo/03-estrategia-de-pruebas.md` §3. La lista la aplica `tools/CoverageCheck/PoliticaDeCobertura.cs`.
 
-## 2. Herramienta de cobertura (commit `2bec81b2`)
+## 2. Herramienta de cobertura (commits `2bec81b2` y `231a1961`)
 
 ```bash
 dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
 dotnet run --project tools/CoverageCheck -- TestResults --html TestResults/reporte-de-cobertura/index.html
 ```
 
-Sale con 0, 1 (algún módulo no cumple) o 2 (uso o informes inválidos). Con informes parciales, los módulos críticos sin datos fallan: para un carril, lo útil es la fila de su módulo.
+Sale con 0 si pudo informar (lo que queda bajo su referencia sale como `AVISO`) y con 2 si el uso es inválido, no puede leer los informes o falta un servicio. El `2bec81b2` hacía fallar por porcentajes; lo sustituye `231a1961`.
 
-| | Antes | Después |
+| | Antes | Ahora |
 | :--- | :--- | :--- |
-| Medición | Por servicio | Por módulo según criticidad |
-| Mínimos desde la línea de órdenes | `--minimo-*` | No se pueden cambiar |
-| Pruebas de la herramienta | 15 | 30 |
+| Medición | Por servicio | Por módulo |
+| Porcentajes | Puerta (85 % y 70 %) | Referencia, solo avisa |
+| Pruebas de la herramienta | 15 | 31 |
 
-Probada sobre informes reales de las pruebas unitarias (5 974 del E-commerce y 2 537 del Inventario): asigna todos los archivos a un módulo y los 19 módulos con código cumplen en Dominio y Aplicación (el más bajo, Biblioteca, 88,8 %; mínimo entre los no críticos, Envíos, 89,2 %). Falta la corrida con integración, que es la que mide el total de cada módulo.
+Probada sobre informes reales de las pruebas unitarias (5 974 del E-commerce y 2 537 del Inventario): asigna todos los archivos a un módulo y los 19 módulos con código quedan sobre su referencia en Dominio y Aplicación (el más bajo, Biblioteca, 88,8 %). El total por módulo con integración no se ha medido: la línea base con cobertura aún no existe y la puerta ya no depende de ella.
 
 ## 3. Comprobaciones estáticas (commit `bf26079b`)
 
@@ -53,5 +55,5 @@ El ahorro de tiempo está en la de secretos; las otras dos solo reducen el núme
 
 ## 4. Para otros dueños
 
-- Las `verificacion.md` de `transversal-seguridad` citan líneas de `CodificacionDeSalidaTests` y `SecretosEnElRepositorioTests` que se movieron; no se tocaron (no son de este carril).
+- Las `verificacion.md` de `transversal-seguridad` citan por número líneas de `CodificacionDeSalidaTests` y `SecretosEnElRepositorioTests` que se movieron; no se tocaron (no son de este carril).
 - `progress/evidencias/cobertura/` y `07-evidencias-sprint-2.md` son fotos anteriores, con la regla por servicio.
