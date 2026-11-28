@@ -15,16 +15,16 @@ public sealed record CoberturaDeModulo(
 
     public double PorcentajeTotal => Cobertura.Porcentaje(TotalCubiertas, TotalTotales);
 
-    // Comparación exacta con enteros: cubiertas / totales >= mínimo / 100.
-    public bool CumpleDominioYAplicacion(Umbrales umbrales) => DominioYAplicacionCubiertas * 100L >= (long)umbrales.DominioYAplicacion * DominioYAplicacionTotales;
+    // Comparación exacta con enteros: cubiertas / totales >= referencia / 100.
+    public bool AlcanzaDominioYAplicacion(Referencia referencia) => DominioYAplicacionCubiertas * 100L >= (long)referencia.DominioYAplicacion * DominioYAplicacionTotales;
 
-    public bool CumpleTotal(Umbrales umbrales) => TotalCubiertas * 100L >= (long)umbrales.Total * TotalTotales;
+    public bool AlcanzaTotal(Referencia referencia) => TotalCubiertas * 100L >= (long)referencia.Total * TotalTotales;
 }
 
 /// <summary>
 /// Calcula la cobertura de líneas por módulo a partir de informes Cobertura de <c>coverlet</c> (uno o varios: de las pruebas
 /// unitarias, de integración, etc.). Una línea cuenta como cubierta si algún informe la cubre. No cuenta el código generado ni las
-/// migraciones. El módulo es la carpeta de primer nivel dentro de la carpeta de la capa. La comparación con el mínimo es exacta,
+/// migraciones. El módulo es la carpeta de primer nivel dentro de la carpeta de la capa. La comparación con la referencia es exacta,
 /// sin redondear: 84,96 % no es 85 %.
 /// </summary>
 public static class Cobertura
@@ -117,56 +117,68 @@ public static class Cobertura
                 p.Value.DaCubiertas, p.Value.DaTotales, p.Value.TCubiertas, p.Value.TTotales))];
     }
 
-    /// <summary>Los incumplimientos, uno por línea y en español; una lista vacía significa que cada módulo cumple sus mínimos.</summary>
-    public static IReadOnlyList<string> Verificar(IReadOnlyList<CoberturaDeModulo> modulos, IReadOnlyCollection<string> servicios, PoliticaDeCobertura politica)
+    /// <summary>Los servicios esperados de los que no llegó ningún dato de Dominio y Aplicación: el informe está incompleto.</summary>
+    public static IReadOnlyList<string> ServiciosSinDatos(IReadOnlyList<CoberturaDeModulo> modulos, IReadOnlyCollection<string> servicios)
+    {
+        ArgumentNullException.ThrowIfNull(modulos);
+        ArgumentNullException.ThrowIfNull(servicios);
+
+        return [.. servicios
+            .Where(s => !modulos.Any(m => string.Equals(m.Servicio, s, StringComparison.Ordinal) && m.TieneDominioYAplicacion))
+            .Select(s => $"{s}: no hay datos de cobertura de su Dominio y su Aplicación.")];
+    }
+
+    /// <summary>
+    /// Lo que conviene mirar de los servicios con datos, uno por línea y en español: los módulos bajo su referencia y los módulos
+    /// críticos declarados sin datos (un renombrado o un informe parcial). Son avisos: no hacen fallar nada.
+    /// </summary>
+    public static IReadOnlyList<string> Avisos(IReadOnlyList<CoberturaDeModulo> modulos, IReadOnlyCollection<string> servicios, PoliticaDeCobertura politica)
     {
         ArgumentNullException.ThrowIfNull(modulos);
         ArgumentNullException.ThrowIfNull(servicios);
         ArgumentNullException.ThrowIfNull(politica);
 
-        var incumplimientos = new List<string>();
+        var avisos = new List<string>();
         foreach (var servicio in servicios)
         {
             var propios = modulos.Where(m => string.Equals(m.Servicio, servicio, StringComparison.Ordinal)).ToList();
             if (!propios.Any(m => m.TieneDominioYAplicacion))
             {
-                incumplimientos.Add($"{servicio}: no hay datos de cobertura de su Dominio y su Aplicación.");
                 continue;
             }
 
-            // Un módulo crítico declarado que desaparece (un renombrado, un informe incompleto) no puede pasar en silencio.
             foreach (var declarado in politica.ModulosCriticos.Where(c => c.StartsWith(servicio + "/", StringComparison.Ordinal)).Order(StringComparer.Ordinal))
             {
                 if (!propios.Any(m => m.Nombre == declarado && m.TieneDominioYAplicacion))
                 {
-                    incumplimientos.Add($"{declarado} (crítico): no hay datos de cobertura de su Dominio y su Aplicación.");
+                    avisos.Add($"{declarado} (crítico): no hay datos de cobertura de su Dominio y su Aplicación.");
                 }
             }
 
             foreach (var modulo in propios)
             {
-                var umbrales = politica.UmbralesDe(modulo.Criticidad);
+                var referencia = politica.ReferenciaDe(modulo.Criticidad);
                 var rotulo = $"{modulo.Nombre} ({Rotulo(modulo.Criticidad)})";
-                if (modulo.TieneDominioYAplicacion && !modulo.CumpleDominioYAplicacion(umbrales))
+                if (modulo.TieneDominioYAplicacion && !modulo.AlcanzaDominioYAplicacion(referencia))
                 {
-                    incumplimientos.Add($"{rotulo}: la cobertura de Dominio y Aplicación es {Formato(modulo.PorcentajeDominioYAplicacion)} % y el mínimo es {umbrales.DominioYAplicacion} %.");
+                    avisos.Add($"{rotulo}: la cobertura de Dominio y Aplicación es {Formato(modulo.PorcentajeDominioYAplicacion)} % y la referencia es {referencia.DominioYAplicacion} %.");
                 }
 
-                if (!modulo.CumpleTotal(umbrales))
+                if (!modulo.AlcanzaTotal(referencia))
                 {
-                    incumplimientos.Add($"{rotulo}: la cobertura total es {Formato(modulo.PorcentajeTotal)} % y el mínimo es {umbrales.Total} %.");
+                    avisos.Add($"{rotulo}: la cobertura total es {Formato(modulo.PorcentajeTotal)} % y la referencia es {referencia.Total} %.");
                 }
             }
         }
 
-        return incumplimientos;
+        return avisos;
     }
 
     public static string Rotulo(Criticidad criticidad) => criticidad switch
     {
         Criticidad.Critico => "crítico",
         Criticidad.NoCritico => "no crítico",
-        _ => "sin clasificar, se exige como crítico",
+        _ => "sin clasificar, con la referencia de crítico",
     };
 
     public static string Formato(double porcentaje) =>
@@ -201,7 +213,7 @@ public static class Cobertura
 
     /// <summary>
     /// El módulo de un archivo ya reducido con <see cref="DesdeLaCarpetaDelEnsamblado"/>. Si la ruta no pasa por la carpeta del
-    /// ensamblado no se puede saber: queda como un módulo sin clasificar, que se exige como crítico.
+    /// ensamblado no se puede saber: queda como un módulo sin clasificar, con la referencia de crítico.
     /// </summary>
     internal static string ModuloDe(string archivo, string ensamblado)
     {

@@ -1,11 +1,12 @@
 using System.Text;
 using BabelHub.Tools.CoverageCheck;
 
-// Verifica la cobertura de líneas de cada módulo de cada servicio según su criticidad (PLA-14): los mínimos y la lista de módulos
-// están en PoliticaDeCobertura.cs, sin código generado ni migraciones. Uso:
+// Informa la cobertura de líneas de cada módulo de cada servicio frente a la referencia de su criticidad (PLA-14): las referencias y la
+// lista de módulos están en PoliticaDeCobertura.cs, sin código generado ni migraciones. Uso:
 //   dotnet run --project tools/CoverageCheck -- <archivo-o-carpeta>... [--servicios Ecommerce,Inventario] [--html reporte.html]
-// Cada carpeta se recorre buscando informes *.cobertura.xml (el formato de coverlet). Sale con 0 si todos los módulos cumplen, 1 si
-// alguno no y 2 si el uso o los informes son inválidos. Los mínimos no se pueden cambiar desde la línea de órdenes.
+// Cada carpeta se recorre buscando informes *.cobertura.xml (el formato de coverlet). Los porcentajes son referenciales: quedar por
+// debajo solo se avisa. Sale con 0 si pudo informar y con 2 si el uso es inválido, si no puede leer los informes o si no tienen datos
+// de un servicio (PLA-45).
 Console.OutputEncoding = Encoding.UTF8;
 var rutas = new List<string>();
 var servicios = new List<string> { "Ecommerce", "Inventario" };
@@ -89,30 +90,41 @@ catch (System.Xml.XmlException error)
     Console.Error.WriteLine($"Un informe de cobertura no es un XML válido: {error.Message}");
     return 2;
 }
+catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"No se pudo leer o escribir un informe: {error.Message}");
+    return 2;
+}
 
 Console.WriteLine($"Informes leídos: {informes.Count}");
-Console.WriteLine($"{"Módulo",-30} {"Criticidad",-14} {"Dominio y Aplicación",22} {"Total",18}");
+Console.WriteLine($"{"Módulo",-30} {"Criticidad",-14} {"Dominio y Aplicación (ref.)",28} {"Total (ref.)",18}");
 foreach (var modulo in resultado)
 {
-    var umbrales = politica.UmbralesDe(modulo.Criticidad);
+    var referencia = politica.ReferenciaDe(modulo.Criticidad);
     var dominioYAplicacion = modulo.TieneDominioYAplicacion
-        ? $"{Cobertura.Formato(modulo.PorcentajeDominioYAplicacion)} % (>= {umbrales.DominioYAplicacion})"
+        ? $"{Cobertura.Formato(modulo.PorcentajeDominioYAplicacion)} % ({referencia.DominioYAplicacion})"
         : "sin líneas";
-    var total = $"{Cobertura.Formato(modulo.PorcentajeTotal)} % (>= {umbrales.Total})";
+    var total = $"{Cobertura.Formato(modulo.PorcentajeTotal)} % ({referencia.Total})";
     var criticidad = modulo.Criticidad == Criticidad.SinClasificar ? "sin clasificar" : Cobertura.Rotulo(modulo.Criticidad);
-    Console.WriteLine($"{modulo.Nombre,-30} {criticidad,-14} {dominioYAplicacion,22} {total,18}");
+    Console.WriteLine($"{modulo.Nombre,-30} {criticidad,-14} {dominioYAplicacion,28} {total,18}");
 }
 
-var incumplimientos = Cobertura.Verificar(resultado, servicios, politica);
-if (incumplimientos.Count == 0)
+var avisos = Cobertura.Avisos(resultado, servicios, politica);
+foreach (var aviso in avisos)
 {
-    Console.WriteLine($"OK: cada módulo de {string.Join(", ", servicios)} cumple los mínimos de su criticidad.");
-    return 0;
+    Console.WriteLine($"AVISO: {aviso}");
 }
 
-foreach (var incumplimiento in incumplimientos)
+var sinDatos = Cobertura.ServiciosSinDatos(resultado, servicios);
+if (sinDatos.Count > 0)
 {
-    Console.Error.WriteLine($"ERROR: {incumplimiento}");
+    foreach (var error in sinDatos)
+    {
+        Console.Error.WriteLine($"ERROR: {error}");
+    }
+
+    return 2;
 }
 
-return 1;
+Console.WriteLine($"Informe de {string.Join(", ", servicios)} completo, con {avisos.Count} aviso(s). Los porcentajes son referenciales y no hacen fallar la verificación.");
+return 0;

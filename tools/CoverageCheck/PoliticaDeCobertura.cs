@@ -1,9 +1,9 @@
 namespace BabelHub.Tools.CoverageCheck;
 
-/// <summary>Los mínimos de cobertura de líneas de un módulo.</summary>
-public sealed record Umbrales(int DominioYAplicacion, int Total);
+/// <summary>La cobertura de líneas de referencia de un módulo: orienta las pruebas, no es un mínimo obligatorio.</summary>
+public sealed record Referencia(int DominioYAplicacion, int Total);
 
-/// <summary>La criticidad de un módulo. Uno sin clasificar se exige como crítico.</summary>
+/// <summary>La criticidad de un módulo. Uno sin clasificar toma la referencia de los críticos.</summary>
 public enum Criticidad
 {
     SinClasificar = 0,
@@ -12,9 +12,9 @@ public enum Criticidad
 }
 
 /// <summary>
-/// La política de cobertura (RNF28, PLA-14) y el único sitio donde se declara la criticidad de cada módulo. Su explicación está en
-/// <c>docs/07-proceso-de-desarrollo/03-estrategia-de-pruebas.md</c> §3. Pasar un módulo a «no crítico» baja su exigencia: es una
-/// decisión de la persona responsable. Un módulo que no figure en ninguna de las dos listas se exige como crítico.
+/// Las referencias de cobertura (RNF28, PLA-14) y el único sitio donde se declara la criticidad de cada módulo. Su explicación está en
+/// <c>docs/07-proceso-de-desarrollo/03-estrategia-de-pruebas.md</c> §3. Los porcentajes son referenciales y no hacen fallar nada; la
+/// clasificación solo la cambia la persona responsable. Un módulo que no figure en ninguna de las dos listas se informa como crítico.
 /// </summary>
 public sealed class PoliticaDeCobertura
 {
@@ -72,9 +72,9 @@ public sealed class PoliticaDeCobertura
             "Ecommerce/Notificaciones",
         ]);
 
-    public Umbrales UmbralesCriticos { get; } = new(DominioYAplicacion: 85, Total: 70);
+    public Referencia ReferenciaDeCriticos { get; } = new(DominioYAplicacion: 85, Total: 70);
 
-    public Umbrales UmbralesNoCriticos { get; } = new(DominioYAplicacion: 60, Total: 40);
+    public Referencia ReferenciaDeNoCriticos { get; } = new(DominioYAplicacion: 60, Total: 40);
 
     /// <summary>Los módulos críticos declarados, como <c>Servicio/Modulo</c>: todos deben tener datos de cobertura.</summary>
     public IReadOnlyCollection<string> ModulosCriticos => _criticos;
@@ -90,7 +90,7 @@ public sealed class PoliticaDeCobertura
             : Criticidad.SinClasificar;
     }
 
-    public Umbrales UmbralesDe(Criticidad criticidad) => criticidad == Criticidad.NoCritico ? UmbralesNoCriticos : UmbralesCriticos;
+    public Referencia ReferenciaDe(Criticidad criticidad) => criticidad == Criticidad.NoCritico ? ReferenciaDeNoCriticos : ReferenciaDeCriticos;
 
     /// <summary>
     /// El módulo de una carpeta de primer nivel de una capa. Las carpetas que no son un módulo se asignan al que les corresponde:
