@@ -11,7 +11,7 @@ Rama `claude/pruebas-politica-fd6970`. La persona responsable decidió el 2026-1
 
 - Detalle y criterio para recortar: `docs/07-proceso-de-desarrollo/03-estrategia-de-pruebas.md` §3.
 - Lista que se hace cumplir: `tools/CoverageCheck/PoliticaDeCobertura.cs`.
-- Por ratificar: DD-150 a DD-153 (`progress/decisiones-delegadas.md`).
+- La persona decidió el 2026-11-27 los mínimos (DD-150) y que Web y Reclamaciones son críticos (DD-151). Pendientes de ratificar, por ser el mecanismo: DD-152 (medición por módulo) y DD-153 (comprobaciones fusionadas), en `progress/decisiones-delegadas.md`.
 
 ## 2. Herramienta de cobertura (commit `2bec81b2`)
 

@@ -31,7 +31,7 @@ La base de la pirámide (Dominio y Aplicación) es la más numerosa; las lentas 
 
 ## 3. Cobertura por criticidad (RNF28)
 
-El 2026-11-27 la persona responsable decidió recortar las pruebas: la exigencia alta queda solo en lo crítico. La cobertura de líneas se mide **por módulo**:
+El 2026-11-27 la persona responsable decidió recortar las pruebas: la exigencia alta queda solo en lo crítico, y fijó 60 % y 40 % para el resto, con el Libro de Reclamaciones y la interfaz web entre los críticos (DD-150 y DD-151). La cobertura de líneas se mide **por módulo**:
 
 | Criticidad del módulo | Dominio y Aplicación | Total del módulo (cuatro capas) |
 | :--- | :---: | :---: |
