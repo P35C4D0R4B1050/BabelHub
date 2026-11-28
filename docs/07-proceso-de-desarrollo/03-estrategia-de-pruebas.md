@@ -51,7 +51,7 @@ El 2026-11-27 la persona responsable decidió recortar las pruebas: la exigencia
 
 **No críticos:** Catálogo, Carrito, Envíos, Devoluciones, Notificaciones y Asistente.
 
-La única lista que se hace cumplir está en `tools/CoverageCheck/PoliticaDeCobertura.cs`; esta tabla la explica. Un módulo es la carpeta de primer nivel de cada capa; las carpetas `Areas`, `Controllers` y `Views` cuentan como Web, y la raíz del proyecto, `Composicion` y `Migracion`, como Plataforma. Un módulo nuevo se exige como crítico hasta que se clasifique (una prueba de la herramienta obliga a clasificarlo). Pasar un módulo a no crítico es una decisión de la persona responsable.
+La clasificación la fija RNF28 y esta tabla la detalla; `tools/CoverageCheck/PoliticaDeCobertura.cs` la aplica en un solo sitio y una prueba de la herramienta comprueba sus listas. Un módulo es la carpeta de primer nivel de cada capa; las carpetas `Areas`, `Controllers` y `Views` cuentan como Web, y la raíz del proyecto, `Composicion` y `Migracion`, como Plataforma. Un módulo nuevo se exige como crítico hasta que se clasifique (una prueba de la herramienta obliga a clasificarlo). Pasar un módulo a no crítico es una decisión de la persona responsable.
 
 ### 3.2 La puerta
 
@@ -75,7 +75,7 @@ No se quita, en ningún módulo:
 
 - la última prueba que nombra un criterio `AC-XXX-NN` (§2, regla 2);
 - las pruebas de concurrencia real de stock, límites y descargas (§2, regla 7);
-- un rechazo de seguridad (acceso fuera de alcance, límite, secreto, descarga ajena) que ninguna otra prueba detecte.
+- un control de seguridad o de datos personales que ninguna otra prueba detecte: acceso fuera de alcance, límite, secreto, descarga ajena, consentimiento, supresión o retención, redacción en registros, firma de llamadas entrantes o codificación de salida.
 
 Fusionar casos repetidos es válido si la prueba resultante **informa todos los infractores**, sigue fallando ante un defecto sembrado (se comprueba) y no debilita ninguna aserción (§2, regla 6). Una comprobación estática sobre muchos archivos es **una** prueba, no un caso por archivo.
 

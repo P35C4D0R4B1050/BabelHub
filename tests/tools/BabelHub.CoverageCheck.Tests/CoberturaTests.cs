@@ -97,6 +97,9 @@ public sealed class CoberturaTests : IDisposable
         var error = Assert.Single(incumplimientos);
         Assert.Contains("Ecommerce/Regalos (sin clasificar, se exige como crítico)", error, StringComparison.Ordinal);
         Assert.Contains("el mínimo es 85 %", error, StringComparison.Ordinal);
+
+        var porTotal = Assert.Single(Verificar(Modulo("Ecommerce/Pagos", 100, 100), Modulo("Ecommerce/Regalos", 85, 53), Reservas));
+        Assert.Contains("la cobertura total es 69.0 % y el mínimo es 70 %", porTotal, StringComparison.Ordinal);
     }
 
     [Fact]
