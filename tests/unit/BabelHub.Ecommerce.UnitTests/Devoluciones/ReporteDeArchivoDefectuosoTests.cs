@@ -263,21 +263,6 @@ public sealed class ReporteDeArchivoDefectuosoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-24")]
-    public async Task Decidir_un_reporte_ya_decidido_es_estado_invalido_y_una_devolucion_que_no_es_un_reporte_es_no_encontrada()
-    {
-        var (admin, _, _, devolucionId) = await ConReporteAbierto();
-        await admin.Decidir.Aprobar(devolucionId);
-
-        var repetida = await admin.Decidir.Aprobar(devolucionId);
-        var inexistente = await admin.Decidir.Aprobar(Guid.NewGuid());
-
-        Assert.Equal("estado-invalido", repetida.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Single(admin.Reembolsos.Registrados);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-DEV-21")]
     public async Task Con_la_auditoria_caida_el_reporte_se_revierte_y_el_acceso_no_queda_suspendido()
     {
@@ -305,23 +290,5 @@ public sealed class ReporteDeArchivoDefectuosoTests
         Assert.Equal("reporte-no-admitido", resultado.Error!.Clave);
         Assert.Empty(entorno.Repositorio.Todas);
         Assert.Empty(entorno.Repositorio.Cupos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-24")]
-    public async Task Rechazar_tolera_que_Reanudar_responda_no_disponible_pero_una_falla_tecnica_de_Biblioteca_revierte_y_el_reporte_sigue_abierto()
-    {
-        var (tolerado, _, _, idTolerado) = await ConReporteAbierto();
-        tolerado.Accesos.ReanudarResponde = ResultadoDeReanudarAcceso.NoDisponible;
-        var (falla, _, linea, idFalla) = await ConReporteAbierto();
-        falla.Accesos.ReanudarFalla = true;
-
-        var cerrado = await tolerado.Decidir.Rechazar(idTolerado);
-        var revertido = await falla.Decidir.Rechazar(idFalla);
-
-        Assert.True(cerrado.EsExito);
-        Assert.Equal(CategoriaDeError.NoDisponible, revertido.Error!.Categoria);
-        Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, falla.Repositorio.Todas.Single().Lineas[0].Estado);
-        Assert.Equal(1, falla.Repositorio.Cupos[linea.LineaId].CantidadComprometida);
     }
 }

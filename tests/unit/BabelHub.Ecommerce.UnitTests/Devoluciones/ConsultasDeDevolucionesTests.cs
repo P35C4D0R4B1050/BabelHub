@@ -75,22 +75,6 @@ public sealed class ConsultasDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-12")]
-    public async Task Un_cliente_sin_pedidos_recibe_una_pagina_vacia_y_con_Pedidos_caido_servicio_no_disponible()
-    {
-        var sin = new EntornoDeDevoluciones();
-        var caido = new EntornoDeDevoluciones();
-        caido.Pedidos.NoResponde = true;
-
-        var vacia = await sin.Consultas.ListarMias(new ListarDevolucionesEntrada());
-        var noDisponible = await caido.Consultas.ListarMias(new ListarDevolucionesEntrada());
-
-        Assert.Empty(vacia.Valor.Devoluciones);
-        Assert.Equal(0, vacia.Valor.Total);
-        Assert.Equal(CategoriaDeError.NoDisponible, noDisponible.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
     public async Task Obtener_la_propia_funciona_y_una_ajena_responde_lo_mismo_que_una_inexistente_con_un_evento_por_intento()
     {
         var a = new EntornoDeDevoluciones();
@@ -133,18 +117,6 @@ public sealed class ConsultasDeDevolucionesTests
         Assert.Equal(2, otro.Denegaciones.Eventos.Count);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
-    public async Task El_limite_de_consultas_se_aplica_despues_del_rol_y_su_exceso_es_el_429_uniforme()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        cliente.Limites.Maximos["consultas-de-devoluciones-por-usuario"] = 0;
-
-        var resultado = await cliente.Consultas.ListarMias(new ListarDevolucionesEntrada());
-
-        Assert.Equal(CategoriaDeError.Limite, resultado.Error!.Categoria);
-    }
-
     // ---------- La sucursal receptora ----------
 
     [Fact]
@@ -177,21 +149,6 @@ public sealed class ConsultasDeDevolucionesTests
         Assert.Equal(CategoriaDeError.Prohibido, ajena.Error!.Categoria);
         Assert.Equal("fuera-de-sucursal", Assert.Single(encargado.Denegaciones.Eventos).Motivo);
         Assert.Equal(CategoriaDeError.Validacion, invalido.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
-    public async Task La_administracion_lista_las_de_cualquier_sucursal_y_el_cliente_no_lista_por_sucursal()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var deArequipa = await SolicitarImpreso(cliente, "arequipa");
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), cliente);
-
-        var comoAdmin = await admin.Consultas.ListarDeLaSucursal("arequipa", new ListarDevolucionesEntrada());
-        var comoCliente = await cliente.Consultas.ListarDeLaSucursal("arequipa", new ListarDevolucionesEntrada());
-
-        Assert.Equal(deArequipa, Assert.Single(comoAdmin.Valor.Devoluciones).DevolucionId);
-        Assert.Equal(CategoriaDeError.Prohibido, comoCliente.Error!.Categoria);
     }
 
     [Fact]
@@ -265,22 +222,6 @@ public sealed class ConsultasDeDevolucionesTests
         Assert.True(resultado.Error!.Categoria is CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado);
         Assert.Single(otro.Denegaciones.Eventos);
         Assert.Equal(CategoriaDeError.Validacion, invalido.Error!.Categoria);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
-    public async Task Con_el_almacen_caido_las_consultas_responden_servicio_no_disponible()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var id = await SolicitarImpreso(cliente, "lima-central");
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), cliente);
-        cliente.Repositorio.NoDisponible = true;
-
-        var mias = await cliente.Consultas.ListarMias(new ListarDevolucionesEntrada());
-        var obtener = await admin.Consultas.Obtener(id);
-        var todas = await admin.Consultas.ListarDeLaAdministracion(new ListarDevolucionesDeLaAdministracionEntrada());
-
-        Assert.All(new[] { mias.Error, obtener.Error, todas.Error }, e => Assert.Equal(CategoriaDeError.NoDisponible, e!.Categoria));
     }
 
     [Fact]

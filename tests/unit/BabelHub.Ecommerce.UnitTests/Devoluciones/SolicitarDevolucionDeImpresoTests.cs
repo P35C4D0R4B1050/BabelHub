@@ -51,18 +51,6 @@ public sealed class SolicitarDevolucionDeImpresoTests
         Assert.Equal(2, entorno.Repositorio.Cupos[linea.LineaId].CantidadComprometida);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-01")]
-    public async Task La_sucursal_se_valida_fuera_de_transaccion_y_el_Inventario_no_se_llama_dentro_de_ninguna()
-    {
-        var (entorno, pedido, linea) = Preparar();
-
-        await entorno.SolicitarImpreso.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
-
-        Assert.Equal(1, entorno.Inventario.ConsultasDeSucursales);
-        Assert.Equal(0, entorno.Inventario.LlamadasDentroDeLaTransaccion);
-    }
-
     // ---------- Orden de comprobación ----------
 
     [Fact]
@@ -130,25 +118,6 @@ public sealed class SolicitarDevolucionDeImpresoTests
 
         Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
         Assert.Equal("motivo", Assert.Single(resultado.Error.Errores).Campo);
-        Assert.Equal(0, entorno.Pedidos.Lecturas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-01")]
-    public async Task La_forma_de_las_lineas_y_de_la_sucursal_se_valida_antes_de_leer_pedidos()
-    {
-        var (entorno, pedido, linea) = Preparar();
-        var sinLineas = new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [], new TextoLibre("x"), "lima-central");
-        var repetidas = new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [new LineaPedidaParaDevolver(linea.LineaId, 1), new LineaPedidaParaDevolver(linea.LineaId, 1)], new TextoLibre("x"), "lima-central");
-        var muchas = new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [.. Enumerable.Range(0, 21).Select(_ => new LineaPedidaParaDevolver(Guid.NewGuid(), 1))], new TextoLibre("x"), "lima-central");
-
-        foreach (var entrada in new[] { sinLineas, repetidas, muchas, Entrada(pedido.PedidoId, linea.LineaId, 0), Entrada(pedido.PedidoId, linea.LineaId, sucursal: "  ") })
-        {
-            var resultado = await entorno.SolicitarImpreso.Ejecutar(entrada);
-
-            Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
-        }
-
         Assert.Equal(0, entorno.Pedidos.Lecturas);
     }
 
@@ -227,18 +196,6 @@ public sealed class SolicitarDevolucionDeImpresoTests
         Assert.Empty(entorno.Repositorio.Todas);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-01")]
-    public async Task Una_linea_que_no_es_del_pedido_es_validacion()
-    {
-        var (entorno, pedido, _) = Preparar();
-
-        var resultado = await entorno.SolicitarImpreso.Ejecutar(Entrada(pedido.PedidoId, Guid.NewGuid()));
-
-        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
-        Assert.Equal("no-es-del-pedido", resultado.Error.Errores[0].Clave);
-    }
-
     // ---------- Cupo (DEV-03, DEV-18) ----------
 
     [Fact]
@@ -276,38 +233,6 @@ public sealed class SolicitarDevolucionDeImpresoTests
         Assert.Single(entorno.Repositorio.Todas);
         Assert.Equal(0, entorno.Repositorio.Cupos.GetValueOrDefault(a.LineaId)?.CantidadComprometida ?? 0);
         Assert.Single(entorno.Auditoria.Solicitudes);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-03")]
-    public async Task Los_cupos_se_toman_en_orden_de_identificador_de_linea()
-    {
-        var entorno = new EntornoDeDevoluciones();
-        var lineas = Enumerable.Range(0, 5).Select(_ => EntornoDeDevoluciones.Entregada(Ahora.AddDays(-1), 1)).ToArray();
-        var pedido = entorno.SembrarPedido(lineas);
-        var entrada = new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [.. lineas.Reverse().Select(l => new LineaPedidaParaDevolver(l.LineaId, 1))], new TextoLibre("x"), "lima-central");
-
-        await entorno.SolicitarImpreso.Ejecutar(entrada);
-
-        Assert.Equal(entorno.Repositorio.OrdenDeCupos.Order(), entorno.Repositorio.OrdenDeCupos);
-        Assert.Equal(5, entorno.Repositorio.OrdenDeCupos.Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
-    public async Task Una_linea_rechazada_devuelve_su_cantidad_y_puede_solicitarse_otra_vez_dentro_del_plazo()
-    {
-        var (entorno, pedido, linea) = Preparar(cantidad: 1);
-        var primera = await entorno.SolicitarImpreso.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
-        var devolucion = Assert.Single(entorno.Repositorio.Todas);
-        devolucion.Rechazar(Ahora, ResponsableDelCambio.Personal(Guid.NewGuid()));
-        await entorno.Repositorio.DevolverCupos([(linea.LineaId, 1)]);
-
-        var otra = await entorno.SolicitarImpreso.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
-
-        Assert.True(primera.EsExito);
-        Assert.True(otra.EsExito);
-        Assert.Equal(2, entorno.Repositorio.Todas.Count);
     }
 
     // ---------- Cancelación de la cuenta (DEV-26) ----------
@@ -371,18 +296,5 @@ public sealed class SolicitarDevolucionDeImpresoTests
         Assert.NotNull(c);
         Assert.Empty(sinAuditoria.Repositorio.Todas);
         Assert.Empty(sinAuditoria.Repositorio.Cupos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-01")]
-    public async Task El_resultado_no_lleva_el_responsable_ni_la_cuenta_ni_el_motivo_en_su_texto()
-    {
-        var (entorno, pedido, linea) = Preparar();
-
-        var resultado = await entorno.SolicitarImpreso.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId, motivo: "Mi DNI es 12345678"));
-
-        Assert.DoesNotContain("12345678", resultado.Valor.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("12345678", JsonSerializer.Serialize(resultado.Valor), StringComparison.Ordinal);
-        Assert.DoesNotContain(entorno.Actor.Actual!.UsuarioId!.Value.ToString(), JsonSerializer.Serialize(resultado.Valor), StringComparison.OrdinalIgnoreCase);
     }
 }

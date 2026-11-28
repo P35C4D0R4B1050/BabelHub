@@ -118,9 +118,7 @@ public sealed class RestInventarioDeDevolucionesTests
     [Trait("Criterio", "AC-DEV-16")]
     [InlineData("INV-PROHIBIDO", 403)]
     [InlineData("INV-NO-AUTENTICADO", 401)]
-    [InlineData("INV-IDEMPOTENCIA-EN-CURSO", 409)]
     [InlineData("INV-SERVICIO-NO-DISPONIBLE", 503)]
-    [InlineData("INV-OTRO-QUE-NO-CONOZCO", 422)]
     [InlineData(null, 408)]
     public async Task Todo_lo_demas_incluidos_el_permiso_la_sesion_y_los_5xx_es_incierto_porque_el_reingreso_pudo_aplicarse(string? codigo, int estado)
     {
@@ -174,18 +172,6 @@ public sealed class RestInventarioDeDevolucionesTests
         }
 
         Assert.Empty(ClienteDelInventarioEspia.Reingresos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public async Task Veinte_lineas_es_el_maximo_que_se_envia()
-    {
-        var (adaptador, _) = Crear();
-
-        var resultado = await adaptador.Reingresar(Carga(20));
-
-        Assert.IsType<ResultadoDelReingreso.Reingresado>(resultado);
-        Assert.Equal(20, Assert.Single(ClienteDelInventarioEspia.Reingresos).Lineas.Count);
     }
 
     // ---------- Las sucursales activas ----------

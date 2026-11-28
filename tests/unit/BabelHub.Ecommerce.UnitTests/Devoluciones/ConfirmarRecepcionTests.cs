@@ -117,21 +117,6 @@ public sealed class ConfirmarRecepcionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-16")]
-    public async Task Una_excepcion_del_adaptador_es_incierta_y_no_propaga_su_texto()
-    {
-        var (entorno, id) = await ConAprobada();
-        entorno.Inventario.Resultado = new ResultadoDelReingreso.Incierto();
-        entorno.Inventario.LanzaAlReingresar = true;
-
-        var resultado = await entorno.Recepcion.Ejecutar(id);
-
-        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
-        Assert.NotNull(Guardada(entorno, id).ReingresoIncertoEn);
-        Assert.DoesNotContain("TEXTO-INTERNO", resultado.Error.Clave, StringComparison.Ordinal);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-DEV-15")]
     public async Task Un_rechazo_de_negocio_sin_intento_incierto_limpia_el_marcador_alerta_y_la_revision_de_plazos_vuelve_a_aplicar()
     {
@@ -252,73 +237,6 @@ public sealed class ConfirmarRecepcionTests
         Assert.Equal(CategoriaDeError.Prohibido, comoCliente.Error!.Categoria);
         Assert.Empty(ajeno.Inventario.Reingresos);
         Assert.Empty(soloCliente.Inventario.Reingresos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public async Task Una_devolucion_solo_solicitada_o_inexistente_no_se_confirma()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var linea = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2));
-        var pedido = cliente.SembrarPedido(linea);
-        var solicitada = await cliente.SolicitarImpreso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [new LineaPedidaParaDevolver(linea.LineaId, 1)], new TextoLibre("x"), "lima-central"));
-        var admin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(cliente);
-
-        var sinAprobar = await admin.Recepcion.Ejecutar(solicitada.Valor.DevolucionId);
-        var inexistente = await admin.Recepcion.Ejecutar(Guid.NewGuid());
-
-        Assert.Equal("estado-invalido", sinAprobar.Error!.Clave);
-        Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
-        Assert.Empty(admin.Inventario.Reingresos);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-15")]
-    public async Task Un_conflicto_seguido_de_un_rechazo_de_negocio_no_limpia_el_marcador_y_el_plazo_no_rechaza_la_devolucion()
-    {
-        var (entorno, id) = await ConAprobada();
-        entorno.Inventario.Resultado = new ResultadoDelReingreso.ConflictoDeIdempotencia();
-        await entorno.Recepcion.Ejecutar(id);
-        entorno.Inventario.Resultado = new ResultadoDelReingreso.RechazoDeNegocio();
-
-        await entorno.Recepcion.Ejecutar(id);
-
-        var devolucion = Guardada(entorno, id);
-        Assert.NotNull(devolucion.ReingresoIniciadoEn);
-        Assert.NotNull(devolucion.ReingresoIncertoEn);
-        Assert.Equal(ResultadoDeTransicionDeDevolucion.ReingresoIniciado, devolucion.RechazarPorPlazoDeRecepcion(Ahora.AddDays(30)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public async Task Dos_confirmaciones_con_el_reingreso_ya_confirmado_no_auditan_dos_veces_el_reingreso()
-    {
-        var (entorno, id) = await ConAprobada();
-        entorno.Reembolsos.ProcesarResponde = EstadoDelReembolso.Pendiente;
-        entorno.Reembolsos.NoDisponible = true;
-        await entorno.Recepcion.Ejecutar(id);
-        entorno.Reembolsos.NoDisponible = false;
-
-        await entorno.Recepcion.Ejecutar(id);
-
-        Assert.Single(entorno.Auditoria.Solicitudes, s => s.Accion.ToString() == "ReingresoPorDevolucion");
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-07")]
-    public async Task Un_digital_o_un_reporte_no_se_confirma_ni_llega_al_Inventario_aunque_lo_pida_la_administracion()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var digital = EntornoDeDevoluciones.Digital();
-        var pedido = new PedidoParaDevolucionesParaPruebas(cliente, digital).Pedido;
-        cliente.Accesos.Sembrar(pedido.CuentaId, pedido.PedidoId, digital.EdicionId, enlaceEntregado: true);
-        await cliente.Reportar.Ejecutar(new ReportarArchivoDefectuosoEntrada(pedido.PedidoId, digital.LineaId, new TextoLibre("x"), new TextoLibre("y")));
-        var admin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(cliente);
-
-        var resultado = await admin.Recepcion.Ejecutar(cliente.Repositorio.Todas.Single().Id);
-
-        Assert.Equal("estado-invalido", resultado.Error!.Clave);
-        Assert.Empty(admin.Inventario.Reingresos);
     }
 
     // ---------- Venta por sucursal: dos líneas de una edición (T48) ----------

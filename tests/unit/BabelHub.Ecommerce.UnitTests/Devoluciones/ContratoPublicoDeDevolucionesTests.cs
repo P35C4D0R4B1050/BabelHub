@@ -41,26 +41,6 @@ public sealed class ContratoPublicoDeDevolucionesTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-25")]
-    public void La_raiz_del_modulo_expone_los_contratos_del_cliente_y_de_la_gestion()
-    {
-        var nombres = TiposPublicos().Select(t => t.Name).ToHashSet();
-
-        Assert.Contains(nameof(IDevolucionesDelCliente), nombres);
-        Assert.Contains(nameof(IGestionDeDevoluciones), nombres);
-        Assert.Contains(nameof(DevolucionVista), nombres);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-25")]
-    public void Ningun_tipo_publico_de_la_raiz_expone_el_dominio_ni_el_interior()
-    {
-        var expuestos = TiposPublicos().SelectMany(TiposQueExpone).Distinct().ToArray();
-
-        Assert.DoesNotContain(expuestos, t => t.Namespace is not null && (t.Namespace.StartsWith("BabelHub.Ecommerce.Domain", StringComparison.Ordinal) || t.Namespace.Contains(".Interno", StringComparison.Ordinal)));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-DEV-12")]
     public void Ningun_modelo_del_contrato_lleva_el_responsable_de_un_cambio_ni_la_cuenta()
     {

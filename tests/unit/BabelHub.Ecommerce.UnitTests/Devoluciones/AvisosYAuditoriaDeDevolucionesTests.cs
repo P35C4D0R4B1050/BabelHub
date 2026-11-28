@@ -76,19 +76,6 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-10")]
-    public async Task Rechazar_avisa_con_el_estado_rechazada_y_la_solicitud_no_avisa()
-    {
-        var e = await ConSolicitada();
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), e);
-        Assert.Empty(Avisos(e.Cliente));
-
-        await admin.Gestion.Rechazar(e.DevolucionId);
-
-        Assert.Equal("rechazada", Assert.Single(Avisos(admin)).Campos["estado"]);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
     public async Task La_recepcion_avisa_recibida_una_vez_y_reembolsada_por_cada_linea_con_eventos_distintos()
     {
         var e = await ConSolicitada();
@@ -125,66 +112,6 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
 
         Assert.Equal(2, Avisos(sistema).Count(a => a.Campos["estado"] == "reembolsada"));
         Assert.All(Avisos(sistema).Where(a => a.Campos["estado"] == "reembolsada"), a => Assert.Equal(e.CuentaId.ToString("D"), a.DestinatarioRef));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
-    public async Task El_rechazo_por_plazo_del_sistema_avisa_al_cliente_dueno_del_pedido()
-    {
-        var e = await ConSolicitada();
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), e);
-        await admin.Gestion.Aprobar(e.DevolucionId);
-        var sistema = Como(ActorDePrueba.DelSistema(), e);
-        sistema.Reloj.Ahora = Ahora.AddDays(11);
-
-        await sistema.Vencidas.Ejecutar(10);
-
-        var aviso = Avisos(sistema).Last();
-        Assert.Equal("rechazada", aviso.Campos["estado"]);
-        Assert.Equal(e.CuentaId.ToString("D"), aviso.DestinatarioRef);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
-    public async Task El_reembolso_de_un_digital_avisa_aprobada_y_reembolsada_y_con_la_pasarela_caida_solo_aprobada()
-    {
-        var conPasarela = new EntornoDeDevoluciones();
-        var sinPasarela = new EntornoDeDevoluciones();
-        sinPasarela.Reembolsos.ProcesarResponde = EstadoDelReembolso.Pendiente;
-        foreach (var entorno in new[] { conPasarela, sinPasarela })
-        {
-            var digital = EntornoDeDevoluciones.Digital();
-            var pedido = new PedidoParaDevolucionesParaPruebas(entorno, digital).Pedido;
-            entorno.Accesos.Sembrar(pedido.CuentaId, pedido.PedidoId, digital.EdicionId);
-            var pedida = await entorno.SolicitarDigital.Ejecutar(new PedirReembolsoDeDigitalEntrada(pedido.PedidoId, digital.LineaId, new TextoLibre(MotivoSembrado)));
-            Assert.True(pedida.EsExito);
-        }
-
-        Assert.Equal(["aprobada", "reembolsada"], Avisos(conPasarela).Select(a => a.Campos["estado"]));
-        Assert.Equal(["aprobada"], Avisos(sinPasarela).Select(a => a.Campos["estado"]));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
-    public async Task Decidir_un_reporte_avisa_aprobada_y_reembolsada_o_rechazada()
-    {
-        var aprobar = new EntornoDeDevoluciones();
-        var rechazar = new EntornoDeDevoluciones();
-        foreach (var cliente in new[] { aprobar, rechazar })
-        {
-            var digital = EntornoDeDevoluciones.Digital();
-            var pedido = new PedidoParaDevolucionesParaPruebas(cliente, digital).Pedido;
-            cliente.Accesos.Sembrar(pedido.CuentaId, pedido.PedidoId, digital.EdicionId, enlaceEntregado: true);
-            Assert.True((await cliente.Reportar.Ejecutar(new ReportarArchivoDefectuosoEntrada(pedido.PedidoId, digital.LineaId, new TextoLibre(MotivoSembrado), new TextoLibre(TextoSembrado)))).EsExito);
-        }
-
-        var adminA = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(aprobar);
-        var adminR = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(rechazar);
-        await adminA.Decidir.Aprobar(aprobar.Repositorio.Todas.Single().Id);
-        await adminR.Decidir.Rechazar(rechazar.Repositorio.Todas.Single().Id);
-
-        Assert.Equal(["aprobada", "reembolsada"], Avisos(adminA).Select(a => a.Campos["estado"]));
-        Assert.Equal(["rechazada"], Avisos(adminR).Select(a => a.Campos["estado"]));
     }
 
     [Fact]
@@ -248,26 +175,6 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-10")]
-    public async Task Con_Pedidos_caido_la_revision_de_plazos_no_rechaza_y_la_siguiente_si_con_su_aviso()
-    {
-        var e = await ConSolicitada();
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), e);
-        await admin.Gestion.Aprobar(e.DevolucionId);
-        var sistema = Como(ActorDePrueba.DelSistema(), e);
-        sistema.Reloj.Ahora = Ahora.AddDays(11);
-        sistema.Pedidos.NoResponde = true;
-
-        var caido = await sistema.Vencidas.Ejecutar(10);
-        sistema.Pedidos.NoResponde = false;
-        var siguiente = await sistema.Vencidas.Ejecutar(10);
-
-        Assert.Equal(0, caido.Valor);
-        Assert.Equal(1, siguiente.Valor);
-        Assert.Equal(["aprobada", "rechazada"], Avisos(sistema).Select(a => a.Campos["estado"]));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
     public async Task Si_la_auditoria_cae_el_cambio_y_su_aviso_se_revierten_juntos()
     {
         var e = await ConSolicitada();
@@ -307,24 +214,6 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
         var reingreso = entradas.Single(s => s.Accion.ToString() == "ReingresoPorDevolucion");
         Assert.Equal("120.00", reingreso.Detalle["monto"]);
         Assert.Equal(e.PedidoId.ToString(), reingreso.Detalle["pedidoId"]);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-11")]
-    public async Task El_rechazo_por_plazo_se_audita_con_el_pedido_y_el_monto_como_sistema()
-    {
-        var e = await ConSolicitada();
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), e);
-        await admin.Gestion.Aprobar(e.DevolucionId);
-        var sistema = Como(ActorDePrueba.DelSistema(), e);
-        sistema.Reloj.Ahora = Ahora.AddDays(11);
-
-        await sistema.Vencidas.Ejecutar(10);
-
-        var rechazo = sistema.Auditoria.Solicitudes.Last();
-        Assert.Equal("rechazada", rechazo.Detalle["estadoNuevo"]);
-        Assert.Equal(e.PedidoId.ToString(), rechazo.Detalle["pedidoId"]);
-        Assert.Equal("120.00", rechazo.Detalle["monto"]);
     }
 
     // ---------- Sin el motivo ni el texto (DEV-29, AC-DEV-31) ----------

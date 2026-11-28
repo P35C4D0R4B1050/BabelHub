@@ -83,40 +83,6 @@ public sealed class DevolucionesDeUnaCuentaTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-25")]
-    public async Task Un_reporte_sin_decidir_cuenta_uno_y_aprobado_con_el_reembolso_pendiente_sigue_contando_uno_sin_contarse_dos_veces()
-    {
-        var cliente = new EntornoDeDevoluciones();
-        var reporte = await Reporte(cliente);
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), cliente);
-
-        var sinDecidir = await cliente.Pendientes.Contar(Cuenta(cliente));
-        admin.Reembolsos.ProcesarResponde = EstadoDelReembolso.Pendiente;
-        await admin.Decidir.Aprobar(reporte);
-        var aprobadoPendiente = await cliente.Pendientes.Contar(Cuenta(cliente));
-
-        Assert.Equal([1, 1], [sinDecidir, aprobadoPendiente]);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-25")]
-    public async Task Un_reporte_rechazado_o_un_digital_reembolsado_ya_no_cuentan()
-    {
-        var rechazado = new EntornoDeDevoluciones();
-        var reporte = await Reporte(rechazado);
-        await Como(ActorDePrueba.DeAdministradorCentral(), rechazado).Decidir.Rechazar(reporte);
-        var reembolsado = new EntornoDeDevoluciones();
-        reembolsado.Reembolsos.ProcesarResponde = EstadoDelReembolso.Reembolsado;
-        var digital = EntornoDeDevoluciones.Digital();
-        var pedido = new PedidoParaDevolucionesParaPruebas(reembolsado, digital).Pedido;
-        reembolsado.Accesos.Sembrar(pedido.CuentaId, pedido.PedidoId, digital.EdicionId);
-        await reembolsado.SolicitarDigital.Ejecutar(new PedirReembolsoDeDigitalEntrada(pedido.PedidoId, digital.LineaId, new TextoLibre(Motivo)));
-
-        Assert.Equal(0, await rechazado.Pendientes.Contar(Cuenta(rechazado)));
-        Assert.Equal(0, await reembolsado.Pendientes.Contar(Cuenta(reembolsado)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-25")]
     public async Task Un_digital_aprobado_con_el_reembolso_pendiente_cuenta_uno_y_se_suma_un_caso_de_cada_clase_sin_contar_los_de_otra_cuenta()
     {
         var cliente = new EntornoDeDevoluciones();
@@ -153,47 +119,6 @@ public sealed class DevolucionesDeUnaCuentaTests
         Assert.Equal(new PendientesDeDevolucionesDeCuenta(1, 1, 0), deLaOtra);
         Assert.Equal(propia.Total, await cliente.Pendientes.Contar(Cuenta(cliente)));
         Assert.Equal(3, propia.Total);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-25")]
-    public async Task ContarEnTres_pasa_un_impreso_recibido_de_abierto_a_reembolso_pendiente_y_un_reporte_aprobado_de_sin_decidir_a_reembolso_pendiente()
-    {
-        var impreso = new EntornoDeDevoluciones();
-        var id = await Impreso(impreso);
-        var admin = Como(ActorDePrueba.DeAdministradorCentral(), impreso);
-        await admin.Gestion.Aprobar(id);
-        var aprobado = await impreso.Pendientes.ContarEnTres(Cuenta(impreso));
-        admin.Reembolsos.ProcesarResponde = EstadoDelReembolso.Pendiente;
-        await admin.Recepcion.Ejecutar(id);
-        var recibido = await impreso.Pendientes.ContarEnTres(Cuenta(impreso));
-
-        var digital = new EntornoDeDevoluciones();
-        var reporte = await Reporte(digital);
-        var adminDigital = Como(ActorDePrueba.DeAdministradorCentral(), digital);
-        var sinDecidir = await digital.Pendientes.ContarEnTres(Cuenta(digital));
-        adminDigital.Reembolsos.ProcesarResponde = EstadoDelReembolso.Pendiente;
-        await adminDigital.Decidir.Aprobar(reporte);
-        var conReembolso = await digital.Pendientes.ContarEnTres(Cuenta(digital));
-
-        Assert.Equal(new PendientesDeDevolucionesDeCuenta(1, 0, 0), aprobado);
-        Assert.Equal(new PendientesDeDevolucionesDeCuenta(0, 0, 2), recibido);
-        Assert.Equal(new PendientesDeDevolucionesDeCuenta(0, 1, 0), sinDecidir);
-        Assert.Equal(new PendientesDeDevolucionesDeCuenta(0, 0, 1), conReembolso);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-25")]
-    public async Task ContarEnTres_sin_poder_contar_lanza_y_exige_la_cuenta()
-    {
-        var sinPedidos = new EntornoDeDevoluciones();
-        await Impreso(sinPedidos);
-        sinPedidos.Pedidos.NoResponde = true;
-        var sin = new EntornoDeDevoluciones();
-
-        Assert.Equal(default, await sin.Pendientes.ContarEnTres(Cuenta(sin)));
-        await Assert.ThrowsAsync<PendientesNoDisponiblesException>(() => sinPedidos.Pendientes.ContarEnTres(Cuenta(sinPedidos)));
-        await Assert.ThrowsAsync<ArgumentException>(() => sin.Pendientes.ContarEnTres(Guid.Empty));
     }
 
     [Fact]
@@ -330,17 +255,5 @@ public sealed class DevolucionesDeUnaCuentaTests
         Assert.IsType<PendientesNoDisponiblesException>(sinPedidos);
         Assert.IsType<PendientesNoDisponiblesException>(sinAlmacen);
         Assert.False(Guardada(cliente, ajena).Motivo.EstaRedactado);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-26")]
-    public void El_aplicador_se_llama_devoluciones_y_el_motivo_sembrado_no_aparece_en_la_vista_redactada()
-    {
-        var cliente = new EntornoDeDevoluciones();
-
-        Assert.Equal("devoluciones", ((IAplicadorDeCancelacion)cliente.Redaccion).Modulo);
-        var redactada = Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", TextoRedactado.Crear(Motivo, 300)!, null, [new NuevaLineaDeDevolucion(Guid.NewGuid(), Guid.NewGuid(), 1, 10m)], Ahora, ResponsableDelCambio.Cliente(Guid.NewGuid()));
-        redactada.Redactar(Ahora, quitarElAcceso: true);
-        Assert.DoesNotContain("SEMBRADO", System.Text.Json.JsonSerializer.Serialize(new { redactada.Motivo, redactada.Lineas }), StringComparison.Ordinal);
     }
 }

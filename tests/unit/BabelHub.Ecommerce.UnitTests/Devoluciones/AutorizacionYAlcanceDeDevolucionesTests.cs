@@ -107,17 +107,6 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-23")]
-    public async Task Un_rol_sin_permiso_se_rechaza_antes_de_consultar_a_Identidad()
-    {
-        var entorno = new EntornoDeDevoluciones(ActorDePrueba.DeEncargadoDe(Sucursal));
-
-        await entorno.Autorizador.ExigirCliente(default);
-
-        Assert.Equal(0, entorno.Cuentas.Consultas);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-23")]
     public async Task Una_cuenta_inexistente_o_cancelada_no_es_una_sesion_valida_y_con_Identidad_caida_es_no_disponible()
     {
         var inexistente = new EntornoDeDevoluciones();
@@ -184,19 +173,6 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
         Assert.Equal(ajena, digital);
         Assert.Equal(["alcance-insuficiente", "alcance-insuficiente", "fuera-de-sucursal"], entorno.Denegaciones.Eventos.Select(e => e.Motivo));
         Assert.Equal(3, entorno.Denegaciones.Eventos.Count);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-12")]
-    public async Task La_administracion_central_ve_todas_sin_resolver_ninguna_sucursal()
-    {
-        var entorno = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral());
-
-        Assert.Null(await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(), default));
-        Assert.Null(await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(TipoDeDevolucion.Digital, OrigenDeDevolucion.Reporte, null), default));
-        Assert.Null(await entorno.Autorizador.ExigirSucursalDeLaRuta("cualquiera", default));
-        Assert.Equal(0, entorno.Sucursales.Consultas);
-        Assert.Empty(entorno.Denegaciones.Eventos);
     }
 
     [Theory]

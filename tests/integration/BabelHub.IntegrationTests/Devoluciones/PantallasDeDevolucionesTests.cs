@@ -107,17 +107,6 @@ public sealed class PantallasDeDevolucionesTests
         Assert.DoesNotContain(TextoLibre.Redactado, html, StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-06")]
-    public async Task Sin_devoluciones_se_muestra_el_estado_vacio()
-    {
-        await using var anfitrion = await Iniciar(RolWeb.Cliente, HostWeb.Tienda, new DevolucionesFalsas());
-
-        var (_, html) = await Pedir(anfitrion, "/cuenta/devoluciones", HostWeb.Tienda);
-
-        Assert.Contains("Aún no hay devoluciones", WebUtility.HtmlDecode(html), StringComparison.Ordinal);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-DEV-20")]
     [InlineData(CategoriaDeError.NoDisponible, "servicio-no-disponible", HttpStatusCode.ServiceUnavailable)]

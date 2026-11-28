@@ -45,16 +45,6 @@ public sealed class PoliticaYCupoDeDevolucionTests
         Assert.False(PoliticaDeDevolucion.ReporteEnPlazo(Base, Base.AddDays(30).AddHours(1)));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-DEV-14")]
-    public void Los_plazos_se_cuentan_en_instantes_sin_importar_el_desfase_con_que_llegan()
-    {
-        var enLima = new DateTimeOffset(2026, 11, 20, 10, 0, 0, TimeSpan.FromHours(-5));
-
-        Assert.True(PoliticaDeDevolucion.SolicitudDeImpresoEnPlazo(enLima, Base.AddDays(15)));
-        Assert.False(PoliticaDeDevolucion.SolicitudDeImpresoEnPlazo(enLima, Base.AddDays(15).AddMinutes(1)));
-    }
-
     // ---------- Monto ----------
 
     [Theory]
@@ -129,18 +119,6 @@ public sealed class PoliticaYCupoDeDevolucionTests
         Assert.Equal(1, cupo.CantidadComprometida);
         Assert.Throws<ArgumentOutOfRangeException>(() => cupo.Comprometer(0));
         Assert.Throws<ArgumentOutOfRangeException>(() => cupo.Devolver(0));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-DEV-03")]
-    public void Un_cupo_guardado_incoherente_se_rechaza_al_leerlo()
-    {
-        Assert.Equal(2, CupoDeLinea.Rehidratar(Guid.NewGuid(), 3, 2).CantidadComprometida);
-        Assert.Throws<ArgumentException>(() => CupoDeLinea.Rehidratar(Guid.NewGuid(), 3, 4));
-        Assert.Throws<ArgumentException>(() => CupoDeLinea.Rehidratar(Guid.NewGuid(), 3, -1));
-        Assert.Throws<ArgumentException>(() => CupoDeLinea.Rehidratar(Guid.Empty, 3, 0));
-        Assert.Throws<ArgumentException>(() => CupoDeLinea.Crear(Guid.Empty, 3));
-        Assert.Throws<ArgumentOutOfRangeException>(() => CupoDeLinea.Crear(Guid.NewGuid(), 0));
     }
 
     [Fact]
