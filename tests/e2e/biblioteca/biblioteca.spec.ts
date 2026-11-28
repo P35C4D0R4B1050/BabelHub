@@ -191,7 +191,8 @@ test.describe('Administración de la biblioteca', () => {
 
     await page.goto('/administracion/biblioteca/ayudas?estado=todas');
     await expect(page.getByRole('heading', { level: 1, name: 'Ayudas de la biblioteca' })).toBeVisible();
-    await expect(page.getByText('@')).toHaveCount(0);
+    // Solo el contenido: el pie puede mostrar el correo de contacto del comercio.
+    await expect(page.getByRole('main').getByText('@')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('ayudas-de-la-biblioteca.png'), fullPage: true });
     await sinViolacionesDeAccesibilidad(page);
     await contexto.close();
