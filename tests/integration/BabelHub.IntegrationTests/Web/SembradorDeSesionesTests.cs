@@ -73,7 +73,6 @@ public sealed class SembradorDeSesionesTests(InstanciaParaMigrar instancia) : IC
             configuracion[SembradorDeSesionesEnLaApi.ClaveDeConfiguracion] = Clave;
         }
 
-
         var migracion = new Dictionary<string, string?> { ["Migrador:Ecommerce:Propietaria"] = propietaria };
         foreach (var (ruta, valor) in configuracion.Where(p => p.Key.StartsWith("Ecommerce:Base:", StringComparison.Ordinal)))
         {

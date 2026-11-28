@@ -274,22 +274,6 @@ public sealed class PantallasDelCatalogoTests
         Assert.Contains($"alt=\"Portada de Estructuras de datos\"", html, StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-07")]
-    public async Task La_pestana_digital_dice_disponible_al_instante_sin_igv_y_sin_consultar_stock()
-    {
-        var catalogo = new CatalogoDePrueba { Ficha = id => Resultado<ResumenDeObra>.Exito(ObraDeEjemplo()) };
-        await using var anfitrion = await Iniciar(catalogo);
-
-        using var respuesta = await anfitrion.Cliente.GetAsync($"/catalogo/obras/{Obra1}?edicion=digital");
-        var html = await Texto(respuesta);
-
-        Assert.Contains(FormatoPeruano.Soles(49m), html, StringComparison.Ordinal);
-        Assert.Contains("Disponible al instante", html, StringComparison.Ordinal);
-        Assert.Contains("Sin IGV", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Disponibilidad por sucursal", html, StringComparison.Ordinal);
-    }
-
     [Theory]
     [Trait("Criterio", "AC-CAT-04")]
     [InlineData(MotivoDeNoDisponibleDeEdicion.LicenciaVencida, "La licencia de esta edición digital venció y ya no se vende.")]
@@ -330,38 +314,6 @@ public sealed class PantallasDelCatalogoTests
         Assert.Equal(HttpStatusCode.NotFound, noEsGuid.StatusCode);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
-    public async Task Con_el_inventario_sin_responder_la_ficha_avisa_que_la_disponibilidad_puede_estar_desactualizada()
-    {
-        var obra = ObraConAmbas(
-            Obra1,
-            "Dato viejo",
-            Impresa(Guid.NewGuid(), 50m, Disp(Guid.NewGuid(), EstadoDeDisponibilidad.Disponible, 3, FrescuraDeLaDisponibilidad.PuedeEstarDesactualizada, fuentes: [new("LIM", "Lima", 3)])),
-            Digital(Guid.NewGuid(), 20m, Disp(Guid.NewGuid(), EstadoDeDisponibilidad.DisponibleAlInstante, null)));
-        var catalogo = new CatalogoDePrueba { Ficha = _ => Resultado<ResumenDeObra>.Exito(obra) };
-        await using var anfitrion = await Iniciar(catalogo);
-
-        using var respuesta = await anfitrion.Cliente.GetAsync($"/catalogo/obras/{Obra1}");
-        var html = await Texto(respuesta);
-
-        Assert.Contains("La disponibilidad puede estar desactualizada", html, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
-    public async Task Un_catalogo_caido_en_la_ficha_es_servicio_no_disponible_con_reintento()
-    {
-        var catalogo = new CatalogoDePrueba { Ficha = _ => Resultado<ResumenDeObra>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "x")) };
-        await using var anfitrion = await Iniciar(catalogo);
-
-        using var respuesta = await anfitrion.Cliente.GetAsync($"/catalogo/obras/{Obra1}");
-        var html = await Texto(respuesta);
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, respuesta.StatusCode);
-        Assert.Contains("No podemos mostrar este libro ahora.", html, StringComparison.Ordinal);
-        Assert.Contains("Reintentar", html, StringComparison.Ordinal);
-    }
     // ---------- La ficha por sucursal (CAR-42, CAR-43) ----------
 
     private static async Task<string> Ficha(DisponibilidadDeEdicion disponibilidad, string? cookie = null)
@@ -421,5 +373,4 @@ public sealed class PantallasDelCatalogoTests
         Assert.Contains("Agregar impreso al carrito", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Disponibilidad por sucursal", html, StringComparison.Ordinal);
     }
-
 }

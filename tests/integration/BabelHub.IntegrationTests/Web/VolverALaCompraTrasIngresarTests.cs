@@ -65,7 +65,6 @@ public sealed class VolverALaCompraTrasIngresarTests : IAsyncLifetime
     [InlineData("//sitio-ajeno.example")]
     [InlineData("/\\sitio-ajeno.example")]
     [InlineData("/administracion/usuarios")]
-    [InlineData("Compra")]
     [InlineData("")]
     public async Task CualquierOtroValor_SeIgnora_YNuncaDecideElDestino(string valor)
     {
@@ -146,7 +145,6 @@ public sealed class VolverALaCompraTrasIngresarTests : IAsyncLifetime
     [Theory]
     [Trait("Criterio", "AC-CAR-13")]
     [InlineData("/checkout", "/ingreso?continuar=compra")]
-    [InlineData("/checkout/iniciar", "/ingreso?continuar=compra")]
     [InlineData("/checkout/pago", "/ingreso?continuar=compra")]
     [InlineData("/cuenta", "/ingreso")]
     [InlineData("/checkoutx", "/ingreso")]

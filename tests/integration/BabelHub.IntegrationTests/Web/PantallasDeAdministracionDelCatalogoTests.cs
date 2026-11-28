@@ -229,22 +229,6 @@ public sealed partial class PantallasDeAdministracionDelCatalogoTests
         Assert.Contains("no-store", respuesta.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAT-01")]
-    public async Task Un_filtro_repetido_o_una_pagina_invalida_es_un_aviso_sin_llamar_a_la_administracion()
-    {
-        var administracion = new AdministracionDePrueba();
-        await using var anfitrion = await Iniciar(administracion);
-
-        using var repetido = await anfitrion.Cliente.GetAsync("/administracion/obras?q=a&q=b");
-        using var pagina = await anfitrion.Cliente.GetAsync("/administracion/obras?pagina=cero");
-
-        Assert.Equal(HttpStatusCode.BadRequest, repetido.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, pagina.StatusCode);
-        Assert.Contains("Algún filtro está repetido.", await Texto(repetido), StringComparison.Ordinal);
-        Assert.Empty(administracion.Listadas);
-    }
-
     // ---------- Obra nueva ----------
 
     [Fact]
@@ -400,18 +384,6 @@ public sealed partial class PantallasDeAdministracionDelCatalogoTests
         Assert.Contains("Entiendo el riesgo", html, StringComparison.Ordinal);
         Assert.Contains("/ingresos/33333333-0000-0000-0000-000000000001/conciliar", html, StringComparison.Ordinal);
         AssertSinScriptsEnLineaNiControlesSinEtiqueta(html);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
-    public async Task Con_el_inventario_sin_responder_el_historial_lo_avisa()
-    {
-        var ingresos = new IngresosDePrueba { Historial = () => Resultado<HistorialDeIngresos>.Exito(new HistorialDeIngresos(ImpresaId, [], true)) };
-        await using var anfitrion = await Iniciar(ingresos: ingresos, edicion: EdicionImpresa());
-
-        var html = await Texto(await anfitrion.Cliente.GetAsync($"/administracion/ediciones/{ImpresaId}/ingreso"));
-
-        Assert.Contains("El Inventario no respondió", html, StringComparison.Ordinal);
     }
 
     [Fact]

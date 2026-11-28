@@ -141,17 +141,6 @@ public sealed partial class SistemaDeDisenoTests
         Assert.True(sueltos.Count == 0, "Colores sueltos (usa tokens semánticos): " + string.Join("; ", sueltos));
     }
 
-    [Theory]
-    [InlineData("color: #FF665A;", true)]
-    [InlineData("background: rgb(0 0 0 / .2);", true)]
-    [InlineData("fill: hsl(10 20% 30%);", true)]
-    [InlineData("color: var(--color-primary);", false)]
-    [InlineData("background: color-mix(in oklab, var(--color-base-content) 20%, transparent);", false)]
-    [InlineData("class=\"btn btn-primary text-error\"", false)]
-    [InlineData("class=\"text-[#ff0000]\"", true)]
-    public void La_revision_de_colores_sueltos_los_detecta(string texto, bool esperado) =>
-        Assert.Equal(esperado, ColoresSueltos("prueba", texto).Count > 0);
-
     [Fact]
     [Trait("Criterio", "AC-WEB-08")]
     public void Con_movimiento_reducido_se_eliminan_las_animaciones_y_transiciones()

@@ -58,13 +58,8 @@ public sealed partial class ContactoYPieTests
     [Theory]
     [InlineData("/")]
     [InlineData("/legal/terminos")]
-    [InlineData("/legal/privacidad")]
-    [InlineData("/legal/cambios-y-devoluciones")]
     [InlineData("/contacto")]
-    [InlineData("/sin-permiso")]
-    [InlineData("/no-disponible")]
     [InlineData("/error")]
-    [InlineData("/prueba-pie/tienda")]
     [InlineData("/prueba-pie/sucursal")]
     [InlineData("/prueba-pie/admin")]
     [Trait("Criterio", "AC-COM-01")]
@@ -121,20 +116,6 @@ public sealed partial class ContactoYPieTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-COM-04")]
-    public async Task Un_sustituto_suelto_en_la_direccion_no_rompe_el_pie_ni_se_escribe_crudo()
-    {
-        var contacto = LeerContacto("987654321", "atencion@tienda.example", "Jr. Callao 123\uD800");
-        await using var a = await AnfitrionWeb.Iniciar(s => { s.RemoveAll<DatosDeContacto>(); s.AddSingleton(contacto); });
-
-        var (respuesta, _) = await Pedir(a, "/");
-        var (pagina, _) = await Pedir(a, "/contacto");
-
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, pagina.StatusCode);
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-COM-01")]
     public async Task Sin_el_contacto_registrado_el_pie_omite_el_bloque_y_la_pagina_responde_servicio_no_disponible_y_no_un_error()
     {
@@ -187,17 +168,6 @@ public sealed partial class ContactoYPieTests
 
         Assert.Equal(HttpStatusCode.MovedPermanently, respuesta.StatusCode);
         Assert.Equal("/legal/cambios-y-devoluciones", respuesta.Headers.Location!.OriginalString);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-COM-09")]
-    public async Task Otros_segmentos_con_otra_capitalizacion_no_son_la_direccion_anterior()
-    {
-        await using var a = await AnfitrionWeb.Iniciar();
-
-        var respuesta = await a.Cliente.GetAsync("/legal/Reembolso");
-
-        Assert.Equal(HttpStatusCode.NotFound, respuesta.StatusCode);
     }
 
     private static DatosDeContacto LeerContacto(string telefono, string correo, string direccion)

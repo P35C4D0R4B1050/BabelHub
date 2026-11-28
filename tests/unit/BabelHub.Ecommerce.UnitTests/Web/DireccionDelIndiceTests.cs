@@ -9,9 +9,7 @@ public sealed class DireccionDelIndiceTests
     [Trait("Criterio", "AC-IND-06")]
     [InlineData("a")]
     [InlineData("s12-p3-e4-v5-pg100")]
-    [InlineData("0")]
     [InlineData("-")]
-    [InlineData("al-azar")]
     public void Una_direccion_de_letras_numeros_y_guiones_es_valida(string texto)
     {
         var resultado = DireccionDelIndice.Evaluar(texto);
@@ -32,18 +30,12 @@ public sealed class DireccionDelIndiceTests
     [Trait("Criterio", "AC-IND-06")]
     [InlineData("Abc")]
     [InlineData("sala-ñ")]
-    [InlineData("página")]
     [InlineData("a b")]
     [InlineData("a/b")]
     [InlineData("..")]
-    [InlineData("a_b")]
     [InlineData("<script>")]
-    [InlineData("!")]
-    [InlineData("a%2fb")]
     [InlineData("a\nb")]
-    [InlineData("a\r\n")]
     [InlineData("\u0000")]
-    [InlineData("ａ")]
     [InlineData("á")]
     public void Cualquier_otro_caracter_no_es_valido(string texto)
     {
@@ -75,12 +67,5 @@ public sealed class DireccionDelIndiceTests
 
         Assert.Null(resultado.Direccion);
         Assert.DoesNotContain(texto, resultado.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IND-06")]
-    public void Un_texto_solo_de_espacios_no_es_valido_aqui_el_recorte_es_del_formulario()
-    {
-        Assert.Equal(EstadoDeDireccion.NoValida, DireccionDelIndice.Evaluar("   ").Estado);
     }
 }

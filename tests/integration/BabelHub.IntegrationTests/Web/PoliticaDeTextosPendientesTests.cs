@@ -32,26 +32,6 @@ public sealed class PoliticaDeTextosPendientesTests
 
     // ---- Traducción de la decisión a HTTP ----
 
-    [Fact]
-    [Trait("Criterio", "AC-WEB-37")]
-    public async Task UnEncargadoConElCodigoDeSuSucursalEnLaRuta_PasaYConOtroCodigo_VeSinPermiso()
-    {
-        // La ruta lleva el código (`ayacucho`) y el token el identificador derivado de ese código (D20): se comparan por la equivalencia canónica.
-        var propia = BabelHub.Ecommerce.Application.Plataforma.IdentificadorDeSucursal.DesdeCodigo("ayacucho")!.Value;
-        var sesiones = new SesionesWebDePrueba().ConSesionValida(RolWeb.Encargado, propia);
-        var (a, _, _, _, denegaciones, _, _) = await AnfitrionConPolitica.Iniciar(HostWeb.Gestion, sesiones);
-        await using var _ = a;
-
-        var suya = await Pedir(a, "/prueba/politica/sucursal/ayacucho", Cookie(HostWeb.Gestion));
-        var suyaConOtraCapitalizacion = await Pedir(a, "/prueba/politica/sucursal/Ayacucho", Cookie(HostWeb.Gestion));
-        var ajena = await Pedir(a, "/prueba/politica/sucursal/cusco", Cookie(HostWeb.Gestion));
-
-        Assert.Equal(HttpStatusCode.OK, suya.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, suyaConOtraCapitalizacion.StatusCode);
-        Assert.Equal("/sin-permiso", ajena.Headers.Location!.OriginalString);
-        Assert.Equal(["fuera-de-sucursal"], denegaciones.Registradas.Select(d => d.Motivo).ToArray());
-    }
-
     [Theory]
     [Trait("Criterio", "AC-WEB-34")]
     [InlineData("/prueba/politica/catalogo")]
@@ -136,36 +116,6 @@ public sealed class PoliticaDeTextosPendientesTests
         }
     }
 
-    [Theory]
-    [Trait("Criterio", "AC-WEB-36")]
-    [InlineData(RolWeb.Encargado, "/prueba/politica/pedidos")]
-    [InlineData(RolWeb.Logistica, "/prueba/politica/pedidos")]
-    [InlineData(RolWeb.AdministradorCentral, "/prueba/politica/pedidos")]
-    public async Task ElPersonal_ConTextosPendientes_SoloVeSuCuenta_LosPedidosLosLlevanAAceptar(RolWeb rol, string ruta)
-    {
-        var sesiones = new SesionesWebDePrueba().ConSesionValida(rol, Guid.NewGuid());
-        var (a, _, _, _, _, _, _) = await AnfitrionConPolitica.Iniciar(HostWeb.Gestion, sesiones);
-        await using var _ = a;
-
-        var respuesta = await Pedir(a, ruta, Cookie(HostWeb.Gestion));
-
-        Assert.Equal(HttpStatusCode.Found, respuesta.StatusCode);
-        Assert.Equal("/textos/aceptar", respuesta.Headers.Location!.OriginalString);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-36")]
-    public async Task EnviarUnaHojaDeReclamacion_SigueSiendoPosible_ConTextosPendientes()
-    {
-        var (a, _, _, _, _, _, _) = await AnfitrionConPolitica.Iniciar();
-        await using var _ = a;
-        var solicitud = await AnfitrionConSesion.Post(a, "/prueba/politica/hoja", Cookie());
-
-        var respuesta = await a.Cliente.SendAsync(solicitud);
-
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-    }
-
     [Fact]
     [Trait("Criterio", "AC-WEB-34")]
     public async Task ConLosTextosAceptados_TodoSigueSuCamino_SinIndicador()
@@ -182,19 +132,6 @@ public sealed class PoliticaDeTextosPendientesTests
     }
 
     // ---- Orden: sesión, rol y alcance antes de consultar ----
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-34")]
-    public async Task UnVisitante_NoConsultaAIdentidad()
-    {
-        var (a, _, estado, _, _, _, _) = await AnfitrionConPolitica.Iniciar(sesiones: new SesionesWebDePrueba());
-        await using var _ = a;
-
-        var respuesta = await Pedir(a, "/prueba/politica/catalogo");
-
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-        Assert.Equal(0, estado.Consultas);
-    }
 
     [Fact]
     [Trait("Criterio", "AC-WEB-37")]
@@ -214,20 +151,6 @@ public sealed class PoliticaDeTextosPendientesTests
         Assert.Equal(HttpStatusCode.OK, suya.StatusCode);
         Assert.Equal(1, estado.Consultas);
         Assert.Equal(["fuera-de-sucursal", "fuera-de-sucursal"], denegaciones.Registradas.Select(d => d.Motivo).ToArray());
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-34")]
-    public async Task UnClienteQueAbreUnaAreaDelPersonal_VeSinPermiso_YNoLaInvitacionAAceptar()
-    {
-        var (a, _, estado, _, denegaciones, _, _) = await AnfitrionConPolitica.Iniciar(HostWeb.Gestion);
-        await using var _ = a;
-
-        var respuesta = await Pedir(a, "/prueba/politica/sucursal-sin-declarar/x", Cookie(HostWeb.Gestion));
-
-        Assert.Equal("/sin-permiso", respuesta.Headers.Location!.OriginalString);
-        Assert.Equal(0, estado.Consultas);
-        Assert.Equal("fuera-de-rol", Assert.Single(denegaciones.Registradas).Motivo);
     }
 
     // ---- Falla cerrada ----

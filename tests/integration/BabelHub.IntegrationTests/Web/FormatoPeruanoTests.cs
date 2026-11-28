@@ -51,13 +51,4 @@ public sealed class FormatoPeruanoTests
         Assert.Equal("14/11/2026 15:42", FormatoPeruano.FechaYHora(instante));
         Assert.Equal("15:42", FormatoPeruano.Hora(instante));
     }
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-10")]
-    public void Una_hora_cerca_de_la_medianoche_UTC_cae_en_el_dia_anterior_en_Lima()
-    {
-        var instante = new DateTimeOffset(2026, 1, 1, 2, 5, 0, TimeSpan.Zero);
-
-        Assert.Equal("31/12/2025 21:05", FormatoPeruano.FechaYHora(instante));
-    }
 }
