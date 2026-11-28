@@ -178,7 +178,7 @@ services:
     restart: unless-stopped
 
   n8n:
-    image: n8nio/n8n:1.121.3@sha256:4f717fcf41f5ea596757173a60ce038707e4edf2c686e9934ae75cd5f5918d73
+    image: n8nio/n8n:2.49.5@sha256:c349b24d6e242b4ea14d75e6f1a90c50e348cf4b1c4512b4a0a50219ead6533d
     user: node
     read_only: true
     # n8n crea /home/node/.cache al arrancar (ENOENT con el sistema de archivos de solo lectura y bucle de reinicios): se le da un tmpfs, sin quitar el solo lectura.
