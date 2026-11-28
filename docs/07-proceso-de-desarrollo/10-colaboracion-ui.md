@@ -48,6 +48,8 @@ Ambos agentes parten de la misma información. Si dos fuentes se contradicen, ga
 
 El trabajo de ramas sin integrar todavía no está en `main`: se consulta en «Reservado».
 
+El resumen vigente de la interfaz (decisiones que no se revierten, cambios por pantalla, lo que no se puede romper y cómo verificar) está en [`docs/06-experiencia-de-usuario/12-estado-de-la-interfaz.md`](../06-experiencia-de-usuario/12-estado-de-la-interfaz.md); quien publique cambios de interfaz lo actualiza.
+
 ## 3. Reglas de la interfaz
 
 1. **Solo apariencia.** No se cambia lo que el sistema hace. Mover una función, agregar o quitar un dato o cambiar un recorrido es un cambio de comportamiento: necesita spec (`AGENTS.md` §2) y se pide en «Peticiones».
@@ -66,9 +68,9 @@ El trabajo de ramas sin integrar todavía no está en `main`: se consulta en «R
 2. Trabaja en una copia propia, nunca en la carpeta principal:
    `git worktree add ../BabelHub-codex -b codex/<tarea> main`
 3. Commits pequeños, `tipo: descripción` en inglés, con la línea `Co-Authored-By` de tu entorno.
-4. Antes de entregar:
+4. Antes de entregar (en una copia nueva, genera primero los estilos con `bash scripts/construir-estilos.sh`):
    - `dotnet build BabelHub.sln -warnaserror`
-   - Las pruebas de pantallas web, todas (`tests/integration`, espacio `Web`), y la de arquitectura. Si una falla por un cambio visual legítimo, **no la edites**: anótalo en «Peticiones».
+   - Las pruebas de pantallas (`dotnet test tests/integration/BabelHub.IntegrationTests --filter "(FullyQualifiedName~Pantallas|FullyQualifiedName~.Web.)&Categoria!=Lanzamiento&Categoria!=Guiones"`) y la de arquitectura. Si una falla por un cambio visual legítimo, **no la edites**: anótalo en «Peticiones».
    - `dotnet run --project tools/SpecCheck`
    - `bash scripts/guardia-ui.sh codex/<tarea> main`
    - Capturas en tema claro y oscuro, escritorio y móvil, guardadas fuera del repositorio.
@@ -86,4 +88,4 @@ El control detecta rutas y patrones conocidos; **no sustituye la revisión**.
 
 ## 6. Mensaje para iniciar a Codex
 
-> Lee `AGENTS.md` y `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`. Trabajas solo la interfaz, dentro de las rutas permitidas. La primera versión de la interfaz que se te haya compartido está retirada: la referencia es la del §2 bis. Lee `git show main:progress/coordinacion-ui.md`, toma la tarea asignada y sigue el flujo del §4. Responde en español. Si algo requiere salir de tus rutas o cambiar el comportamiento, no lo hagas: anótalo en «Peticiones» y avísame.
+> Lee `AGENTS.md`, `docs/07-proceso-de-desarrollo/10-colaboracion-ui.md` y `docs/06-experiencia-de-usuario/12-estado-de-la-interfaz.md`. Trabajas solo la interfaz, dentro de las rutas permitidas. La primera versión de la interfaz que se te haya compartido está retirada: la referencia es la del §2 bis. Lee `git show main:progress/coordinacion-ui.md`, toma la tarea asignada y sigue el flujo del §4. Responde en español. Si algo requiere salir de tus rutas o cambiar el comportamiento, no lo hagas: anótalo en «Peticiones» y avísame.

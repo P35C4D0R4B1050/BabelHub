@@ -1031,7 +1031,7 @@ Qué trae:
 
 **Cambia las bases de datos** (el despliegue las migra solo) y una línea de los secretos. Tras la primera compra por sucursal **no se vuelve a `v0.1.2`**: un problema se corrige hacia adelante. Los libros impresos que ya estén en un carrito deben quitarse y volver a agregarse eligiendo sucursal.
 
-Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5). Desde esta versión el lanzamiento corre además las pruebas de operación (unos 35 minutos) antes de pedirte la primera aprobación.
+Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5). Desde esta versión el lanzamiento corre además las pruebas de operación (unos 10 minutos) antes de pedirte la primera aprobación.
 
 **1. [Cada VM] Traer el código.** Mira primero que la VM no tenga cambios hechos a mano:
 

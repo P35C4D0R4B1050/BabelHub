@@ -13,5 +13,6 @@ Cómo se ve, se usa y se hace accesible BabelHub. Parte del prototipo aprobado (
 | [07 Rendimiento y móvil](07-rendimiento-y-movil.md) | Presupuesto de Core Web Vitals y técnicas. |
 | [08 Contenido y mensajes](08-contenido-y-mensajes.md) | Tono, errores y mensajes de seguridad. |
 | [09 Pruebas de usabilidad](09-pruebas-de-usabilidad.md) | Método, tareas y métricas (SUS, éxito, errores). |
+| [12 Estado de la interfaz](12-estado-de-la-interfaz.md) | Qué cambió en `v0.1.3`, decisiones que no se revierten y cómo verificar un cambio visual. |
 
 **Skills relacionadas:** `ui-screen` (construir una pantalla) y `ui-review` (revisarla). Las specs de la interfaz son `web-base` y `web-indice-infinito`.
