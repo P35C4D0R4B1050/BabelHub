@@ -153,10 +153,30 @@ public sealed class AlmacenR2ShTests : IDisposable
 
     private static string[] Contenedores() => [.. PoliticasDeR2.Cargar().Contenedores.Select(c => c.Nombre)];
 
+    /// <summary>
+    /// El estado que deja un <c>r2-aplicar</c> correcto, generado una sola vez: aplicarlo cuesta decenas de procesos y casi todos los casos
+    /// de <c>r2-comprobar</c> parten de él. Los casos de la clase corren en serie (misma colección), así que no hace falta candado.
+    /// </summary>
+    private static Dictionary<string, string>? _estadoConforme;
+
     private void CuentaConforme()
     {
-        var (codigo, salida, errores) = Ejecutar(["r2-aplicar"]);
-        Assert.True(codigo == 0, salida + errores);
+        if (_estadoConforme is null)
+        {
+            var (codigo, salida, errores) = Ejecutar(["r2-aplicar"]);
+            Assert.True(codigo == 0, salida + errores);
+            _estadoConforme = Directory.GetFiles(_estado)
+                .Where(f => !f.EndsWith(".log", StringComparison.Ordinal))
+                .ToDictionary(f => Path.GetFileName(f), File.ReadAllText);
+            Assert.NotEmpty(_estadoConforme);
+        }
+
+        foreach (var (nombre, contenido) in _estadoConforme)
+        {
+            File.WriteAllText(Path.Combine(_estado, nombre), contenido);
+        }
+
+        // Los registros de lo aplicado no son parte del estado: cada caso mira solo los cambios que él provoca.
         File.Delete(Path.Combine(_estado, "cambios.log"));
     }
 
