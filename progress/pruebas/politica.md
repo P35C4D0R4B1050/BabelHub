@@ -28,6 +28,8 @@ Sale con 0, 1 (algún módulo no cumple) o 2 (uso o informes inválidos). Con in
 | Mínimos desde la línea de órdenes | `--minimo-*` | No se pueden cambiar |
 | Pruebas de la herramienta | 15 | 30 |
 
+Probada sobre informes reales de las pruebas unitarias (5 974 del E-commerce y 2 537 del Inventario): asigna todos los archivos a un módulo y los 19 módulos con código cumplen en Dominio y Aplicación (el más bajo, Biblioteca, 88,8 %; mínimo entre los no críticos, Envíos, 89,2 %). Falta la corrida con integración, que es la que mide el total de cada módulo.
+
 ## 3. Comprobaciones estáticas (commit `bf26079b`)
 
 Medido en esta máquina con `dotnet test --no-build --filter` por clase, con otros carriles corriendo a la vez (los tiempos son orientativos).
