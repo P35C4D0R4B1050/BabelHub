@@ -6,7 +6,8 @@ namespace BabelHub.IntegrationTests.Plataforma;
 /// </summary>
 public sealed class CopiasDeAdaptadoresTests
 {
-    public static TheoryData<string> Archivos => new(
+    private static readonly string[] Archivos =
+    [
         "Infrastructure/Plataforma/AdaptadoresBase.cs",
         // UnidadDeTrabajoPostgres.cs ya no es copia: la del Inventario fija el alcance de datos y ofrece la lectura coherente (inventario-fuentes T03 y T04).
         "Application/Plataforma/ConexionDeLaUnidadDeTrabajo.cs",
@@ -78,17 +79,45 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Auditoria/AlertasPostgres.cs",
         "Infrastructure/Auditoria/LimitesYDepuracionPostgres.cs",
         "Infrastructure/Auditoria/ClavesDeCursorDelEntorno.cs",
-        "Infrastructure/Auditoria/TrabajosDeFondoDeAuditoria.cs");
+        "Infrastructure/Auditoria/TrabajosDeFondoDeAuditoria.cs",
+    ];
 
-    [Theory]
-    [MemberData(nameof(Archivos))]
-    public void LaCopiaDelInventario_EsLaMismaQueLaDelECommerceSalvoElNombreDelServicio(string ruta)
+    [Fact]
+    public void CadaCopiaDelInventario_EsLaMismaQueLaDelECommerceSalvoElNombreDelServicio()
     {
         var raiz = BuscarRaiz();
-        var ecommerce = Leer(raiz, "Ecommerce", ruta);
-        var inventario = Leer(raiz, "Inventario", ruta);
+        var distintos = Archivos.Select(ruta => Diferencia(raiz, ruta)).OfType<string>().ToList();
 
-        Assert.Equal(Normalizar(ecommerce), Normalizar(inventario));
+        Assert.True(Archivos.Length > 0, "No hay copias que comparar.");
+        Assert.True(distintos.Count == 0, $"{distintos.Count} copia(s) que ya no coinciden:\n" + string.Join('\n', distintos));
+    }
+
+    /// <summary>En qué difieren las dos copias de un archivo (la primera línea distinta), o nulo si son la misma.</summary>
+    private static string? Diferencia(string raiz, string ruta)
+    {
+        string[] ecommerce, inventario;
+        try
+        {
+            ecommerce = Normalizar(Leer(raiz, "Ecommerce", ruta)).Split('\n');
+            inventario = Normalizar(Leer(raiz, "Inventario", ruta)).Split('\n');
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return $"{ruta}: falta una de las dos copias ({error.Message})";
+        }
+
+        if (ecommerce.SequenceEqual(inventario, StringComparer.Ordinal))
+        {
+            return null;
+        }
+
+        var linea = 0;
+        while (linea < ecommerce.Length && linea < inventario.Length && ecommerce[linea] == inventario[linea])
+        {
+            linea++;
+        }
+
+        return $"{ruta}, línea {linea + 1}: E-commerce «{ecommerce.ElementAtOrDefault(linea) ?? "(fin)"}» / Inventario «{inventario.ElementAtOrDefault(linea) ?? "(fin)"}»";
     }
 
     private static string Leer(string raiz, string servicio, string ruta)

@@ -131,8 +131,6 @@ public sealed partial class SecretosEnElRepositorioTests
         return hallazgos;
     }
 
-    public static TheoryData<string> ArchivosDeTexto => new([.. ArchivosDelRepositorio().Where(EsTexto)]);
-
     [Fact]
     public void LaRevisionVeElRepositorio()
     {
@@ -165,24 +163,33 @@ public sealed partial class SecretosEnElRepositorioTests
         }
     }
 
-    [Theory]
-    [MemberData(nameof(ArchivosDeTexto))]
+    [Fact]
     [Trait("Criterio", "AC-SEG-25")]
-    public void UnArchivoDeTexto_NoLlevaClavesPrivadasCredencialesNiContrasenasConValor(string ruta)
+    public void NingunArchivoDeTexto_LlevaClavesPrivadasCredencialesNiContrasenasConValor()
     {
-        var completa = Path.Combine(BuscarRaiz(), ruta);
-        if (new FileInfo(completa).Length > TamanoMaximo)
+        var raiz = BuscarRaiz();
+        var archivos = ArchivosDelRepositorio().Where(EsTexto).ToList();
+        var hallazgos = new List<string>();
+        foreach (var ruta in archivos)
         {
-            return;
+            var completa = Path.Combine(raiz, ruta);
+            if (new FileInfo(completa).Length > TamanoMaximo)
+            {
+                continue;
+            }
+
+            var propios = Revisar(ruta, File.ReadAllText(completa));
+            if (Permitidos.TryGetValue(ruta, out var permitido))
+            {
+                propios = [.. propios.Where(h => !permitido.Patrones.Any(p => h.EndsWith(": " + p, StringComparison.Ordinal)))];
+            }
+
+            hallazgos.AddRange(propios);
         }
 
-        var hallazgos = Revisar(ruta, File.ReadAllText(completa));
-        if (Permitidos.TryGetValue(ruta, out var permitido))
-        {
-            hallazgos = [.. hallazgos.Where(h => !permitido.Patrones.Any(p => h.EndsWith(": " + p, StringComparison.Ordinal)))];
-        }
-
-        Assert.True(hallazgos.Count == 0, string.Join("; ", hallazgos));
+        // Sin archivos que revisar, la prueba no estaría comprobando nada.
+        Assert.True(archivos.Count > 100, $"Solo se listaron {archivos.Count} archivos de texto.");
+        Assert.True(hallazgos.Count == 0, $"{hallazgos.Count} hallazgo(s):\n" + string.Join('\n', hallazgos));
     }
 
     [Fact]
