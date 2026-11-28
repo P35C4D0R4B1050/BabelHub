@@ -1,6 +1,6 @@
 # Actualizaciones de dependencias (Dependabot). Solo abre pull requests; nada se fusiona solo.
 # Política del proyecto: versiones fijas, bloqueos de paquetes (`packages.lock.json`), imágenes y acciones fijadas por huella.
-# Cada pull request debe pasar `ci.yml` (compilación sin advertencias, pruebas, cobertura y umbrales) antes de revisarse.
+# Cada pull request debe pasar `ci.yml` (compilación sin advertencias, pruebas e informe de cobertura) antes de revisarse.
 version: 2
 
 updates:
