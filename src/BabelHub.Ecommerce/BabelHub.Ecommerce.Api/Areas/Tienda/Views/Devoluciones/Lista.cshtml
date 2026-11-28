@@ -21,7 +21,7 @@
     else
     {
         <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "devolución" : "devoluciones")</p>
-        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100" tabindex="0" role="region" aria-label="Devoluciones (se desplaza en horizontal)">
             <table class="table">
                 <caption class="sr-only">Devoluciones con su tipo, el estado de cada libro y su reembolso</caption>
                 <thead>

@@ -27,7 +27,7 @@
     else
     {
         <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "envío" : "envíos")</p>
-        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100" tabindex="0" role="region" aria-label="Envíos (se desplaza en horizontal)">
             <table class="table">
                 <caption class="sr-only">Envíos con su estado, su guía, su operador y la acción que sigue</caption>
                 <thead>
