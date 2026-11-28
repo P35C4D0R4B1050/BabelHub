@@ -648,6 +648,32 @@ public sealed class PantallasDePedidosTests
         Assert.DoesNotContain("name=\"nota\"", html, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-PED-20")]
+    [InlineData(EstadoVisibleDeLaLinea.Anulado, true)]
+    [InlineData(EstadoVisibleDeLaLinea.EnPreparacion, false)]
+    public async Task Una_anulacion_parcial_se_avisa_solo_si_alguna_linea_quedo_anulada(EstadoVisibleDeLaLinea otraLinea, bool seAvisa)
+    {
+        var falso = new AdministracionFalsa
+        {
+            Detalle = Resultado<DetalleDelPedidoDePersonal>.Exito(new DetalleDelPedidoDePersonal(
+                Resumen(EstadoVisibleDelPedido.Despachado, TipoDeEntregaVisible.Domicilio),
+                12m,
+                "Ayacucho",
+                [Linea(LineaA, "Cien años de soledad", EstadoVisibleDeLaLinea.Despachado), Linea(LineaB, "Aves sin nido", otraLinea)],
+                Contacto(),
+                false,
+                null,
+                PuedeAnular: false)),
+        };
+        await using var anfitrion = await ComoAdministracion(falso);
+
+        var (_, html) = await Pedir(anfitrion, $"/administracion/pedidos/{Pedido:D}?hecho=anular", HostWeb.Gestion);
+
+        Assert.Equal(seAvisa, html.Contains("Se anularon las líneas que no habían salido", StringComparison.Ordinal));
+        Assert.DoesNotContain("El pedido se anuló", html, StringComparison.Ordinal);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PED-11")]
     public async Task Anular_con_un_motivo_responde_303_y_llama_una_sola_vez()

@@ -338,6 +338,8 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
     /// <summary>La página más lejana que se pide (20 por página: 10 000 filas): un offset mayor no lo necesita ninguna pantalla y lo acota también el límite de consultas por usuario.</summary>
     protected const int PaginaMaxima = FiltroDePedidos.PaginaMaxima;
 
+    private const string AvisoDeAnulacionParcial = "Se anularon las líneas que no habían salido y el reembolso quedó registrado.";
+
     private static readonly Dictionary<string, string> AvisoPorAccion = new(StringComparer.Ordinal)
     {
         ["preparar"] = "Las líneas pasaron a preparación.",
@@ -572,7 +574,11 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         vista.RutaDeLaLista = rutaDeLaLista;
         vista.RutaDelDetalle = rutaDelDetalle;
         // Un aviso de «cancelado» o «anulado» solo se muestra si el pedido lo está: un enlace con `?hecho=` no puede afirmar lo que no pasó.
-        vista.Aviso = Request.Query["hecho"].ToString() is "cancelar" or "anular" && resumen.Estado != EstadoVisibleDelPedido.Anulado ? null : aviso;
+        // Una anulación parcial (algo ya salió, PED-27) deja el pedido sin anular: se avisa de las líneas anuladas solo si alguna lo está.
+        var hecho = Request.Query["hecho"].ToString();
+        vista.Aviso = hecho is "cancelar" or "anular" && resumen.Estado != EstadoVisibleDelPedido.Anulado
+            ? hecho == "anular" && lineas.Any(l => l.Estado == EstadoVisibleDeLaLinea.Anulado) ? AvisoDeAnulacionParcial : null
+            : aviso;
         return vista;
     }
 
