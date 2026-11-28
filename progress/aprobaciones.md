@@ -97,3 +97,5 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-27 | plan | ecommerce-carrito-checkout | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 1 | 62f8e508afb76074 |
 | 2026-11-27 | spec | identidad-recuperacion-del-segundo-factor | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 16 | e441b0b499c093a7 |
 | 2026-11-27 | plan | identidad-recuperacion-del-segundo-factor | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 12 | 8328a313a8d3d65f |
+| 2026-11-27 | spec | transversal-plataforma | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 8 | faa36a564fdf42c7 |
+| 2026-11-27 | plan | transversal-plataforma | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple | 0 | 5 | bc4d142154dcf384 |

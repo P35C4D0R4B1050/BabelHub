@@ -53,7 +53,20 @@ El ahorro de tiempo está en la de secretos; las otras dos solo reducen el núme
 | Codificación | `Html.Raw` en una vista, un valor del modelo en `onclick` en otra y `HtmlString` en un `.cs` del Inventario | Falla e informa los 3 |
 | Copias | Una línea de más en dos copias del Inventario y una copia ausente | Falla e informa las 3, con la línea |
 
-## 4. Para otros dueños
+## 4. Aprobación y verificación
+
+| Puerta | Auditor | Arquitectura | Seguridad | Graves / Menores | Huella |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| Spec (2 rondas) | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 / 8 | `faa36a564fdf42c7` |
+| Plan (1 ronda) | Con cambios menores | Cumple con observaciones | Cumple | 0 / 5 | `bc4d142154dcf384` |
+
+- La ronda 1 de la spec dio 2 Importantes (decisiones sin ratificar); la persona los resolvió y de paso cambió la política. Menores en `progress/hallazgos.md`.
+- G9: la suite completa en verde la corrió la coordinadora sobre `d96d9873` (base de la rama; sin cobertura). En esta rama se corrieron solo las pruebas afectadas: compilación estricta, 264 de arquitectura, 31 de la herramienta, las 23 de `SpecCheck` y las clases de integración tocadas más `ContactoFueraDelRepositorioTests`. **No se corrió la suite completa.**
+- No se escribió entrada en `progress/CHANGELOG.md` para no chocar con los otros carriles.
+
+## 5. Para otros dueños
 
 - Las `verificacion.md` de `transversal-seguridad` citan por número líneas de `CodificacionDeSalidaTests` y `SecretosEnElRepositorioTests` que se movieron; no se tocaron (no son de este carril).
 - `progress/evidencias/cobertura/` y `07-evidencias-sprint-2.md` son fotos anteriores, con la regla por servicio.
+- El criterio de recorte tiene un Menor abierto: la lista «No se quita» no nombra pagos, autenticación y sesión, auditoría transaccional, arquitectura ni el Notificador. Conviene aplicarla igualmente a esos casos.
+- `SpecCheck.Tests` usa `transversal-plataforma` como spec de ejemplo: falla mientras esa spec tenga una pregunta abierta, y tarda unos 10 minutos (un proceso por caso); es candidata del carril de plataforma.
