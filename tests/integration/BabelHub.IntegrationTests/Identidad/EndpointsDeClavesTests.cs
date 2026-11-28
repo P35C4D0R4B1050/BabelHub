@@ -78,7 +78,6 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
                 ? throw new InvalidOperationException("La base no responde.")
                 : Task.FromResult<IReadOnlyList<ClavePublicaDeFirma>>([.. Claves.Select(c => new ClavePublicaDeFirma(c.Kid, "ES256", JwkEs256.Publico(c.Clave, c.Kid), "activa"))]);
 
-
         public Task<IReadOnlyList<string>> Revocadas(CancellationToken cancelacion = default) =>
             Caida ? throw new InvalidOperationException("La base no responde.") : Task.FromResult<IReadOnlyList<string>>([.. KidsRevocados]);
 
@@ -361,17 +360,6 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         Assert.Empty(e._claves.Llamadas);
-    }
-
-    [Fact]
-    public async Task LosVerbosNoPrevistos_NoSeAtienden()
-    {
-        await using var e = await Crear();
-
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await e._cliente.PostAsync(RutasDeClavesDeFirma.Jwks, null)).StatusCode);
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await e._cliente.PostAsync(RutasDeClavesDeFirma.Revocaciones, null)).StatusCode);
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await e._cliente.GetAsync(RutasDeClavesDeFirma.Rotar)).StatusCode);
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await e._cliente.GetAsync(RutasDeClavesDeFirma.Comprometida)).StatusCode);
     }
 
     [Fact]

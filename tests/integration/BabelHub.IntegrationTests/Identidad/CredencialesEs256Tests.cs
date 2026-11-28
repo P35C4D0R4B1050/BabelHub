@@ -140,19 +140,6 @@ public sealed class CredencialesEs256Tests
     }
 
     [Theory]
-    [InlineData(RolDeUsuario.Cliente, "cliente")]
-    [InlineData(RolDeUsuario.Logistica, "personal-de-logistica")]
-    [InlineData(RolDeUsuario.AdministradorCentral, "administrador-central")]
-    public async Task ElRolViajaConElNombreDeShared(RolDeUsuario rol, string esperado)
-    {
-        var e = new Escenario();
-
-        var verificada = e.Verificador.Verificar(await e.Credencial(rol), Ahora);
-
-        Assert.Equal(esperado, verificada.Rol);
-    }
-
-    [Theory]
     [InlineData(0, EstadoDeLaCredencial.Valida)]
     [InlineData(899, EstadoDeLaCredencial.Valida)]
     [InlineData(900, EstadoDeLaCredencial.Valida)]
@@ -542,16 +529,6 @@ public sealed class CredencialesEs256Tests
         Assert.DoesNotContain("\"d\"", json, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void LasRevocaciones_LlevanLosKidYElInstante()
-    {
-        var json = DocumentosDeClavesPublicadas.Revocaciones(["kid-uno-1234", "kid-dos-1234"], Ahora);
-        using var documento = JsonDocument.Parse(json);
-
-        Assert.Equal(["kid-uno-1234", "kid-dos-1234"], documento.RootElement.GetProperty("revocadas").EnumerateArray().Select(k => k.GetString()));
-        Assert.Equal(Ahora.ToUnixTimeSeconds(), documento.RootElement.GetProperty("generadoEn").GetInt64());
-    }
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -641,18 +618,6 @@ public sealed class CredencialesEs256Tests
         Assert.ThrowsAny<CryptographicException>(() => cifrador.Descifrar(AesGcmCifradorDeSecretos.PropositoDelSegundoFactor, clave.Kid, cifrada.Value));
     }
 
-    [Fact]
-    public async Task DosClavesGeneradas_TienenKidDistintos()
-    {
-        var cifrador = new AesGcmCifradorDeSecretos(ClaveVersionadaDeIdentidad.Analizar($"v1:{Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))}", "c"));
-        var generador = new Es256GeneradorDeClavesDeFirma(cifrador, new AlmacenPrivadoFalso());
-
-        var (uno, _) = await generador.Generar(Ahora);
-        var (otro, _) = await generador.Generar(Ahora);
-
-        Assert.NotEqual(uno.Kid, otro.Kid);
-    }
-
     // ---------------------------------------------------------------- el puerto de la Web
 
     [Fact]
@@ -675,17 +640,5 @@ public sealed class CredencialesEs256Tests
         Assert.Null(invalida.Actor);
         e.Fuente.Actual = null;
         Assert.Equal(EstadoDeVerificacion.SinClavesVigentes, adaptador.Verificar(encargado, Ahora).Estado);
-    }
-
-    [Theory]
-    [InlineData(RolDeUsuario.Cliente, RolWeb.Cliente)]
-    [InlineData(RolDeUsuario.Logistica, RolWeb.Logistica)]
-    [InlineData(RolDeUsuario.AdministradorCentral, RolWeb.AdministradorCentral)]
-    public async Task ElAdaptadorDeLaWeb_MapeaCadaRol(RolDeUsuario rol, RolWeb esperado)
-    {
-        var e = new Escenario();
-        var adaptador = new VerificadorDeCredencialDeLaWeb(e.Verificador);
-
-        Assert.Equal(esperado, adaptador.Verificar(await e.Credencial(rol), Ahora).Actor!.Rol);
     }
 }

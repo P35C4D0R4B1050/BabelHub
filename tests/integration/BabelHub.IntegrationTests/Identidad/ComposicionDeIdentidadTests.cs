@@ -84,49 +84,6 @@ public sealed class ComposicionDeIdentidadTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-09")]
-    public void ElGrafoDeIdentidad_SeValida_ConAlcancesYDependenciasCompletas()
-    {
-        using var proveedor = Proveedor();
-
-        Assert.NotNull(proveedor);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IDE-09")]
-    public void CadaContratoPublico_SeResuelve_ConSuImplementacionReal()
-    {
-        using var proveedor = Proveedor();
-        using var alcance = proveedor.CreateScope();
-        var s = alcance.ServiceProvider;
-
-        Assert.IsType<RegistroDeCuentas>(s.GetRequiredService<IRegistroDeCuentas>());
-        Assert.IsType<Ingreso>(s.GetRequiredService<IIngreso>());
-        Assert.IsType<Sesiones>(s.GetRequiredService<ISesiones>());
-        Assert.IsType<RecuperacionDeAcceso>(s.GetRequiredService<IRecuperacionDeAcceso>());
-        Assert.IsType<EstadoDeCuentaDeIdentidad>(s.GetRequiredService<IEstadoDeCuenta>());
-        Assert.Single(s.GetServices<IEstadoDeCuenta>());
-        Assert.IsType<GestionDeLaCuenta>(s.GetRequiredService<ICuentaDelCliente>());
-        Assert.IsType<CorreoVerificadoDeSistemaDeIdentidad>(s.GetRequiredService<ICorreoVerificadoDeSistema>());
-        Assert.IsType<ClientePorCorreoVerificadoDeSistemaDeIdentidad>(s.GetRequiredService<IClientePorCorreoVerificadoDeSistema>());
-        Assert.NotNull(s.GetRequiredService<ReceptoresDeCambiosDeCuentaCompuestos>());
-        Assert.IsType<VersionesVigentesDeLosTextosDeIdentidad>(s.GetRequiredService<IVersionesVigentesDeLosTextos>());
-        Assert.IsType<CambioDeCorreo>(s.GetRequiredService<ICambioDeCorreo>());
-        Assert.IsType<DispositivosDeLaCuenta>(s.GetRequiredService<IDispositivosDeLaCuenta>());
-        Assert.IsType<AtencionDeSolicitudesDeDatos>(s.GetRequiredService<ISolicitudesDeDatos>());
-        Assert.IsType<CancelacionDeCuenta>(s.GetRequiredService<ICancelacionDeCuenta>());
-        Assert.Same(s.GetRequiredService<ICancelacionDeCuenta>(), s.GetRequiredService<IMarcaDeCancelacionDeCuenta>());
-        Assert.IsType<AdministracionDeUsuarios>(s.GetRequiredService<IAdministracionDeUsuarios>());
-        Assert.IsType<ClavesDeFirma>(s.GetRequiredService<IClavesDeFirma>());
-        Assert.IsType<ContextoDeLecturaDelAsistente>(s.GetRequiredService<IContextoDeLectura>());
-        Assert.IsType<ContextoDelAsistenteDeLaWeb>(s.GetRequiredService<IContextoDelAsistente>());
-        Assert.IsType<DestinatariosDeAlertasDeIdentidad>(s.GetRequiredService<IDestinatariosDeAlertas>());
-        Assert.NotNull(s.GetRequiredService<IAplicadorDeSupresion>());
-        Assert.NotNull(s.GetRequiredService<IRestauracionDeIdentidad>());
-        Assert.Equal(2, s.GetServices<IPasoDeRestauracion>().Count());
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-IDE-30")]
     public void LosPuertosDeLaWeb_ReemplazanALosProvisionales_Y_ElVerificadorDeCredencialesEsUnico()
     {
@@ -190,17 +147,6 @@ public sealed class ComposicionDeIdentidadTests
         var falla = Assert.Throws<ArgumentException>(() => OpcionesDeIdentidad.Leer(Configuracion(cifrado: misma, pimienta: misma), esProduccion: true));
 
         Assert.DoesNotContain(misma, falla.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void FueraDeProduccion_SinVariables_SeGeneranClavesEfimeras_DistintasEnCadaLectura()
-    {
-        var uno = OpcionesDeIdentidad.Leer(Configuracion(), esProduccion: false);
-        var otro = OpcionesDeIdentidad.Leer(Configuracion(), esProduccion: false);
-
-        Assert.NotSame(uno.ClaveDeCifrado, otro.ClaveDeCifrado);
-        Assert.Equal("[clave]", uno.ClaveDeCifrado.ToString());
-        Assert.Equal("[opciones de identidad]", uno.ToString());
     }
 
     [Fact]

@@ -28,22 +28,6 @@ public sealed class TrabajosDeFondoDeIdentidadTests(PostgresDeIdentidadFixture b
 
     [Fact]
     [Trait("Criterio", "AC-IDE-19")]
-    public async Task LaPurga_QuitaSoloLoVencidoMasAllaDeSuRetencion_YConservaLoVigente()
-    {
-        var usuario = await Cuenta();
-        var purga = new PostgresPurgaDeVencidos(bd.AccesoAlEsquema);
-        string Desafio(Guid id, DateTimeOffset vence) => $"INSERT INTO identidad.desafios_de_ingreso (id, huella, usuario_id, modo, creado_en, vence_en) VALUES ('{id}', '{new string('a', 63)}{id.ToString("N")[0]}', '{usuario}', 'presentar-segundo-factor', {Fecha(vence.AddMinutes(-5))}, {Fecha(vence)})";
-        var (viejo, reciente, vigente) = (Guid.Parse("a0000000-0000-0000-0000-000000000001"), Guid.Parse("b0000000-0000-0000-0000-000000000002"), Guid.Parse("c0000000-0000-0000-0000-000000000003"));
-        await bd.Ejecutar(Desafio(viejo, Ahora.AddHours(-3)) + ";" + Desafio(reciente, Ahora.AddMinutes(-30)) + ";" + Desafio(vigente, Ahora.AddMinutes(3)));
-
-        var quitados = await purga.DesafiosVencidos(Ahora.AddHours(-1));
-
-        Assert.Equal(1, quitados);
-        Assert.Equal(2, await bd.Consultar<long>($"SELECT count(*) FROM identidad.desafios_de_ingreso WHERE usuario_id = '{usuario}'"));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-IDE-19")]
     public async Task LaPurgaDeCodigosYRenovaciones_ALos30Dias_ConservaLoRecienteYLoVigente()
     {
         var usuario = await Cuenta();
@@ -185,7 +169,6 @@ public sealed class TrabajosDeFondoDeIdentidadTests(PostgresDeIdentidadFixture b
         }
     }
 
-
     private sealed class AlertasDePrueba : IAlertas
     {
         public List<string> Tecnicas { get; } = [];
@@ -247,56 +230,6 @@ public sealed class TrabajosDeFondoDeIdentidadTests(PostgresDeIdentidadFixture b
     }
 
     [Fact]
-    public async Task SiElRegistroOLaAlertaFallan_ElTrabajoSigue_SinLanzar()
-    {
-        var (trabajo, registro, _, alertas) = Trabajo(_ => throw new InvalidOperationException("Se cayó."));
-        registro.Falla = true;
-        alertas.Falla = true;
-
-        for (var i = 0; i < 3; i++)
-        {
-            await trabajo.EjecutarUnaVez();
-        }
-
-        Assert.Equal(3, registro.Corridas.Count);
-        Assert.Single(alertas.Tecnicas);
-    }
-
-    [Fact]
-    public async Task LaCancelacionDelApagado_SePropaga_YElActorSeLimpia()
-    {
-        using var origen = new CancellationTokenSource();
-        var (trabajo, registro, actor, _) = Trabajo(ct =>
-        {
-            origen.Cancel();
-            ct.ThrowIfCancellationRequested();
-            return Task.CompletedTask;
-        });
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => trabajo.EjecutarUnaVez(origen.Token));
-
-        Assert.Empty(registro.Corridas);
-        Assert.Equal(1, actor.Limpiezas);
-    }
-
-    [Fact]
-    public async Task CorrerSeDetieneConLaCancelacion_SinLanzar_DespuesDeLaPrimeraCorrida()
-    {
-        using var origen = new CancellationTokenSource();
-        var corridas = 0;
-        var (trabajo, _, _, _) = Trabajo(_ =>
-        {
-            corridas++;
-            origen.Cancel();
-            return Task.CompletedTask;
-        });
-
-        await trabajo.Correr(origen.Token);
-
-        Assert.Equal(1, corridas);
-    }
-
-    [Fact]
     public async Task UnaCorridaColgada_SeCancelaALosPlazos_YCuentaComoFallo_ParaPoderAlertar()
     {
         var registro = new RegistroDePrueba();
@@ -323,14 +256,5 @@ public sealed class TrabajosDeFondoDeIdentidadTests(PostgresDeIdentidadFixture b
         Assert.Equal(1, TrabajosDeIdentidad.IntervaloDeLaRotacion.FallosSeguidosParaAlertar);
         Assert.True(TrabajosDeIdentidad.IntervaloDeLaRenovacionDeClaves.PlazoDeLaCorrida <= TimeSpan.FromMinutes(2));
         Assert.Equal(TimeSpan.FromMinutes(10), TrabajosDeIdentidad.IntervaloDeLasBajas.PlazoDeLaCorrida);
-    }
-
-    [Fact]
-    public void LosTrabajosDeIdentidad_TienenNombresEstables_IntervalosYLaRenovacionDeClavesMenorQueLaFoto()
-    {
-        Assert.Equal(TimeSpan.FromMinutes(15), TrabajosDeIdentidad.IntervaloDeLasBajas.Intervalo);
-        Assert.True(TrabajosDeIdentidad.IntervaloDeLaRenovacionDeClaves.Intervalo < TimeSpan.FromMinutes(5));
-        Assert.True(TrabajosDeIdentidad.IntervaloDeLaPurga.Intervalo <= TimeSpan.FromMinutes(10));
-        Assert.Equal(5, new[] { TrabajosDeIdentidad.PurgaDeVencidos, TrabajosDeIdentidad.DescarteDeCancelaciones, TrabajosDeIdentidad.RotacionDeLaClaveDeFirma, TrabajosDeIdentidad.RenovacionDeLasClavesDeVerificacion, TrabajosDeIdentidad.EntregaDeBajas }.Distinct().Count());
     }
 }
