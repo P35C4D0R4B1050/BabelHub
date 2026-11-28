@@ -209,6 +209,35 @@ public sealed class ElegirEntregaTests
     }
 
     [Fact]
+    public async Task Con_el_checkout_en_pago_un_cambio_reabre_la_intencion_antes_de_bloquear_y_conserva_el_pedido()
+    {
+        var (e, checkout, _) = await EnPago();
+        var pedido = checkout.PedidoId;
+        e.Bitacora.Bloqueos.Clear();
+
+        var resultado = await Elegir(e, Domicilio());
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(["reabrir", "checkout", "carrito"], e.Bitacora.Bloqueos);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+        Assert.Equal(pedido, checkout.PedidoId);
+        Assert.Equal(TipoDeEntrega.Domicilio, checkout.TipoDeEntrega);
+        Assert.Contains(checkout, e.Checkouts.Guardados);
+    }
+
+    [Fact]
+    public async Task Elegir_lo_mismo_es_un_no_op_que_no_reabre_la_intencion()
+    {
+        var (e, checkout, _) = await EnPago();
+
+        var resultado = await Elegir(e, Recojo());
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(0, e.Pagos.Reaperturas);
+        Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
+    }
+
+    [Fact]
     public async Task Con_un_intento_activo_se_rechaza_y_con_el_pago_pendiente_o_reservando_tambien()
     {
         var (activo, checkoutActivo, _) = await EnPago();
@@ -223,6 +252,21 @@ public sealed class ElegirEntregaTests
         Assert.Equal(ClavesDelCarrito.PagoPendiente, b.Error!.Clave);
         Assert.Equal(EstadoDelCheckout.EnPago, checkoutActivo.Estado);
         Assert.Equal(0, pendiente.Pagos.Reaperturas);
+    }
+
+    [Fact]
+    public async Task Si_la_intencion_ya_no_admite_cobro_se_aborta_desde_en_pago_y_la_eleccion_sigue()
+    {
+        var (e, checkout, _) = await EnPago();
+        var pedido = checkout.PedidoId;
+        e.Pagos.AlReabrir = ResultadoDeReabrirIntencion.Cerrada;
+
+        var resultado = await Elegir(e, Domicilio());
+
+        Assert.True(resultado.EsExito);
+        Assert.Null(checkout.PedidoId);
+        Assert.Equal(pedido, checkout.PedidoDescartado);
+        Assert.Equal(TipoDeEntrega.Domicilio, checkout.TipoDeEntrega);
     }
 
     [Fact]

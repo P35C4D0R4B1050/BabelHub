@@ -120,6 +120,20 @@ public sealed class ProgresoDelCheckoutTests
     }
 
     [Fact]
+    public async Task PagoAprobado_desde_en_pago_sin_pendiente_tambien_paga_y_repetirlo_es_idempotente()
+    {
+        var s = await EnPago();
+        var progreso = Progreso(s);
+
+        var primero = await progreso.PagoAprobado(s.Pedido);
+        var repetido = await progreso.PagoAprobado(s.Pedido);
+
+        Assert.Equal(ResultadoDelAvisoDePago.Aplicado, primero);
+        Assert.Equal(ResultadoDelAvisoDePago.SinCambios, repetido);
+        Assert.Equal(EstadoDelCheckout.Pagado, s.Checkout.Estado);
+    }
+
+    [Fact]
     public async Task PagoAprobado_quita_solo_la_cantidad_comprada_y_conserva_lo_no_pagado()
     {
         var s = await Pendiente();
@@ -131,6 +145,19 @@ public sealed class ProgresoDelCheckoutTests
 
         var restante = Assert.Single(carrito.Lineas);
         Assert.Equal((s.Impreso, 2), (restante.EdicionId, restante.Cantidad.Valor));
+    }
+
+    [Fact]
+    public async Task PagoAprobado_aplica_los_retiros_pendientes_dejando_su_aviso()
+    {
+        var s = await Pendiente();
+        var carrito = s.Entorno.Carritos.Todos.Single();
+        carrito.RetirarEdicion(s.Digital, diferir: true, Inicio);
+
+        await Progreso(s).PagoAprobado(s.Pedido);
+
+        Assert.Single(await s.Entorno.Carritos.AvisosSinVer(s.Entorno.Actor.Actual!.UsuarioId!.Value));
+        Assert.Empty(carrito.Lineas);
     }
 
     // ---------- PagoResuelto ----------
@@ -183,6 +210,7 @@ public sealed class ProgresoDelCheckoutTests
     [InlineData(ResultadoDeReabrirIntencion.Reabierta, EstadoDelCheckout.EnEdicion)]
     [InlineData(ResultadoDeReabrirIntencion.NoCancelable, EstadoDelCheckout.EnPago)]
     [InlineData(ResultadoDeReabrirIntencion.Cerrada, EstadoDelCheckout.Cancelado)]
+    [InlineData(ResultadoDeReabrirIntencion.NoExiste, EstadoDelCheckout.Cancelado)]
     public async Task Con_un_retiro_pendiente_un_rechazo_pasa_por_Reabrir_fuera_de_transaccion_y_antes_de_bloquear(ResultadoDeReabrirIntencion respuesta, EstadoDelCheckout esperado)
     {
         var s = await Pendiente();

@@ -50,8 +50,10 @@ public sealed class VerificacionDePersonaWebTests
     [Theory]
     [Trait("Criterio", "AC-SEG-28")]
     [InlineData(AccionProtegida.Ingreso, "ingreso")]
+    [InlineData(AccionProtegida.Registro, "registro")]
     [InlineData(AccionProtegida.HojaDeReclamacion, "hoja-de-reclamacion")]
     [InlineData(AccionProtegida.Reserva, "reserva")]
+    [InlineData(AccionProtegida.Asistente, "asistente")]
     public void UnaPaginaQueDeclaraLaVerificacion_DibujaElDesafioConSuAccionYElScriptDeTurnstile(AccionProtegida accion, string nombre)
     {
         var html = Dibujar(Contexto(new VerificacionDePersonaAttribute(accion)));

@@ -298,6 +298,23 @@ public sealed class RepositorioDeDevolucionesPostgresTests(PostgresDeDevolucione
 
     [Fact]
     [Trait("Criterio", "AC-DEV-03")]
+    public async Task Veinte_pares_de_solicitudes_simultaneas_sobre_la_misma_unidad_dejan_pasar_solo_a_una()
+    {
+        for (var par = 0; par < 20; par++)
+        {
+            var linea = Guid.NewGuid();
+            var pedido = Guid.NewGuid();
+
+            var resultados = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => Task.Run(() => En(token => bd.Devoluciones.TomarCupos([new CupoPedido(linea, pedido, 3, 2)], token)))));
+
+            Assert.Equal(1, resultados.Count(r => r is null));
+            Assert.Equal(1, resultados.Count(r => r == linea));
+            Assert.Equal(2, await bd.Consultar<int>($"SELECT cantidad_comprometida FROM devoluciones.cupos_de_linea WHERE linea_id = '{linea}'"));
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-03")]
     public async Task Si_una_linea_no_alcanza_la_transaccion_del_llamador_revierte_lo_comprometido_en_las_anteriores()
     {
         var a = Guid.Parse("00000000-0000-0000-0000-00000000000a");

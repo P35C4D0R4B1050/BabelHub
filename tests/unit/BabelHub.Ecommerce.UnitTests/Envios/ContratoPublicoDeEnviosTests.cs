@@ -41,6 +41,15 @@ public sealed class ContratoPublicoDeEnviosTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-17")]
+    public void Ningun_tipo_publico_de_la_raiz_expone_el_dominio_ni_el_interior()
+    {
+        var expuestos = TiposPublicos().SelectMany(TiposQueExpone).Distinct().ToArray();
+
+        Assert.DoesNotContain(expuestos, t => t.Namespace is not null && (t.Namespace.StartsWith("BabelHub.Ecommerce.Domain", StringComparison.Ordinal) || t.Namespace.Contains(".Interno", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-17")]
     public void Ningun_modelo_del_contrato_tiene_un_campo_de_contacto()
     {
         var campos = TiposPublicos().Where(t => t.IsClass).SelectMany(t => t.GetProperties()).Select(p => p.Name).ToArray();

@@ -71,6 +71,18 @@ public sealed class SolicitarReembolsoDeDigitalTests
         Assert.Empty(entorno.Inventario.Reingresos);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-04")]
+    public async Task La_auditoria_lleva_la_solicitud_la_aprobacion_y_el_reembolso_sin_el_motivo()
+    {
+        var (entorno, pedido, linea) = Preparar();
+
+        await entorno.SolicitarDigital.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId, "Mi DNI es 12345678"));
+
+        Assert.Equal(["DevolucionSolicitada", "EstadoDeDevolucionCambiado", "EstadoDeDevolucionCambiado"], entorno.Auditoria.Solicitudes.Select(s => s.Accion.ToString()));
+        Assert.DoesNotContain("12345678", JsonSerializer.Serialize(entorno.Auditoria.Solicitudes.Select(s => s.Detalle)), StringComparison.Ordinal);
+    }
+
     // ---------- Pasarela caída (DEV-21) ----------
 
     [Theory]
@@ -208,6 +220,21 @@ public sealed class SolicitarReembolsoDeDigitalTests
         Assert.Empty(entorno.Accesos.Llamadas);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-04")]
+    public async Task Una_segunda_solicitud_de_la_misma_linea_no_crea_otro_reembolso()
+    {
+        var (entorno, pedido, linea) = Preparar();
+        var primera = await entorno.SolicitarDigital.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
+
+        var segunda = await entorno.SolicitarDigital.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
+
+        Assert.True(primera.EsExito);
+        Assert.Equal("linea-no-devolvible", segunda.Error!.Clave);
+        Assert.Single(entorno.Reembolsos.Registrados);
+        Assert.Single(entorno.Repositorio.Todas);
+    }
+
     [Theory]
     [Trait("Criterio", "AC-DEV-28")]
     [InlineData(EstadoDeLaMarca.EnEjecucion)]
@@ -248,6 +275,21 @@ public sealed class SolicitarReembolsoDeDigitalTests
         Assert.Equal("no-es-del-pedido", d.Error!.Errores[0].Clave);
         Assert.Empty(bibliotecaCaida.Repositorio.Todas);
         Assert.Empty(pagosCaido.Repositorio.Todas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-04")]
+    public async Task Un_rol_sin_permiso_o_un_motivo_invalido_se_rechazan_antes_de_leer_nada()
+    {
+        var (entorno, pedido, linea) = Preparar();
+        var sinMotivo = await entorno.SolicitarDigital.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId, "   "));
+        var encargado = new EntornoDeDevoluciones(BabelHub.Ecommerce.UnitTests.Soporte.ActorDePrueba.DeEncargadoDe(Guid.NewGuid()));
+        var prohibido = await encargado.SolicitarDigital.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
+
+        Assert.Equal(CategoriaDeError.Validacion, sinMotivo.Error!.Categoria);
+        Assert.Equal(CategoriaDeError.Prohibido, prohibido.Error!.Categoria);
+        Assert.Equal(0, entorno.Pedidos.Lecturas);
+        Assert.Equal(0, encargado.Pedidos.Lecturas);
     }
 
     [Fact]

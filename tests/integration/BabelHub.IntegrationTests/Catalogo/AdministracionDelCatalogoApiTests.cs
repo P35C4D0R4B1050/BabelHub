@@ -320,6 +320,18 @@ public sealed class AdministracionDelCatalogoApiTests(PostgresDelCatalogoYAudito
         Assert.Equal(HttpStatusCode.NotFound, sinPortada.StatusCode);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-CAT-12")]
+    public async Task Un_cuerpo_json_de_mas_de_64_KiB_se_rechaza_sin_parsearlo_entero()
+    {
+        var enorme = "{\"titulo\":\"" + new string('x', 200_000) + "\"}";
+
+        using var respuesta = await _host.Json(HttpMethod.Post, "/administracion/obras", enorme);
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Equal(0, await bd.Consultar<long>("SELECT count(*) FROM catalogo.obras"));
+    }
+
     // ---------- Portadas ----------
 
     [Fact]

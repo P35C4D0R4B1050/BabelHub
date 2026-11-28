@@ -120,6 +120,22 @@ public sealed class DenegacionesHttpInventarioTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-21")]
+    public async Task UnaSolicitudPermitida_NoRegistraNada()
+    {
+        var (app, contador) = await Crear();
+        await using var _ = app;
+        var cliente = app.GetTestClient();
+        cliente.DefaultRequestHeaders.Add("X-Rol", "administrador-central");
+
+        Assert.Equal(HttpStatusCode.OK, (await cliente.GetAsync("/protegido")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await app.GetTestClient().GetAsync("/libre")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await app.GetTestClient().GetAsync("/no-existe")).StatusCode);
+
+        Assert.Empty(contador.Recibidas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-21")]
     public async Task UnRechazoPropioDeUnEndpoint_ConUn403_SeRegistra()
     {
         var (app, contador) = await Crear();

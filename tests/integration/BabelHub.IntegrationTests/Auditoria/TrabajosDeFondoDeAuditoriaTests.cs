@@ -136,6 +136,21 @@ public sealed class TrabajosDeFondoDeAuditoriaTests
     }
 
     [Fact]
+    public async Task SiNoSePuedeRegistrarLaCorridaOPublicarLaAlerta_ElTrabajoSigue()
+    {
+        var e = new Entorno((_, _) => throw new InvalidOperationException("falla"));
+        e.Registro.Falla = true;
+        e.Alertas.Falla = true;
+
+        for (var i = 0; i < 4; i++)
+        {
+            await e.Trabajo.EjecutarUnaVez();
+        }
+
+        Assert.Equal(4, e.Registro.Corridas.Count);
+    }
+
+    [Fact]
     public async Task ElServicioCorreTodosLosTrabajosYSeDetieneAlApagar()
     {
         var a = new Entorno(intervalo: TimeSpan.FromMilliseconds(40));

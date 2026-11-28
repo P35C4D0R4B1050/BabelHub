@@ -112,6 +112,18 @@ public sealed class CriptografiaDeIdentidadTests
     }
 
     [Fact]
+    public async Task ElSemaforoGlobal_AcotaLosCalculosSimultaneos_YLoDevuelveSiTodoTermina()
+    {
+        using var hasher = new Argon2idHasherDeContrasenas(concurrenciaMaxima: 2, espera: TimeSpan.FromSeconds(30));
+        var frase = Frase("frase para acotar la concurrencia");
+
+        var resumenes = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => hasher.Resumir(frase)));
+
+        Assert.Equal(6, resumenes.Distinct().Count());
+        Assert.Equal(2, hasher.TurnosLibres);
+    }
+
+    [Fact]
     public void LosParametrosDelHasher_SeValidan()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new Argon2idHasherDeContrasenas(concurrenciaMaxima: 0));
@@ -152,6 +164,15 @@ public sealed class CriptografiaDeIdentidadTests
         Assert.Equal(ResultadoDeContrasena.Comun, PoliticaDeContrasenas.Evaluar("PASSWORD123", lista.EsComun));
         Assert.Equal(ResultadoDeContrasena.Comun, PoliticaDeContrasenas.Evaluar("ｑｗｅｒｔｙｕｉｏｐ", lista.EsComun));
         Assert.Equal(ResultadoDeContrasena.Aceptable, PoliticaDeContrasenas.Evaluar("mi gato come pescado los viernes", lista.EsComun));
+    }
+
+    [Fact]
+    public void UnaListaPropia_IgnoraMayusculasYVacios()
+    {
+        var lista = new RecursoListaDeContrasenasComunes(["Alfa-Bravo-Charlie", "  ", ""]);
+
+        Assert.Equal(1, lista.Cantidad);
+        Assert.True(lista.EsComun("alfa-bravo-charlie"));
     }
 
     // ---------------------------------------------------------------- AES-GCM
@@ -274,5 +295,37 @@ public sealed class CriptografiaDeIdentidadTests
         Assert.DoesNotContain("123456", verificacion, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void LaHuellaDeUnValorOpaco_EsSha256Hexadecimal()
+    {
+        var huellas = new HmacHuellasDeIdentidad(Clave("p1"));
+
+        Assert.Equal("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", huellas.DeValorOpaco("abc"));
+        Assert.Throws<ArgumentException>(() => huellas.DeValorOpaco(string.Empty));
+    }
+
     // ---------------------------------------------------------------- aleatorios
+
+    [Fact]
+    public void Los_aleatorios_son_unicos_y_tienen_el_tamano_esperado()
+    {
+        var generador = new CsprngGeneradorDeSecretos();
+
+        var opacos = Enumerable.Range(0, 50).Select(_ => generador.ValorOpaco()).ToList();
+        var secretos = Enumerable.Range(0, 50).Select(_ => Convert.ToHexString(generador.SecretoDelSegundoFactor())).ToList();
+        var temporales = Enumerable.Range(0, 50).Select(_ => generador.ContrasenaTemporal()).ToList();
+
+        Assert.Equal(50, opacos.Distinct().Count());
+        Assert.All(opacos, o => Assert.Matches("^[A-Za-z0-9_-]{43}$", o));
+        Assert.Equal(50, secretos.Distinct().Count());
+        Assert.All(secretos, s => Assert.Equal(40, s.Length));
+        Assert.Equal(50, temporales.Distinct().Count());
+        Assert.All(temporales, t =>
+        {
+            Assert.True(t.Length >= 20);
+            Assert.DoesNotContain(t, c => "0O1lI".Contains(c, StringComparison.Ordinal));
+        });
+        Assert.NotEqual(generador.NuevoIdentificador(), generador.NuevoIdentificador());
+        Assert.True(PoliticaDeContrasenas.Evaluar(temporales[0], new RecursoListaDeContrasenasComunes().EsComun) == ResultadoDeContrasena.Aceptable);
+    }
 }

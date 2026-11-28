@@ -126,6 +126,19 @@ public sealed class RegistrarAceptacionesTests
     }
 
     [Fact]
+    public async Task Repetir_la_aceptacion_de_la_misma_version_conserva_la_primera_fecha()
+    {
+        var (e, checkout) = await ConCheckout(conDigital: false);
+        await Registrar(e, Los2);
+        e.Reloj.Ahora = Inicio.AddMinutes(10);
+
+        var resultado = await Registrar(e, Los2);
+
+        Assert.True(resultado.EsExito);
+        Assert.All(checkout.Aceptaciones.Aceptadas, a => Assert.Equal(Inicio, a.AceptadoEn));
+    }
+
+    [Fact]
     public async Task Si_no_se_pueden_obtener_las_versiones_vigentes_falla_cerrado_y_no_se_guarda_nada()
     {
         var (e, checkout) = await ConCheckout(conDigital: false);
@@ -149,6 +162,16 @@ public sealed class RegistrarAceptacionesTests
         Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
         Assert.Equal("aceptados", Assert.Single(resultado.Error.Errores).Campo);
         Assert.Equal(0, e.Textos.Consultas);
+    }
+
+    [Fact]
+    public async Task Una_lista_vacia_con_demasiadas_versiones_o_un_texto_repetido_es_una_validacion()
+    {
+        var (e, _) = await ConCheckout(conDigital: false);
+
+        Assert.Equal(CategoriaDeError.Validacion, (await Registrar(e, [])).Error!.Categoria);
+        Assert.Equal(CategoriaDeError.Validacion, (await Registrar(e, [Visto(TextoLegalDeCompra.Terminos, "t-1"), Visto(TextoLegalDeCompra.Terminos, "t-1")])).Error!.Categoria);
+        Assert.Equal(CategoriaDeError.Validacion, (await Registrar(e, [Visto(TextoLegalDeCompra.Terminos, new string('v', 41)), Visto(TextoLegalDeCompra.Privacidad, "p-1")])).Error!.Categoria);
     }
 
     // ---------- WhatsApp ----------
@@ -218,6 +241,17 @@ public sealed class RegistrarAceptacionesTests
     }
 
     [Fact]
+    public async Task Si_el_registro_de_textos_falla_el_consentimiento_no_se_pide()
+    {
+        var (e, _) = await ConCheckout(conDigital: false);
+        e.Textos.Vigente(TipoDeTextoLegal.Terminos, "t-2");
+
+        await Registrar(e, Los2, whatsapp: true, huella: "•••• •• 321");
+
+        Assert.Empty(e.Consentimiento.Guardados);
+    }
+
+    [Fact]
     public async Task Si_Identidad_ya_tiene_el_consentimiento_o_no_hay_numero_no_se_ofrece_ni_se_guarda()
     {
         var (e, _) = await ConCheckout(conDigital: false);
@@ -281,6 +315,17 @@ public sealed class RegistrarAceptacionesTests
     }
 
     [Fact]
+    public async Task Un_pedido_oculto_ajeno_es_no_encontrado_con_su_evento()
+    {
+        var (e, _) = await ConCheckout(conDigital: false);
+
+        var resultado = await Registrar(e, Los2, pedido: Guid.NewGuid());
+
+        Assert.Equal(ClavesDelCarrito.NoEncontrado, resultado.Error!.Clave);
+        Assert.Equal("recurso-ajeno-pedido-id", Assert.Single(e.Denegaciones.Eventos).Motivo);
+    }
+
+    [Fact]
     public async Task Sin_sesion_con_personal_o_con_la_cuenta_cancelada_se_rechaza()
     {
         var visitante = EntornoDelCarrito.DeVisitante();
@@ -307,6 +352,16 @@ public sealed class RegistrarAceptacionesTests
         Assert.Equal(new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.SeOfrece, "•••• •• 321"), resultado.Valor.ConsentimientoDeWhatsApp);
         Assert.Equal(guardados, e.Checkouts.Guardados.Count);
         Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+    }
+
+    [Fact]
+    public async Task Obtener_el_checkout_sin_checkout_vivo_es_no_encontrado()
+    {
+        var e = EntornoDelCarrito.DeCliente();
+
+        var resultado = await new ObtenerCheckout(e.ServiciosDelCheckout()).Ejecutar(new ObtenerCheckoutEntrada());
+
+        Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
     }
 
     [Fact]

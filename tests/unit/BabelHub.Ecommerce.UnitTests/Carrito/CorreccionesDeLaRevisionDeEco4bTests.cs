@@ -47,6 +47,20 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     }
 
     [Fact]
+    public async Task El_aborto_desde_en_pago_guarda_el_pedido_descartado_y_la_liberacion_anotada()
+    {
+        var (e, checkout, _, libro) = EnPago();
+        e.Pagos.AlReabrir = ResultadoDeReabrirIntencion.Cerrada;
+
+        await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 5));
+
+        var guardado = Assert.Single(e.Checkouts.Guardados);
+        Assert.Same(checkout, guardado);
+        Assert.NotNull(guardado.PedidoDescartado);
+        Assert.NotNull(guardado.ReservaALiberarDesde);
+    }
+
+    [Fact]
     public async Task Si_la_operacion_se_rechaza_despues_de_reabrir_el_checkout_igual_se_guarda()
     {
         var (e, checkout, carrito, libro) = EnPago(cantidad: 18);

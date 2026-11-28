@@ -34,6 +34,7 @@ public sealed class AutorizacionYValidacionTests
     [Theory]
     [Trait("Criterio", "AC-CAT-19")]
     [InlineData("cliente")]
+    [InlineData("personal-de-logistica")]
     [InlineData("sistema")]
     [InlineData("integracion")]
     public async Task Ningun_otro_actor_con_contexto_es_la_administracion_central(string actor)

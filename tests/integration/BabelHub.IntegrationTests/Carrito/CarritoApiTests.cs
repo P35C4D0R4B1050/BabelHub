@@ -84,6 +84,7 @@ public sealed class CarritoApiTests : IAsyncLifetime
     [Theory]
     [InlineData("")]
     [InlineData("corta")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+")]
     public async Task Una_cookie_mal_formada_se_trata_como_sin_carrito_y_no_llega_a_la_Aplicacion(string cookie)
     {
@@ -177,6 +178,16 @@ public sealed class CarritoApiTests : IAsyncLifetime
         Assert.Empty(_host.Carrito.Llamadas);
         var campos = (await CarritoApiHost.Leer(desconocido)).GetProperty("errores").EnumerateArray().Select(e => e.GetProperty("campo").GetString()).ToList();
         Assert.Contains("precio", campos);
+    }
+
+    [Fact]
+    public async Task Un_nombre_de_campo_con_caracteres_raros_no_se_repite_en_el_error()
+    {
+        using var respuesta = await _host.Enviar("/carrito/lineas", [C("edicionId", Edicion.ToString("D")), C("cantidad", "1"), C("<script>x</script>", "1")]);
+
+        var texto = await respuesta.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("<script>", texto, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
     }
 
     [Theory]

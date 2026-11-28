@@ -90,6 +90,22 @@ public sealed class RestReservasDelPagoTests
         Assert.All(new[] { limite, caido, lanza }, r => Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, r.Resultado));
     }
 
+    [Fact]
+    public async Task La_cancelacion_no_se_traga()
+    {
+        var (adaptador, _) = Crear(() => throw new OperationCanceledException());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => adaptador.Liberar(Pedido, MotivoDeLiberacion.PagoVencido));
+    }
+
+    [Fact]
+    public async Task Un_pedido_vacio_es_un_error_de_programacion()
+    {
+        var (adaptador, _) = Crear(() => ResultadoDelInventario<ReservaDelInventario>.SinRespuesta);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => adaptador.Liberar(Guid.Empty, MotivoDeLiberacion.PagoVencido));
+    }
+
     // ---------- consultar, extender y confirmar ----------
 
     private static readonly DateTimeOffset Ahora = new(2026, 11, 19, 12, 0, 0, TimeSpan.Zero);
@@ -259,6 +275,18 @@ public sealed class RestReservasDelPagoTests
         cliente.Confirmacion = () => ResultadoDelInventario<ReservaDelInventario>.Rechazo(estado, codigo);
 
         Assert.Equal(esperado, (await adaptador.Confirmar(Pedido, "conf-1")).Resultado.ToString());
+    }
+
+    [Fact]
+    public async Task Confirmar_extender_y_consultar_sin_pedido_o_sin_clave_son_errores_de_programacion_y_la_cancelacion_no_se_traga()
+    {
+        var (adaptador, cliente) = CrearSinLiberar();
+
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => adaptador.Confirmar(Pedido, " "));
+        await Assert.ThrowsAsync<ArgumentException>(() => adaptador.Extender(Guid.Empty));
+        await Assert.ThrowsAsync<ArgumentException>(() => adaptador.Consultar(Guid.Empty, Guid.NewGuid()));
+        cliente.Extension = () => throw new OperationCanceledException();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => adaptador.Extender(Pedido));
     }
 
     private sealed class RelojDePrueba : IReloj

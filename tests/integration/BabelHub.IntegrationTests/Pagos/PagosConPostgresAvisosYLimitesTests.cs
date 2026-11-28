@@ -63,6 +63,38 @@ public sealed class PagosConPostgresAvisosYLimitesTests(PostgresDePagosFixture b
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-06")]
+    public async Task Un_cobro_aplicado_sin_respuesta_se_descubre_por_consulta_y_se_cobra_una_sola_vez()
+    {
+        var pedido = await ComprasDePrueba.Sembrar(_entorno);
+        var respuesta = await Cobrar(pedido, await Clave(pedido), MedioDelContrato.Yape, EscenariosDelSimulador.AplicaSinResponder);
+
+        Assert.Equal(EstadoDelCobro.PendienteDeConfirmacion, respuesta.Valor.Estado);
+        _entorno.Reloj.Avanzar(TimeSpan.FromMinutes(1));
+        await Correr(consultar: true, reanudar: true);
+
+        Assert.Equal(1, _entorno.Pasarela.LlamadasDeCobrar);
+        Assert.Equal(1, _entorno.Pasarela.CargosDe(respuesta.Valor.IntentoId));
+        Assert.Equal(1, await Contar("intentos", "estado = 'aprobado'"));
+        Assert.Single(_entorno.Pedidos.PedidosCreados);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-16")]
+    public async Task Un_aprobado_por_otro_importe_no_se_acepta_deja_una_alerta_y_no_crea_el_pedido()
+    {
+        var pedido = await ComprasDePrueba.Sembrar(_entorno);
+
+        var respuesta = await Cobrar(pedido, await Clave(pedido), MedioDelContrato.Tarjeta, EscenariosDelSimulador.OtroImporte);
+        await Correr(consultar: true, reanudar: true);
+
+        Assert.NotEqual(EstadoDelCobro.Aprobado, respuesta.Valor.Estado);
+        Assert.Contains(IniciarCobro.MotivoDeAlertaCobroDudoso, _entorno.Alertas);
+        Assert.Empty(_entorno.Pedidos.PedidosCreados);
+        Assert.Equal(0, await Contar("intenciones", "estado = 'completada'"));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PAG-16")]
     public async Task Un_aviso_solo_adelanta_la_consulta_un_duplicado_no_repite_nada_y_uno_forjado_se_rechaza()
     {

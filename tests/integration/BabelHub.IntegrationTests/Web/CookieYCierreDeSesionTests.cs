@@ -334,6 +334,21 @@ public sealed class CookieYCierreDeSesionTests
         Assert.True(fallos.Count == 0, string.Join(Environment.NewLine, fallos));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-WEB-22")]
+    public async Task ElExploradorDeSondeos_FallaSiUnSondeoNoDeclaraLaConsultaAutomatica_OSiNoSePuedeResolver()
+    {
+        await using var anfitrion = await AnfitrionConSesion.Iniciar(new SesionesWebDePrueba());
+        var endpoints = anfitrion.Servicios.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>().ToList();
+
+        Assert.Empty(ExploradorDeSondeos.Revisar("""<div hx-get="/prueba/sesion/sondeo" hx-trigger="every 20s"></div>""", endpoints));
+        Assert.Empty(ExploradorDeSondeos.Revisar("""<div hx-get="/prueba/sesion/yo" hx-trigger="click"></div>""", endpoints));
+        Assert.Single(ExploradorDeSondeos.Revisar("""<div hx-get="/prueba/sesion/yo" hx-trigger="every 20s"></div>""", endpoints));
+        Assert.Single(ExploradorDeSondeos.Revisar("""<div hx-get="/no/existe" hx-trigger="load, every 5s"></div>""", endpoints));
+        Assert.Single(ExploradorDeSondeos.Revisar("""<div hx-get="@Url.Action("Sondeo")" hx-trigger="every 20s"></div>""", endpoints));
+        Assert.Single(ExploradorDeSondeos.Revisar("""<div hx-trigger="every 20s"></div>""", endpoints));
+    }
+
     private static class ExploradorDeSondeos
     {
         private static readonly Regex Etiqueta = new(@"<[^<>]*hx-trigger\s*=\s*""[^""]*\bevery\b[^""]*""[^<>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);

@@ -320,10 +320,13 @@ public sealed class DominioDeNotificacionesTests
     [InlineData("numeroDePedido", "https://tienda.example/descarga?x=1")]
     [InlineData("numeroDePedido", "www.tienda.pe")]
     [InlineData("nombre", "juan@example.com")]
+    [InlineData("nombre", "Maria Jose")]
     [InlineData("nombre", "Ana123")]
     [InlineData("nombre", "")]
     [InlineData("numeroDePedido", "4111-1111-1111-1111")]
+    [InlineData("numeroDePedido", "4111111111111111")]
     [InlineData("numeroDePedido", "AB")]
+    [InlineData("numeroDePedido", "BH 123")]
     [InlineData("numeroDePedido", "BH-123\n456")]
     [Trait("Criterio", "AC-NOT-06")]
     public void UnValorConEnlaceTarjetaTextoLibreOFormatoInvalido_SeRechaza_SinDevolverElValor(string campo, string valor)

@@ -186,6 +186,18 @@ public sealed class IniciarCheckoutTests
     // ---------- Checkout vivo ----------
 
     [Fact]
+    public async Task Con_un_checkout_vivo_en_edicion_se_devuelve_ese_sin_crear_otro()
+    {
+        var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
+        var primero = (await Iniciar(e)).Valor;
+        var segundo = await Iniciar(e);
+
+        Assert.True(segundo.EsExito);
+        Assert.Single(e.Checkouts.Todos);
+        Assert.Equal(primero.Lineas.Single().LineaId, segundo.Valor.Lineas.Single().LineaId);
+    }
+
+    [Fact]
     public async Task Con_el_checkout_en_edicion_las_lineas_se_sincronizan_con_el_carrito_conservando_el_lineaId_de_las_que_siguen()
     {
         var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
@@ -198,6 +210,31 @@ public sealed class IniciarCheckoutTests
         Assert.Equal(2, segundo.Lineas.Count);
         Assert.Equal(primero.Lineas.Single().LineaId, segundo.Lineas[0].LineaId);
         Assert.Equal(2, e.Checkouts.Todos.Single().Lineas.Count);
+    }
+
+    [Fact]
+    public async Task Con_el_checkout_en_pago_se_devuelve_con_su_pedido_y_la_reserva()
+    {
+        var e = EntornoDelCarrito.DeCliente();
+        var cuenta = e.Actor.Actual!.UsuarioId!.Value;
+        var libro = e.Impreso(5);
+        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(cuenta), Inicio);
+        carrito.Agregar(libro, false, 1, Inicio);
+        e.Carritos.Sembrar(carrito);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 1, 50m, libro, Sucursal.Principal)], Guid.NewGuid, Inicio);
+        checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
+        checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
+        checkout.ElegirRecojo(Inicio);
+        checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, carrito, Inicio);
+        checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito);
+        e.Checkouts.Sembrar(checkout);
+
+        var vista = (await Iniciar(e)).Valor;
+
+        Assert.Equal(EstadoVisibleDelCheckout.EnPago, vista.Estado);
+        Assert.Equal(checkout.PedidoId, vista.PedidoId);
+        Assert.Equal(Inicio.AddMinutes(15), vista.ReservaExpiraEn);
+        Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
     }
 
     [Fact]

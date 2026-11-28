@@ -297,4 +297,17 @@ public sealed class SolicitarDevolucionDeImpresoTests
         Assert.Empty(sinAuditoria.Repositorio.Todas);
         Assert.Empty(sinAuditoria.Repositorio.Cupos);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-01")]
+    public async Task El_resultado_no_lleva_el_responsable_ni_la_cuenta_ni_el_motivo_en_su_texto()
+    {
+        var (entorno, pedido, linea) = Preparar();
+
+        var resultado = await entorno.SolicitarImpreso.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId, motivo: "Mi DNI es 12345678"));
+
+        Assert.DoesNotContain("12345678", resultado.Valor.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678", JsonSerializer.Serialize(resultado.Valor), StringComparison.Ordinal);
+        Assert.DoesNotContain(entorno.Actor.Actual!.UsuarioId!.Value.ToString(), JsonSerializer.Serialize(resultado.Valor), StringComparison.OrdinalIgnoreCase);
+    }
 }

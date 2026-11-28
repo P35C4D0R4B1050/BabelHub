@@ -101,6 +101,18 @@ public sealed class TextoRedactadoYRetencionTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    public void Redactar_es_idempotente_y_reaplicable()
+    {
+        var devolucion = Reporte(out _);
+        Assert.True(devolucion.Redactar(Ahora, quitarElAcceso: true));
+        var redactadaEn = devolucion.RedactadaEn;
+
+        Assert.False(devolucion.Redactar(Ahora.AddDays(9), quitarElAcceso: true));
+        Assert.Equal(redactadaEn, devolucion.RedactadaEn);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-DEV-29")]
     public void La_redaccion_por_retencion_conserva_la_referencia_al_acceso_y_quita_solo_el_responsable_del_cliente()
     {
@@ -152,6 +164,16 @@ public sealed class TextoRedactadoYRetencionTests
         Assert.True(devolucion.EstaVencidaParaDepurar(hoy.AddDays(1)));
         devolucion.Redactar(Ahora.AddYears(2).AddDays(3), quitarElAcceso: false);
         Assert.False(devolucion.EstaVencidaParaDepurar(hoy.AddYears(1)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-29")]
+    public void Una_linea_no_final_impide_la_depuracion_aunque_hayan_pasado_los_dos_anios()
+    {
+        var devolucion = Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", TextoRedactado.Crear("Defecto", 300)!, null, [new NuevaLineaDeDevolucion(Guid.NewGuid(), Guid.NewGuid(), 1, 50m)], Ahora, ResponsableDelCambio.Cliente(Cliente));
+        devolucion.Aprobar(Ahora, ResponsableDelCambio.Personal(Personal));
+
+        Assert.False(devolucion.EstaVencidaParaDepurar(DateOnly.FromDateTime(Ahora.UtcDateTime).AddYears(10)));
     }
 
     [Fact]

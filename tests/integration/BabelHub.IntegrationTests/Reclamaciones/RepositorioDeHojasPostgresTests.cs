@@ -75,6 +75,18 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
         Assert.Equal((EstadoDeHoja.Respondido, AvisoDeRespuesta.Enviado, quien), (leida!.Estado, leida.AvisoDeRespuesta!.Value, leida.RespondidaPor!.Value));
     }
 
+    [Fact]
+    public async Task Descartar_y_marcar_la_cuenta_cancelada_se_guardan()
+    {
+        var hoja = Hoja(1, "clave-1");
+        await Agregar(hoja);
+        Assert.Equal(ResultadoDeTransicion.Hecha, hoja.Descartar(Inicio.AddHours(1)));
+        Assert.True(hoja.MarcarDeCuentaCancelada());
+        await Guardar(hoja);
+
+        Assert.Equivalent(hoja, await Leer(hoja.Id), strict: true);
+    }
+
     // ---------- Secuencia y clave ----------
 
     [Fact]

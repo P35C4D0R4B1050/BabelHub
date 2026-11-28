@@ -413,6 +413,26 @@ public sealed class IngresosDeMercaderiaTests
         Assert.Contains(new ErrorDeCampo("ingresoId", "pendiente-vencido"), vencido.Error.Errores);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-CAT-18")]
+    public async Task Dos_reintentos_seguidos_no_duplican_el_lote_porque_comparten_la_clave()
+    {
+        var e = new EntornoDelCatalogo();
+        var edicion = e.ImpresaSembrada();
+        e.Inventario.AplicaYNoResponde = true;
+        var servicio = e.IngresosDeMercaderia();
+        var primero = await servicio.Registrar(Ingreso(e, edicion));
+        e.Inventario.AplicaYNoResponde = false;
+
+        var a = await servicio.Reintentar(new ReintentarIngresoEntrada(primero.Valor.IngresoSolicitadoId));
+        var b = await servicio.Reintentar(new ReintentarIngresoEntrada(primero.Valor.IngresoSolicitadoId));
+
+        Assert.Equal(EstadoDeIngresoSolicitado.Registrado, a.Valor.Estado);
+        Assert.Equal(ClavesDelCatalogo.IngresoYaResuelto, b.Error!.Clave);
+        Assert.Single(e.Inventario.Ingresos);
+        Assert.Equal(30, e.Inventario.Ediciones[edicion].Sum(f => f.Vendible));
+    }
+
     // ---------- Lista (CAT-22) ----------
 
     [Fact]
@@ -434,6 +454,22 @@ public sealed class IngresosDeMercaderiaTests
         Assert.Equal(EstadoDeIngresoSolicitado.Pendiente, pendiente.Estado);
         Assert.Equal(primero.Valor.IngresoSolicitadoId, pendiente.IngresoSolicitadoId);
         Assert.Equal(e.UsuarioId, pendiente.UsuarioId);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-18")]
+    public async Task La_lista_ignora_un_inventario_que_devuelve_ingresos_de_otra_edicion()
+    {
+        var e = new EntornoDelCatalogo();
+        var edicion = e.ImpresaSembrada();
+        var otra = e.ImpresaSembrada("0-306-40615-2");
+        await e.IngresosDeMercaderia().Registrar(Ingreso(e, otra));
+        e.Inventario.Ingresos.Add(new IngresoDelInventario(Guid.NewGuid(), otra, "RECEPCION", 9, null, null, null, e.Reloj.Ahora));
+
+        var lista = await e.IngresosDeMercaderia().Listar(new ListarIngresosEntrada(edicion));
+
+        Assert.Empty(lista.Valor.Ingresos);
+        Assert.False(lista.Valor.InventarioNoRespondio);
     }
 
     [Fact]

@@ -123,9 +123,26 @@ public sealed class ConciliacionDeReembolsosTests
         Assert.Equal(EstadoDeLineaDeDevolucion.Recibida, Guardada(sistema, id).Lineas[0].Estado);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-08")]
+    public async Task Solo_el_sistema_concilia_y_el_almacen_caido_es_servicio_no_disponible()
+    {
+        var (sistema, _) = await ConRecibidaPendiente();
+        var comoAdmin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(sistema);
+        sistema.Repositorio.NoDisponible = true;
+
+        var prohibido = await comoAdmin.Conciliacion.Ejecutar(10);
+
+        Assert.Equal(CategoriaDeError.Prohibido, prohibido.Error!.Categoria);
+        sistema.Repositorio.NoDisponible = true;
+        var caido = await sistema.Conciliacion.Ejecutar(10);
+        Assert.Equal(CategoriaDeError.NoDisponible, caido.Error!.Categoria);
+    }
+
     [Theory]
     [Trait("Criterio", "AC-DEV-08")]
     [InlineData("cliente")]
+    [InlineData("encargado")]
     [InlineData("anonimo")]
     [InlineData("integracion")]
     public async Task Un_actor_que_no_es_el_sistema_no_concilia_y_cada_intento_deja_un_evento(string quien)

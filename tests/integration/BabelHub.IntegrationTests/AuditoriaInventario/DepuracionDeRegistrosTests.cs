@@ -141,6 +141,24 @@ public sealed class DepuracionDeRegistrosTests(PostgresDeAuditoriaFixture bd) : 
     [Theory]
     [MemberData(nameof(Esquemas))]
     [Trait("Criterio", "AC-AUD-09")]
+    public async Task RepetirLaDepuracionElMismoDiaNoCambiaNadaYDevuelveCero(string esquema, string rolDeEsquema)
+    {
+        await LimpiarPorAnonimizar(esquema);
+        var cuenta = Guid.NewGuid();
+        await Sembrar(esquema, rolDeEsquema, "3 years", actor: Guid.NewGuid());
+        await Sembrar(esquema, rolDeEsquema, "1 day", actor: cuenta, rol: "cliente");
+        await Cancelar(esquema, rolDeEsquema, cuenta);
+
+        Assert.True(await Depurar(esquema) >= 2);
+        var instantaneas = await bd.Consultar<string>($"SELECT string_agg(r::text, '|' ORDER BY secuencia) FROM {esquema}.registros r");
+
+        Assert.Equal(0, await Depurar(esquema));
+        Assert.Equal(instantaneas, await bd.Consultar<string>($"SELECT string_agg(r::text, '|' ORDER BY secuencia) FROM {esquema}.registros r"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Esquemas))]
+    [Trait("Criterio", "AC-AUD-09")]
     public async Task UnaCuentaCanceladaDespuesDeUnaAnonimizacionParcialAnonimizaLoQueQuede(string esquema, string rolDeEsquema)
     {
         await LimpiarPorAnonimizar(esquema);

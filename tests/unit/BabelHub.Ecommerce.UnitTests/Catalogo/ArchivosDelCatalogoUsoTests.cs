@@ -292,6 +292,27 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
+    public async Task Un_libro_reemplazado_a_los_30_dias_deja_su_objeto_borrado_aunque_su_fila_consumida_ya_se_purgo()
+    {
+        var e = new EntornoDelCatalogo();
+        var obra = await e.ObraRegistrada("Reemplazo", e.EdicionDigital());
+        var digital = obra.Ediciones[0];
+        var claveAnterior = digital.Archivo!.ClaveDelAlmacen;
+        await e.Almacen.Escribir(claveAnterior, FinalidadDeArchivo.Libro, new MemoryStream(Epub()));
+        e.Reloj.Ahora = e.Reloj.Ahora.AddDays(30);
+        await e.Depurador().Ejecutar(default);
+        Assert.DoesNotContain(e.Referencias.Todas, r => r.Estado == EstadoDeReferencia.Consumida);
+        var nuevo = await e.Archivos().SubirArchivo(Subida(FinalidadDeLaSubida.Libro, Epub(300)));
+
+        await e.EditarEdicion().Ejecutar(new EditarEdicionEntrada(obra.Id, digital.Id, obra.Version, null, null, nuevo.Valor.ReferenciaId));
+        var depuracion = await e.Depurador().Ejecutar(default);
+
+        Assert.DoesNotContain(claveAnterior, e.Almacen.Objetos.Keys);
+        Assert.True(depuracion.Valor.ObjetosBorrados >= 1);
+        Assert.Contains((await e.Obras.Obtener(obra.Id, false))!.Ediciones[0].Archivo!.ClaveDelAlmacen, e.Almacen.Objetos.Keys);
+    }
+
+    [Fact]
     public async Task Un_objeto_que_no_se_pudo_borrar_deja_su_fila_para_la_corrida_siguiente_y_solo_el_sistema_depura()
     {
         var e = new EntornoDelCatalogo();

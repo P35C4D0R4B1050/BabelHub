@@ -91,6 +91,38 @@ public sealed class ContratoDePlataformaTests
         Assert.True(OrigenDeSolicitud.Desconocido.Huella.EsDesconocido);
     }
 
+    [Fact]
+    public void ActorActual_DeUsuario_ConservaRolYSucursal()
+    {
+        var usuario = Guid.NewGuid();
+        var sucursal = Guid.NewGuid();
+
+        var actor = ActorActual.DeUsuario(usuario, "encargado", sucursal);
+
+        Assert.Equal(TipoDeActor.Usuario, actor.Tipo);
+        Assert.Equal(usuario, actor.UsuarioId);
+        Assert.Equal("encargado", actor.Rol);
+        Assert.Equal(sucursal, actor.SucursalId);
+    }
+
+    [Fact]
+    public void ActorActual_ConDatosInvalidos_Lanza()
+    {
+        Assert.Throws<ArgumentException>(() => ActorActual.DeUsuario(Guid.Empty, "cliente"));
+        Assert.Throws<ArgumentException>(() => ActorActual.DeUsuario(Guid.NewGuid(), " "));
+        Assert.Throws<ArgumentException>(() => ActorActual.DeIntegracion(""));
+    }
+
+    [Fact]
+    public void ActorActual_DelSistemaYDeIntegracion_NoTraenUsuario()
+    {
+        Assert.Null(ActorActual.DelSistema().UsuarioId);
+        var integracion = ActorActual.DeIntegracion("culqi");
+        Assert.Equal(TipoDeActor.Integracion, integracion.Tipo);
+        Assert.Equal("culqi", integracion.Integracion);
+        Assert.Null(integracion.Rol);
+    }
+
     [Theory]
     [InlineData("identidad")]
     [InlineData("notificaciones")]

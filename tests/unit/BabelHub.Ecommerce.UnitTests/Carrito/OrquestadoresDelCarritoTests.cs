@@ -136,6 +136,20 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAR-18")]
+    public async Task Un_visitante_no_pasa_por_la_posesion_porque_no_tiene_cuenta()
+    {
+        var e = EntornoDelCarrito.DeVisitante();
+        var digital = e.Digital();
+        e.Posesion.Poseer(digital);
+
+        var resultado = await Agregar(e, digital, 1);
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(0, e.Posesion.Consultas);
+    }
+
+    [Fact]
     public async Task Una_edicion_que_el_catalogo_no_ofrece_se_rechaza()
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -223,6 +237,16 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
+    public async Task Un_visitante_no_consulta_a_Identidad()
+    {
+        var e = EntornoDelCarrito.DeVisitante();
+
+        await Agregar(e, e.Impreso(5), 1);
+
+        Assert.Equal(0, e.Cuenta.Consultas);
+    }
+
+    [Fact]
     public async Task Un_limite_excedido_responde_limite_con_el_instante_de_reintento_y_uno_sin_almacen_falla_cerrado()
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -300,6 +324,18 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
+    public async Task Una_cookie_desconocida_es_sin_carrito_al_ver_y_se_borra()
+    {
+        var e = EntornoDelCarrito.DeVisitante();
+
+        var resultado = await Obtener(e, new string('A', 43));
+
+        Assert.Empty(resultado.Valor.Carrito.Lineas);
+        Assert.True(resultado.Valor.BorrarLaCookie);
+        Assert.Null(resultado.Valor.CookieNueva);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-CAR-25")]
     public async Task Un_visitante_que_lleva_31_dias_sin_volver_encuentra_su_carrito_caducado()
     {
@@ -307,6 +343,19 @@ public sealed class OrquestadoresDelCarritoTests
         var libro = e.Impreso(5);
         var primera = await Agregar(e, libro, 1);
         e.Reloj.Ahora = EntornoDelCarrito.Inicio.AddDays(31);
+
+        var vista = await Obtener(e, primera.Valor.CookieNueva);
+
+        Assert.Empty(vista.Valor.Carrito.Lineas);
+        Assert.True(vista.Valor.BorrarLaCookie);
+    }
+
+    [Fact]
+    public async Task Una_cookie_de_un_carrito_fusionado_es_sin_carrito()
+    {
+        var e = EntornoDelCarrito.DeVisitante();
+        var primera = await Agregar(e, e.Impreso(5), 1);
+        e.Carritos.Todos.Single().MarcarFusionado(EntornoDelCarrito.Inicio);
 
         var vista = await Obtener(e, primera.Valor.CookieNueva);
 

@@ -256,6 +256,24 @@ public Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(C
 
     [Fact]
     [Trait("Criterio", "AC-CAT-18")]
+    public void Las_opciones_del_almacen_y_del_catalogo_no_imprimen_claves()
+    {
+        var secreta = "secreta-" + Guid.NewGuid().ToString("N") + "-de-prueba";
+        var acceso = "acceso-" + Guid.NewGuid().ToString("N") + "-de-prueba";
+        var almacen = new OpcionesDelAlmacenDelCatalogo(new Uri("https://almacen.ejemplo.pe"), "sa-lima-1", acceso, new ValorSecreto(secreta));
+        var composicion = new BabelHub.Ecommerce.Infrastructure.Composicion.OpcionesDelCatalogo(null!, "clave-de-firma-" + Guid.NewGuid().ToString("N"), "anterior-" + Guid.NewGuid().ToString("N"));
+
+        foreach (var texto in new[] { almacen.ToString(), composicion.ToString() })
+        {
+            Assert.DoesNotContain("secreta-", texto, StringComparison.Ordinal);
+            Assert.DoesNotContain("acceso-", texto, StringComparison.Ordinal);
+            Assert.DoesNotContain("clave-de-firma-", texto, StringComparison.Ordinal);
+            Assert.DoesNotContain("anterior-", texto, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-18")]
     public void El_adaptador_no_abre_un_cliente_http_ni_toca_el_token()
     {
         var campos = typeof(ClienteDelInventarioDelCatalogo).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);

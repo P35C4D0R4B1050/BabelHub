@@ -67,6 +67,17 @@ public sealed class PagoApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Falta_un_campo_o_sobra_uno_es_validacion()
+    {
+        using var sinMedio = await _host.Enviar("/checkout/pago", Cobro().Where(c => c.Key != "medio"));
+        using var conSobrante = await _host.Enviar("/checkout/pago", [.. Cobro(), C("total", "1")]);
+
+        Assert.Equal(HttpStatusCode.BadRequest, sinMedio.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, conSobrante.StatusCode);
+        Assert.Empty(_host.Pagos.Llamadas);
+    }
+
+    [Fact]
     public async Task Sin_token_antifalsificacion_no_se_llega_a_Pagos()
     {
         using var sinToken = await _host.Enviar("/checkout/pago", Cobro(), conToken: false);
@@ -201,6 +212,18 @@ public sealed class PagoApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Si_no_se_puede_pagar_ahora_no_se_emite_la_clave()
+    {
+        _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(new EstadoDelPagoVista(EstadoDelPagoDeLaCompra.ConfirmandoElPago, null, null, null, false));
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"/checkout/pago?pedidoId={Pedido:D}", html: true));
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.Equal(["estado"], _host.Pagos.Llamadas);
+        Assert.DoesNotContain("name=\"claveDeIntento\"", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PAG-05")]
     public async Task Tras_un_rechazo_la_pantalla_dice_el_motivo_en_palabras_de_la_persona()
     {
@@ -294,6 +317,23 @@ public sealed class PagoApiTests : IAsyncLifetime
 
         var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
         Assert.Contains("Estamos confirmando tu pago", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("estará disponible pronto", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-42")]
+    [InlineData("/checkout/pago")]
+    [InlineData("/checkout/pago/estado")]
+    public async Task Sin_pasarela_una_compra_ya_cerrada_con_un_rechazo_anterior_conserva_su_estado_sin_invitar_a_reintentar(string ruta)
+    {
+        // Resto de cuando había pasarela: el último intento se rechazó y la compra ya no admite pagos.
+        _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(SinCobro(EstadoDelPagoDeLaCompra.Cerrado) with { UltimoMotivo = MotivoDeRechazoDePago.TarjetaVencida });
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"{ruta}?pedidoId={Pedido:D}", html: true));
+
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("Esta compra ya no admite pagos", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("intentarlo de nuevo", html, StringComparison.Ordinal);
         Assert.DoesNotContain("estará disponible pronto", html, StringComparison.Ordinal);
     }
 

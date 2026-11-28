@@ -27,6 +27,69 @@ public sealed class RegistrosInmutablesTests(PostgresDeAuditoriaFixture bd) : IC
     // ---------- T22: la forma de las tablas ----------
 
     [Fact]
+    [Trait("Criterio", "AC-AUD-06")]
+    public async Task LaMigracionCreaLasTablasDelModuloConSuPropietarioDeMigraciones()
+    {
+        foreach (var tabla in new[] { "registros", "alertas", "acumulado_de_limites", "por_anonimizar", "alertas_ya_enviadas", "marca_de_lectura_de_alertas", "estado_de_depuracion", "politica_de_anonimizacion" })
+        {
+            Assert.Equal("auditoria_migraciones", await bd.Consultar<string>($"SELECT tableowner FROM pg_tables WHERE schemaname = 'auditoria' AND tablename = '{tabla}'"));
+        }
+
+        Assert.Equal("auditoria_migraciones", await bd.Consultar<string>("SELECT tableowner FROM pg_tables WHERE schemaname = 'identidad' AND tablename = 'registros'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-06")]
+    public async Task LaMigracionEsIdempotente()
+    {
+        await bd.Ejecutar(DefinicionDeAuditoria.Roles + DefinicionDeAuditoria.Tablas + DefinicionDeAuditoria.RegistrosInmutables("auditoria") + DefinicionDeAuditoria.PoliticaDesdeElCatalogo(PostgresDeAuditoriaFixture.Catalogo));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-06")]
+    public async Task LosIndicesDeConsultaYElDeTextoEstan()
+    {
+        var indices = new HashSet<string>();
+        await using var comando = bd.Administracion.CreateCommand("SELECT indexname FROM pg_indexes WHERE schemaname = 'auditoria' AND tablename = 'registros'");
+        await using var lector = await comando.ExecuteReaderAsync();
+        while (await lector.ReadAsync())
+        {
+            indices.Add(lector.GetString(0));
+        }
+
+        Assert.Contains("registros_por_instante", indices);
+        Assert.Contains("registros_por_texto", indices);
+        Assert.Contains("registros_un_acceso_denegado_por_correlacion", indices);
+        Assert.Contains("registros_de_umbral", indices);
+        Assert.Equal("gin", await bd.Consultar<string>("SELECT am.amname FROM pg_class c JOIN pg_am am ON am.oid = c.relam WHERE c.relname = 'registros_por_texto' AND c.relnamespace = 'auditoria'::regnamespace"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Esquemas))]
+    [Trait("Criterio", "AC-AUD-06")]
+    public async Task LaSecuenciaLaAsignaLaBaseYSoloCrece(string esquema, string rol)
+    {
+        await bd.EjecutarComoLaAplicacion(rol, Insertar(esquema));
+        await bd.EjecutarComoLaAplicacion(rol, Insertar(esquema));
+
+        var secuencias = new List<long>();
+        await using var comando = bd.Administracion.CreateCommand($"SELECT secuencia FROM {esquema}.registros ORDER BY secuencia");
+        await using var lector = await comando.ExecuteReaderAsync();
+        while (await lector.ReadAsync())
+        {
+            secuencias.Add(lector.GetInt64(0));
+        }
+
+        Assert.True(secuencias.Count >= 2);
+        Assert.Equal(secuencias.Order(), secuencias);
+        Assert.Equal(secuencias.Count, secuencias.Distinct().Count());
+
+        // La aplicación no elige la secuencia.
+        var error = await PostgresDeAuditoriaFixture.IntentarComo(bd.Acceso, rol, Insertar(esquema).Replace("INSERT INTO " + esquema + ".registros (id,", "INSERT INTO " + esquema + ".registros (secuencia, id,", StringComparison.Ordinal).Replace("VALUES ('", "VALUES (1, '", StringComparison.Ordinal));
+        Assert.NotNull(error);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-AUD-21")]
     public async Task ElIndiceUnicoParcialDejaUnSoloAccesoDenegadoPorServicioCorrelacionYMotivo_PeroNoLimitaLasDemasAcciones()
     {

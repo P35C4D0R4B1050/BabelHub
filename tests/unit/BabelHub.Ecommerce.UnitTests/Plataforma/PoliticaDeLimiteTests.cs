@@ -235,4 +235,10 @@ public sealed class PoliticaDeLimiteTests
         Assert.Equal(esperado, respuesta.EsperaEnSegundos);
         Assert.Equal(Ahora + TimeSpan.FromSeconds(segundos), respuesta.DisponibleDesde);
     }
+
+    [Fact]
+    public void RespuestaDeLimite_ConUnInstanteQueYaPaso_Lanza()
+    {
+        Assert.Throws<ArgumentException>(() => RespuestaDeLimite.Crear("motivo", Ahora, Ahora));
+    }
 }

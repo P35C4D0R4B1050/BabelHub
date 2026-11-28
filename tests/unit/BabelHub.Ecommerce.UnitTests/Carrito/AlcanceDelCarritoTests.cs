@@ -18,6 +18,8 @@ public sealed class AlcanceDelCarritoTests
 
     [Theory]
     [InlineData("encargado")]
+    [InlineData("logistica")]
+    [InlineData("administrador")]
     [InlineData("sistema")]
     [InlineData("integracion")]
     [InlineData("sin-contexto")]
@@ -167,9 +169,25 @@ public sealed class AlcanceDelCarritoTests
 
     [Theory]
     [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
     [InlineData("corta")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA ")]
     [InlineData("ÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁÁ")]
     public void Una_cookie_mal_formada_no_tiene_huella_y_es_sin_carrito(string? cookie) => Assert.False(HuellaDeLaCookie.TryDe(cookie, out _));
+
+    [Fact]
+    public void Dos_cookies_distintas_dan_huellas_distintas()
+    {
+        var a = new string('A', 43);
+        var b = new string('B', 43);
+
+        Assert.True(HuellaDeLaCookie.TryDe(a, out var ha));
+        Assert.True(HuellaDeLaCookie.TryDe(b, out var hb));
+        Assert.NotEqual(ha, hb);
+    }
 }

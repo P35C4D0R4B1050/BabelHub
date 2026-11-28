@@ -116,6 +116,26 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-10")]
+    public async Task El_reembolso_de_un_digital_avisa_aprobada_y_reembolsada_y_con_la_pasarela_caida_solo_aprobada()
+    {
+        var conPasarela = new EntornoDeDevoluciones();
+        var sinPasarela = new EntornoDeDevoluciones();
+        sinPasarela.Reembolsos.ProcesarResponde = EstadoDelReembolso.Pendiente;
+        foreach (var entorno in new[] { conPasarela, sinPasarela })
+        {
+            var digital = EntornoDeDevoluciones.Digital();
+            var pedido = new PedidoParaDevolucionesParaPruebas(entorno, digital).Pedido;
+            entorno.Accesos.Sembrar(pedido.CuentaId, pedido.PedidoId, digital.EdicionId);
+            var pedida = await entorno.SolicitarDigital.Ejecutar(new PedirReembolsoDeDigitalEntrada(pedido.PedidoId, digital.LineaId, new TextoLibre(MotivoSembrado)));
+            Assert.True(pedida.EsExito);
+        }
+
+        Assert.Equal(["aprobada", "reembolsada"], Avisos(conPasarela).Select(a => a.Campos["estado"]));
+        Assert.Equal(["aprobada"], Avisos(sinPasarela).Select(a => a.Campos["estado"]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-10")]
     public async Task El_evento_es_determinista_y_repetir_la_aprobacion_no_avisa_otra_vez()
     {
         var e = await ConSolicitada();
@@ -214,6 +234,24 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
         var reingreso = entradas.Single(s => s.Accion.ToString() == "ReingresoPorDevolucion");
         Assert.Equal("120.00", reingreso.Detalle["monto"]);
         Assert.Equal(e.PedidoId.ToString(), reingreso.Detalle["pedidoId"]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-11")]
+    public async Task El_rechazo_por_plazo_se_audita_con_el_pedido_y_el_monto_como_sistema()
+    {
+        var e = await ConSolicitada();
+        var admin = Como(ActorDePrueba.DeAdministradorCentral(), e);
+        await admin.Gestion.Aprobar(e.DevolucionId);
+        var sistema = Como(ActorDePrueba.DelSistema(), e);
+        sistema.Reloj.Ahora = Ahora.AddDays(11);
+
+        await sistema.Vencidas.Ejecutar(10);
+
+        var rechazo = sistema.Auditoria.Solicitudes.Last();
+        Assert.Equal("rechazada", rechazo.Detalle["estadoNuevo"]);
+        Assert.Equal(e.PedidoId.ToString(), rechazo.Detalle["pedidoId"]);
+        Assert.Equal("120.00", rechazo.Detalle["monto"]);
     }
 
     // ---------- Sin el motivo ni el texto (DEV-29, AC-DEV-31) ----------

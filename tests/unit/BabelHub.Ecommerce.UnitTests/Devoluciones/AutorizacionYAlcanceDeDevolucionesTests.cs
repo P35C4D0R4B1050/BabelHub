@@ -107,6 +107,17 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-23")]
+    public async Task Un_rol_sin_permiso_se_rechaza_antes_de_consultar_a_Identidad()
+    {
+        var entorno = new EntornoDeDevoluciones(ActorDePrueba.DeEncargadoDe(Sucursal));
+
+        await entorno.Autorizador.ExigirCliente(default);
+
+        Assert.Equal(0, entorno.Cuentas.Consultas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-23")]
     public async Task Una_cuenta_inexistente_o_cancelada_no_es_una_sesion_valida_y_con_Identidad_caida_es_no_disponible()
     {
         var inexistente = new EntornoDeDevoluciones();

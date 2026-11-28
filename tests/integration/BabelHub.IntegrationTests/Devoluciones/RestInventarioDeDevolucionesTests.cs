@@ -174,6 +174,18 @@ public sealed class RestInventarioDeDevolucionesTests
         Assert.Empty(ClienteDelInventarioEspia.Reingresos);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-07")]
+    public async Task Veinte_lineas_es_el_maximo_que_se_envia()
+    {
+        var (adaptador, _) = Crear();
+
+        var resultado = await adaptador.Reingresar(Carga(20));
+
+        Assert.IsType<ResultadoDelReingreso.Reingresado>(resultado);
+        Assert.Equal(20, Assert.Single(ClienteDelInventarioEspia.Reingresos).Lineas.Count);
+    }
+
     // ---------- Las sucursales activas ----------
 
     [Fact]

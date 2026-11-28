@@ -116,6 +116,20 @@ public sealed partial class ContactoYPieTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-COM-04")]
+    public async Task Un_sustituto_suelto_en_la_direccion_no_rompe_el_pie_ni_se_escribe_crudo()
+    {
+        var contacto = LeerContacto("987654321", "atencion@tienda.example", "Jr. Callao 123\uD800");
+        await using var a = await AnfitrionWeb.Iniciar(s => { s.RemoveAll<DatosDeContacto>(); s.AddSingleton(contacto); });
+
+        var (respuesta, _) = await Pedir(a, "/");
+        var (pagina, _) = await Pedir(a, "/contacto");
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, pagina.StatusCode);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-COM-01")]
     public async Task Sin_el_contacto_registrado_el_pie_omite_el_bloque_y_la_pagina_responde_servicio_no_disponible_y_no_un_error()
     {

@@ -251,6 +251,16 @@ public sealed class GuardaYDoblesDePagosTests
 
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Ninguna")]
+    [InlineData("NINGUNA")]
+    [InlineData("ninguno")]
+    public void El_nombre_de_sin_pasarela_es_exacto(string pasarela)
+    {
+        Assert.Contains(GuardaDeArranqueDePagos.VariablePasarela, Rechaza(Opciones(pasarela: pasarela, entorno: "Staging", nula: true)).Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
     [InlineData("ninguna", false, true)]
     [InlineData("simulador", false, false)]
     [InlineData("culqi", false, false)]

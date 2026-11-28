@@ -406,6 +406,18 @@ public sealed class EvaluarLimiteTests
     }
 
     [Fact]
+    public async Task Reservar_ConElSujetoMalIndicado_Lanza()
+    {
+        var huella = HuellaDeSujeto.Crear(Resumen, "v1");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(Reservas));
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(Reservas, sujeto: "u-1", huellaDelLlamador: huella));
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(PoliticasDeLimite.RegistrosPorOrigen, sujeto: "u-1"));
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(Avisos, sujeto: "u-1"));
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(new ClaveDePolitica("no-existe"), sujeto: "u-1"));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-SEG-29")]
     public async Task Reservar_ConLaDireccionReenviadaIgnorada_NoCuentaLosLimitesPorOrigenYSiElTopeDeLaDireccionDirecta()
     {
@@ -426,6 +438,12 @@ public sealed class EvaluarLimiteTests
 
         Assert.Equal(EstadoDeLimite.Excedido, rechazo.Estado);
         Assert.All(_motor.ContadoresUsados, c => Assert.StartsWith("d:", c, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Reservar_ConLaPoliticaDeLaDireccionDirectaYSujeto_Lanza()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(Directa, sujeto: "u-1"));
     }
 
     private async Task<ResultadoDeLimite> Agotar(ClaveDePolitica politica, int cupos)

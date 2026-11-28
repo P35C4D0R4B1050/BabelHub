@@ -116,6 +116,42 @@ public sealed class EdicionConCheckoutVivoTests
     }
 
     [Fact]
+    public async Task Con_el_checkout_en_edicion_no_se_llama_a_Pagos()
+    {
+        var (e, checkout, _, libro) = EnPago();
+        checkout.Editar(e.Carritos.Todos.Single(), Inicio);
+        var antes = e.Pagos.Reaperturas;
+
+        var resultado = await Modificar(e, libro, 5);
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(antes, e.Pagos.Reaperturas);
+    }
+
+    [Fact]
+    public async Task Un_visitante_nunca_llama_a_Pagos()
+    {
+        var e = EntornoDelCarrito.DeVisitante();
+
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(5), 1, CodigoDeSucursal: Sucursal.Principal));
+
+        Assert.Equal(0, e.Pagos.Reaperturas);
+    }
+
+    [Fact]
+    public async Task Si_otra_solicitud_ya_lo_devolvio_a_edicion_entre_Reabrir_y_el_bloqueo_esta_edita_con_normalidad()
+    {
+        var (e, checkout, carrito, libro) = EnPago();
+        e.Pagos.EnLaCarreraDeReabrir = () => checkout.Editar(carrito, Inicio);
+
+        var resultado = await Modificar(e, libro, 5);
+
+        // Otra solicitud ya lo devolvió a edición: esta no necesita reabrir y edita con normalidad (sin doble edición ni estado atascado).
+        Assert.True(resultado.EsExito);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+    }
+
+    [Fact]
     public async Task Si_el_checkout_cambia_a_otro_estado_vivo_entre_Reabrir_y_el_bloqueo_responde_en_curso()
     {
         var (e, checkout, carrito, libro) = EnPago();
@@ -145,5 +181,18 @@ public sealed class EdicionConCheckoutVivoTests
         Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
         var aviso = Assert.Single(resultado.Valor.Carrito.Avisos);
         Assert.Equal(otro, aviso.EdicionId);
+    }
+
+    [Fact]
+    public async Task Quitar_una_linea_tambien_reabre_la_intencion()
+    {
+        var (e, checkout, carrito, libro) = EnPago();
+
+        var resultado = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(e.LineaDe(libro)));
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(1, e.Pagos.Reaperturas);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+        Assert.Empty(carrito.Lineas);
     }
 }

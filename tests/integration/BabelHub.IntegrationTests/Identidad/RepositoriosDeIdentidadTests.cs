@@ -165,6 +165,7 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
         Assert.Null(await _cuentas.EncargadoActivoDe(Guid.NewGuid()));
     }
 
+
     [Fact]
     [Trait("Criterio", "AC-WEB-29")]
     public async Task ListarCuentas_FiltraPorRolEstadoYCorreo_PaginaPorElUltimoCorreo_YSinCorreoNoEntregaClientes()
@@ -208,6 +209,18 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
         Assert.Null(await _cuentas.PorId(id));
         Assert.Equal(0, await _bd.Consultar<long>($"SELECT count(*) FROM identidad.avisos_de_cuenta WHERE usuario_id = '{id}'"));
         Assert.Equal(0, await _bd.Consultar<long>($"SELECT count(*) FROM identidad.dispositivos WHERE usuario_id = '{id}'"));
+    }
+
+    [Fact]
+    public async Task LasVersionesDeLosTextos_SeLeen_YSinSembrarFallaClaro()
+    {
+        var versiones = new PostgresVersionesDeTextosVigentes(_bd.AccesoAlEsquema);
+        await _bd.Ejecutar("DELETE FROM identidad.versiones_de_textos");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => versiones.Obtener());
+
+        await _bd.Ejecutar("INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 't2', 'p2', 'r2')");
+
+        Assert.Equal(new VersionesDeTextos("t2", "p2", "r2"), await versiones.Obtener());
     }
 
     // ---------------------------------------------------------------- códigos de un solo uso
@@ -538,6 +551,26 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
+    public async Task UnaCancelacionAbiertaPorUsuario_SeGuardaSeLeeYSeCierra()
+    {
+        var repositorio = new PostgresRepositorioDeCancelaciones(_bd.AccesoAlEsquema);
+        var usuario = (await Insertada()).Usuario.Id;
+        var solicitud = SolicitudDeCancelacion.Diferir(Guid.NewGuid(), usuario, Ahora);
+        await repositorio.Guardar(solicitud);
+
+        Assert.Equal(solicitud.Id, (await repositorio.AbiertaDe(usuario))!.Id);
+        await Assert.ThrowsAnyAsync<Exception>(() => repositorio.Guardar(SolicitudDeCancelacion.Diferir(Guid.NewGuid(), usuario, Ahora.AddMinutes(1))));
+
+        Assert.True(solicitud.Desistir(Ahora.AddDays(30)));
+        await repositorio.Guardar(solicitud);
+
+        Assert.Null(await repositorio.AbiertaDe(usuario));
+        Assert.Equal(EstadoDeCancelacion.Descartada, (await repositorio.UltimaDe(usuario))!.Estado);
+        Assert.Equal(Ahora.AddDays(30), (await repositorio.UltimaDe(usuario))!.CerradaEn);
+        Assert.Null(await repositorio.UltimaDe(Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task LaRevisionDeCancelaciones_TomaCadaAbiertaConSkipLocked_YDosRevisionesNoComparten()
     {
         var repositorio = new PostgresRepositorioDeCancelaciones(_bd.AccesoAlEsquema);
@@ -697,6 +730,25 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
         Assert.True(JwkEs256.TryLeerLaPublica(publicas[activaDespues.Kid], out var publica));
         var firma = activaDespues.Clave.SignData(new byte[] { 1, 2, 3 }, HashAlgorithmName.SHA256);
         Assert.True(publica.VerifyData(new byte[] { 1, 2, 3 }, firma, HashAlgorithmName.SHA256));
+    }
+
+    [Fact]
+    public async Task UnaClaveGeneradaCuyaTransaccionSeRevierte_NoDejaNada()
+    {
+        var almacen = new PostgresAlmacenDeClavesDeFirma(_bd.AccesoAlEsquema);
+        var cifrador = new AesGcmCifradorDeSecretos(ClaveVersionadaDeIdentidad.Analizar($"v1:{Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))}", "c"));
+        var generador = new Es256GeneradorDeClavesDeFirma(cifrador, almacen);
+        var antes = await _bd.Consultar<long>("SELECT count(*) FROM identidad.claves_de_firma");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _bd.Unidad.Ejecutar<int>(
+            async ct =>
+            {
+                await generador.Generar(Ahora, ct);
+                throw new InvalidOperationException("La rotación falló.");
+            },
+            CancellationToken.None));
+
+        Assert.Equal(antes, await _bd.Consultar<long>("SELECT count(*) FROM identidad.claves_de_firma"));
     }
 
     private sealed class RelojDeCachePrueba(DateTimeOffset inicio) : TimeProvider

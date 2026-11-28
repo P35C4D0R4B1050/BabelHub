@@ -230,6 +230,20 @@ public sealed class PantallasDelCheckoutTests
     }
 
     [Fact]
+    public async Task La_entrega_elegida_se_marca_con_texto_y_el_contacto_guardado_rellena_el_formulario_de_domicilio()
+    {
+        var contacto = new ContactoDeCompra("Ana Pérez Quispe", "987654321", "Jr. Lima 123", "ayacucho");
+        await using var anfitrion = await Iniciar(Con(Vista(Mixto, paso: 3, tipo: TipoDeEntregaDeCompra.Domicilio, envio: 12m, contacto: contacto)));
+
+        var (html, _) = await Pedir(anfitrion);
+
+        Assert.Contains("Elegido", html, StringComparison.Ordinal);
+        Assert.Contains("value=\"Ana Pérez Quispe\"", html, StringComparison.Ordinal);
+        Assert.Contains("value=\"987654321\"", html, StringComparison.Ordinal);
+        Assert.Contains("value=\"Jr. Lima 123\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-CAR-26")]
     public async Task Un_error_de_validacion_se_dice_junto_al_campo_con_su_aria_y_lo_escrito_solo_vive_en_esa_respuesta()
     {
@@ -340,6 +354,22 @@ public sealed class PantallasDelCheckoutTests
         Assert.DoesNotContain("Tus datos y aceptaciones", antes, StringComparison.Ordinal);
         Assert.Contains("Tus datos y aceptaciones", conDigital, StringComparison.Ordinal);
         Assert.Contains("la política de cambios y devoluciones (reembolso de libros digitales)", conDigital, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Un_texto_ya_aceptado_en_su_version_vigente_sale_marcado_y_uno_de_otra_version_no()
+    {
+        var aceptadas = new[]
+        {
+            new AceptacionDeCompra(TextoLegalDeCompra.Terminos, "t-1", DateTimeOffset.UtcNow),
+            new AceptacionDeCompra(TextoLegalDeCompra.Privacidad, "p-0", DateTimeOffset.UtcNow),
+        };
+        await using var anfitrion = await Iniciar(Con(ConEntrega(Mixto, aceptadas)));
+
+        var (html, _) = await Pedir(anfitrion);
+
+        Assert.Matches("name=\"terminosVersion\" value=\"t-1\" checked", html);
+        Assert.DoesNotMatch("name=\"privacidadVersion\" value=\"p-1\" checked", html);
     }
 
     [Fact]

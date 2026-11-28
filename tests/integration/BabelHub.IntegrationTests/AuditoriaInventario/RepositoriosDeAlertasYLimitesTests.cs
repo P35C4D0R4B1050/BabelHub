@@ -111,6 +111,21 @@ public sealed class RepositoriosDeAlertasYLimitesTests(PostgresDeAuditoriaFixtur
     }
 
     [Fact]
+    [Trait("Criterio", "AC-AUD-26")]
+    public async Task PasadaLaVentanaDeQuinceMinutosOtraOcurrenciaAbreOtraAlerta()
+    {
+        var e = new Entorno(bd);
+        var inicio = Cronologia.Siguiente();
+
+        await e.Tecnica(MotivosDeAlerta.MemoriaDeContadoresAlta, inicio);
+        await e.Tecnica(MotivosDeAlerta.MemoriaDeContadoresAlta, inicio.AddMinutes(14));
+        await e.Tecnica(MotivosDeAlerta.MemoriaDeContadoresAlta, inicio.AddMinutes(15));
+
+        var filas = await e.Alertas.Desde(inicio.AddSeconds(-1), 5000);
+        Assert.Equal([2, 1], filas.Where(a => a.Motivo == MotivosDeAlerta.MemoriaDeContadoresAlta && a.PrimeraOcurrencia >= inicio.AddSeconds(-1).AddSeconds(-1)).OrderBy(a => a.PrimeraOcurrencia).Select(a => a.Ocurrencias));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-AUD-12")]
     public async Task MarcarRevisadaYSumarOcurrenciasALaVez_NoPierdenNiLaMarcaNiLasOcurrencias()
     {
@@ -179,9 +194,70 @@ public sealed class RepositoriosDeAlertasYLimitesTests(PostgresDeAuditoriaFixtur
         Assert.Equal(3, final.RevisadasHasta);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-AUD-13")]
+    public async Task LaListaDeSeguridadPaginaPorUltimaOcurrenciaSinLasTecnicas_YDesdeLeeEnOrdenAscendente()
+    {
+        var e = new Entorno(bd);
+        var origen = Cronologia.Siguiente();
+        for (var i = 0; i < 5; i++)
+        {
+            await e.Tecnica(MotivosDeAlerta.IngresosFallidos, origen.AddHours(i));
+        }
+
+        await e.Tecnica(MotivosDeAlerta.TrabajoDeFondoDetenido, origen.AddHours(9));
+
+        var primera = await e.Alertas.ListarDeSeguridad(null, 3);
+        var siguiente = await e.Alertas.ListarDeSeguridad(new PosicionDeAlerta(primera[^1].UltimaOcurrencia, primera[^1].Id), 3);
+
+        Assert.All(primera.Concat(siguiente), a => Assert.Equal(ClaseDeAlerta.Seguridad, a.Clase));
+        Assert.Equal(primera.Concat(siguiente).OrderByDescending(a => a.UltimaOcurrencia).ThenBy(a => a.Id, StringComparer.Ordinal).Select(a => a.Id), primera.Concat(siguiente).Select(a => a.Id));
+        Assert.Empty(primera.Select(a => a.Id).Intersect(siguiente.Select(a => a.Id)));
+
+        var ascendente = await e.Alertas.Desde(origen.AddSeconds(-1), 5000);
+        Assert.Equal(ascendente.OrderBy(a => a.UltimaOcurrencia).ThenBy(a => a.Id, StringComparer.Ordinal).Select(a => a.Id), ascendente.Select(a => a.Id));
+        Assert.Contains(ascendente, a => a.Clase == ClaseDeAlerta.Tecnica);
+    }
+
+    [Fact]
+    public async Task LaBaseRechazaUnaAlertaConContadoresIncoherentes()
+    {
+        var error = await PostgresDeAuditoriaFixture.IntentarComo(
+            bd.Acceso,
+            "rol_auditoria",
+            $"INSERT INTO auditoria.alertas (id, servicio, motivo, clase, primera_ocurrencia, ultima_ocurrencia, ocurrencias, revisadas_hasta) VALUES ('eco:{Guid.NewGuid():D}', 'ecommerce', 'accesos-denegados', 'seguridad', now(), now(), 2, 3)");
+
+        Assert.Equal("23514", error?.SqlState);
+    }
+
     // ---------- Acumulado de límites (AUD-28, AUD-41) ----------
 
     private static DateTimeOffset Ventana() => VentanaDeLimite.Que(DateTimeOffset.UtcNow.AddDays(-500).AddMinutes(-Random.Shared.Next(60, 500_000))).Inicio;
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-25")]
+    public async Task CincuentaRechazosYVeinteDespuesDeUnReinicioSonUnaFilaDeSetentaConLaDireccionCompleta()
+    {
+        var e = new Entorno(bd);
+        var ventana = Ventana();
+        var huella = "k" + Guid.NewGuid().ToString("N");
+
+        for (var i = 0; i < 50; i++)
+        {
+            Assert.Equal(ResultadoDeRegistroDeRechazo.Acumulado, await e.Acumulador.Registrar(huella, "registros-por-origen", ventana.AddSeconds(i), "2001:db8:0:0:0:0:0:1"));
+        }
+
+        // «Reinicio»: otro acumulador sobre la misma base sigue sumando a la misma ventana.
+        var otro = new PostgresAcumuladorDeLimites(bd.Acceso, new LimitadorDeEscrituras());
+        for (var i = 0; i < 20; i++)
+        {
+            await otro.Registrar(huella, "registros-por-origen", ventana.AddSeconds(100 + i), "2001:db8::1");
+        }
+
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
+        Assert.Equal(70, await bd.Consultar<int>($"SELECT rechazos FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
+        Assert.Equal("2001:db8::1", await bd.Consultar<string>($"SELECT direccion_completa FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
+    }
 
     [Fact]
     [Trait("Criterio", "AC-AUD-25")]
@@ -232,6 +308,23 @@ public sealed class RepositoriosDeAlertasYLimitesTests(PostgresDeAuditoriaFixtur
         await Assert.ThrowsAsync<ArgumentException>(() => e.Acumulador.Registrar("huella-valida-1234", "Con Mayusculas", ventana, null));
         await Assert.ThrowsAsync<ArgumentException>(() => e.Acumulador.Registrar("huella-valida-1234", "registros-por-origen", ventana, "no es una direccion; DROP"));
         Assert.Equal(0L, await bd.Consultar<long>($"SELECT count(*) FROM auditoria.acumulado_de_limites WHERE ventana_inicio = '{ventana:O}'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-25")]
+    public async Task UnRechazoQueLlegaAUnaVentanaCerradaSeInformaYNoSeAcumula()
+    {
+        var e = new Entorno(bd);
+        var ventana = Ventana();
+        var huella = "c" + Guid.NewGuid().ToString("N");
+        await e.Acumulador.Registrar(huella, "registros-por-origen", ventana, "203.0.113.5");
+        await e.Cerrables.GuardarCierre(ventana, ventana.AddMinutes(6));
+
+        var tardio = await e.Acumulador.Registrar(huella, "registros-por-origen", ventana.AddSeconds(30), "203.0.113.5");
+
+        Assert.Equal(ResultadoDeRegistroDeRechazo.VentanaCerrada, tardio);
+        Assert.Equal(1, await bd.Consultar<int>($"SELECT rechazos FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
+        Assert.Null(await bd.Consultar<string>($"SELECT direccion_completa FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
     }
 
     // ---------- Cierre: un solo evento, con el total y la dirección, y la dirección borrada (AC-AUD-25) ----------
@@ -297,5 +390,48 @@ public sealed class RepositoriosDeAlertasYLimitesTests(PostgresDeAuditoriaFixtur
         Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM auditoria.registros WHERE accion = 'LimiteExcedido' AND origen = '203.0.113.8'"));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-AUD-25")]
+    public async Task LasVentanasCerradasSePurganA24HorasDelCierre()
+    {
+        var e = new Entorno(bd);
+        var ventana = Ventana();
+        var huella = "g" + Guid.NewGuid().ToString("N");
+        await e.Acumulador.Registrar(huella, "registros-por-origen", ventana, "203.0.113.3");
+        await e.Cerrables.GuardarCierre(ventana, ventana.AddMinutes(5));
+
+        await e.Cerrables.Purgar(ventana.AddMinutes(5).AddHours(24).AddSeconds(-1));
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
+
+        await e.Cerrables.Purgar(ventana.AddMinutes(5).AddHours(24));
+        Assert.Equal(0L, await bd.Consultar<long>($"SELECT count(*) FROM auditoria.acumulado_de_limites WHERE huella = '{huella}'"));
+    }
+
+
     // ---------- Conteo local para los umbrales de SEG-09 ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-09")]
+    public async Task ElConteoLocalCuentaLosRegistrosDeLaAccionEnElRangoYLosRechazosDelLimiteQueSeSolapan()
+    {
+        var e = new Entorno(bd);
+        var conteo = new PostgresConteoLocalDeEventos(e.Unidad, e.Unidad);
+        var ventana = Ventana();
+        var desde = ventana.AddMinutes(1);
+        var hasta = ventana.AddMinutes(6);
+        var limite = "solicitudes-por-usuario";
+        await e.Acumulador.Registrar("u-" + Guid.NewGuid().ToString("N")[..16], limite, ventana.AddMinutes(2), null);
+        await e.Acumulador.Registrar("u-" + Guid.NewGuid().ToString("N")[..16], limite, ventana.AddMinutes(7), null);
+        await e.Acumulador.Registrar("u-" + Guid.NewGuid().ToString("N")[..16], "ingresos-fallidos", ventana.AddMinutes(2), null);
+
+        var rechazos = await conteo.ContarRechazosDeLimite(limite, desde, hasta);
+        var todos = await conteo.ContarRechazosDeLimite(null, desde, hasta);
+        Assert.Equal(2, rechazos);
+        Assert.Equal(3, todos);
+
+        var registros = e.Auditoria;
+        var antes = await conteo.ContarRegistros(AccionesAuditables.AccesoDenegado, desde, hasta);
+        Assert.Equal(0, antes);
+        _ = registros;
+    }
 }

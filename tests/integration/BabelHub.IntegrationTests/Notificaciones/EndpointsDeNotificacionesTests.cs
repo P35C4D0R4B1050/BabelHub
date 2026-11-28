@@ -436,6 +436,18 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
 
     [Fact]
     [Trait("Criterio", "AC-NOT-08")]
+    public async Task LaSolicitudDemasiadoGrande_SeRechaza()
+    {
+        var grande = Aviso() with { Campos = new Dictionary<string, string> { ["x"] = new string('a', EndpointsDeNotificaciones.TopeDeLaSolicitudDelInventario) } };
+
+        var respuesta = await SolicitudDelInventario(grande);
+
+        Assert.True(respuesta.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge);
+        Assert.Empty(_recepcion.Recibidas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-08")]
     public void LaOperacionDeLaSolicitud_EsLaDelContratoCompartido_ConElAlcanceSolicitarAviso()
     {
         var operacion = OperacionesDelEcommerce.Todas.Single(o => o.Nombre == EndpointsDeNotificaciones.OperacionDeLasSolicitudesDelInventario);

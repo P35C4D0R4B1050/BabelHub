@@ -117,6 +117,18 @@ public sealed class ConsultasDeDevolucionesTests
         Assert.Equal(2, otro.Denegaciones.Eventos.Count);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-12")]
+    public async Task El_limite_de_consultas_se_aplica_despues_del_rol_y_su_exceso_es_el_429_uniforme()
+    {
+        var cliente = new EntornoDeDevoluciones();
+        cliente.Limites.Maximos["consultas-de-devoluciones-por-usuario"] = 0;
+
+        var resultado = await cliente.Consultas.ListarMias(new ListarDevolucionesEntrada());
+
+        Assert.Equal(CategoriaDeError.Limite, resultado.Error!.Categoria);
+    }
+
     // ---------- La sucursal receptora ----------
 
     [Fact]
@@ -149,6 +161,21 @@ public sealed class ConsultasDeDevolucionesTests
         Assert.Equal(CategoriaDeError.Prohibido, ajena.Error!.Categoria);
         Assert.Equal("fuera-de-sucursal", Assert.Single(encargado.Denegaciones.Eventos).Motivo);
         Assert.Equal(CategoriaDeError.Validacion, invalido.Error!.Categoria);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-12")]
+    public async Task La_administracion_lista_las_de_cualquier_sucursal_y_el_cliente_no_lista_por_sucursal()
+    {
+        var cliente = new EntornoDeDevoluciones();
+        var deArequipa = await SolicitarImpreso(cliente, "arequipa");
+        var admin = Como(ActorDePrueba.DeAdministradorCentral(), cliente);
+
+        var comoAdmin = await admin.Consultas.ListarDeLaSucursal("arequipa", new ListarDevolucionesEntrada());
+        var comoCliente = await cliente.Consultas.ListarDeLaSucursal("arequipa", new ListarDevolucionesEntrada());
+
+        Assert.Equal(deArequipa, Assert.Single(comoAdmin.Valor.Devoluciones).DevolucionId);
+        Assert.Equal(CategoriaDeError.Prohibido, comoCliente.Error!.Categoria);
     }
 
     [Fact]

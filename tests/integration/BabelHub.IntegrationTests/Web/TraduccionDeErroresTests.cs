@@ -36,6 +36,17 @@ public sealed class TraduccionDeErroresTests
         Assert.Null(respuesta.RedirigirA);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-WEB-04")]
+    public void El_codigo_estable_y_el_seguimiento_solo_van_en_el_soporte()
+    {
+        var respuesta = TraductorDeErrores.Traducir(Problema("ECO-ERROR-INESPERADO", 500, traza: "traza-77"), rutaDeReintento: "/");
+
+        Assert.Equal("ECO-ERROR-INESPERADO", respuesta.Vista.CodigoDeSoporte);
+        Assert.Equal("traza-77", respuesta.Vista.IdentificadorDeSeguimiento);
+        Assert.DoesNotContain("traza-77", respuesta.Vista.Mensaje ?? string.Empty, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("ECO-SERVICIO-NO-DISPONIBLE")]
     [InlineData("INV-SERVICIO-NO-DISPONIBLE")]

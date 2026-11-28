@@ -407,4 +407,16 @@ public sealed class FormulariosConTokenTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
         Assert.Single(_host.Reclamaciones.Entradas);
     }
+
+    [Theory]
+    [InlineData("/reclamaciones/2026-000001%0A")]
+    [InlineData("/reclamaciones/2026-00001")]
+    [InlineData("/reclamaciones/abc")]
+    public async Task Un_numero_mal_escrito_responde_no_encontrado_uniforme_sin_llegar_al_modulo(string ruta)
+    {
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir(ruta, html: false));
+
+        Assert.Equal(HttpStatusCode.NotFound, respuesta.StatusCode);
+        Assert.Empty(_host.Consumidor.Llamadas);
+    }
 }

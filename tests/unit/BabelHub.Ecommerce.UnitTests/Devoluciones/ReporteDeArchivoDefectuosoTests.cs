@@ -291,4 +291,22 @@ public sealed class ReporteDeArchivoDefectuosoTests
         Assert.Empty(entorno.Repositorio.Todas);
         Assert.Empty(entorno.Repositorio.Cupos);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-24")]
+    public async Task Rechazar_tolera_que_Reanudar_responda_no_disponible_pero_una_falla_tecnica_de_Biblioteca_revierte_y_el_reporte_sigue_abierto()
+    {
+        var (tolerado, _, _, idTolerado) = await ConReporteAbierto();
+        tolerado.Accesos.ReanudarResponde = ResultadoDeReanudarAcceso.NoDisponible;
+        var (falla, _, linea, idFalla) = await ConReporteAbierto();
+        falla.Accesos.ReanudarFalla = true;
+
+        var cerrado = await tolerado.Decidir.Rechazar(idTolerado);
+        var revertido = await falla.Decidir.Rechazar(idFalla);
+
+        Assert.True(cerrado.EsExito);
+        Assert.Equal(CategoriaDeError.NoDisponible, revertido.Error!.Categoria);
+        Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, falla.Repositorio.Todas.Single().Lineas[0].Estado);
+        Assert.Equal(1, falla.Repositorio.Cupos[linea.LineaId].CantidadComprometida);
+    }
 }

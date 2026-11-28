@@ -84,6 +84,21 @@ public sealed class DepuracionDeDevolucionesTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-DEV-29")]
+    public async Task Un_minuto_antes_de_la_medianoche_de_Lima_del_cumpleanios_no_vence_y_a_la_medianoche_si()
+    {
+        var (sistema, id) = await ConRechazada(new DateTimeOffset(2026, 11, 18, 23, 59, 0, TimeSpan.FromHours(-5)));
+
+        await sistema.Depuracion.Ejecutar();
+        var antes = Guardada(sistema, id).Motivo.EstaRedactado;
+        sistema.Reloj.Ahora = new DateTimeOffset(2026, 11, 19, 0, 0, 0, TimeSpan.FromHours(-5));
+        await sistema.Depuracion.Ejecutar();
+
+        Assert.False(antes);
+        Assert.True(Guardada(sistema, id).Motivo.EstaRedactado);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-DEV-32")]
     public async Task Una_devolucion_con_una_linea_no_final_no_se_redacta_aunque_hayan_pasado_los_dos_anios()
     {
@@ -131,9 +146,24 @@ public sealed class DepuracionDeDevolucionesTests
         Assert.True(Guardada(sistema, id).Motivo.EstaRedactado);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-29")]
+    public async Task Procesa_hasta_el_maximo_por_corrida_y_el_resto_espera_a_la_siguiente()
+    {
+        var (sistema, ids) = await ConRechazadas(3, LimaMedianoche(2026, 11, 19));
+
+        var primera = await sistema.Depuracion.Ejecutar(maximo: 2);
+        var segunda = await sistema.Depuracion.Ejecutar(maximo: 2);
+
+        Assert.Equal(2, primera.Valor);
+        Assert.Equal(1, segunda.Valor);
+        Assert.All(ids, id => Assert.True(Guardada(sistema, id).Motivo.EstaRedactado));
+    }
+
     [Theory]
     [Trait("Criterio", "AC-DEV-29")]
     [InlineData("cliente")]
+    [InlineData("administracion")]
     [InlineData("integracion")]
     [InlineData("anonimo")]
     public async Task Solo_el_sistema_depura_y_cada_intento_de_otro_actor_deja_un_evento(string quien)
@@ -173,5 +203,42 @@ public sealed class DepuracionDeDevolucionesTests
         Assert.False(antes.Valor);
         Assert.True(despues.Valor);
         Assert.Single(sistema.Alertas.Alertas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-32")]
+    public async Task Una_corrida_correcta_reinicia_la_cuenta_pero_una_fallida_no()
+    {
+        var (sistema, _) = await ConRechazada(LimaMedianoche(2026, 11, 19));
+        var arranque = sistema.Reloj.Ahora;
+        sistema.ControlDeDepuracion.RegistrarCorridaCorrecta(arranque);
+        sistema.Auditoria.Caida = true;
+        sistema.Reloj.Ahora = arranque.AddHours(30);
+        var fallida = await sistema.Depuracion.Ejecutar();
+        var alertaTrasFallar = await sistema.RevisionDeLaDepuracion.Ejecutar();
+        sistema.Auditoria.Caida = false;
+        var correcta = await sistema.Depuracion.Ejecutar();
+        var alertaTrasCorrer = await sistema.RevisionDeLaDepuracion.Ejecutar();
+
+        Assert.False(fallida.EsExito);
+        Assert.True(alertaTrasFallar.Valor);
+        Assert.True(correcta.EsExito);
+        Assert.False(alertaTrasCorrer.Valor);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-32")]
+    public async Task Una_alerta_que_no_sale_no_interrumpe_y_solo_el_sistema_vigila()
+    {
+        var (sistema, _) = await ConRechazada(LimaMedianoche(2026, 11, 19));
+        sistema.Reloj.Ahora = sistema.Reloj.Ahora.AddDays(3);
+        sistema.Alertas.Falla = new InvalidOperationException("sin canal");
+        var comoAdmin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(sistema);
+
+        var resultado = await sistema.RevisionDeLaDepuracion.Ejecutar();
+        var prohibido = await comoAdmin.RevisionDeLaDepuracion.Ejecutar();
+
+        Assert.True(resultado.Valor);
+        Assert.Equal(CategoriaDeError.Prohibido, prohibido.Error!.Categoria);
     }
 }

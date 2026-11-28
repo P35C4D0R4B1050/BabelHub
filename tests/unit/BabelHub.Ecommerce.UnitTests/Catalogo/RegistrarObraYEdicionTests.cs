@@ -261,6 +261,21 @@ public sealed class RegistrarObraYEdicionTests
         Assert.Equal(EstadoDeReferencia.Lista, entorno.Referencias.Todas.Single().Estado);
     }
 
+    [Fact]
+    public async Task Una_obra_con_una_impresa_y_una_digital_audita_la_obra_y_cada_edicion()
+    {
+        var entorno = new EntornoDelCatalogo();
+
+        var resultado = await entorno.RegistrarObra().Ejecutar(entorno.Obra("Ambas", entorno.EdicionImpresa(), entorno.EdicionDigital()));
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(
+            ["ObraRegistrada", "EdicionRegistrada", "EdicionRegistrada"],
+            entorno.Auditoria.Solicitudes.Select(s => s.Accion.Identificador).ToList());
+        Assert.Equal(["impresa", "digital"], entorno.Auditoria.Solicitudes.Skip(1).Select(s => s.Detalle["formato"]).ToList());
+        Assert.Equal(2, entorno.Referencias.Todas.Count(r => r.Estado == EstadoDeReferencia.Consumida));
+    }
+
     // ---------- RegistrarEdicion ----------
 
     [Fact]

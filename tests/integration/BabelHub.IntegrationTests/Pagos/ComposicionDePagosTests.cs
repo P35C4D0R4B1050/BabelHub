@@ -67,6 +67,38 @@ public sealed class ComposicionDePagosTests
     }
 
     [Fact]
+    public void Con_el_simulador_en_Test_se_resuelven_los_contratos_publicos_y_la_pasarela_es_el_simulador()
+    {
+        var servicios = ConExternos().AgregarPagos(Opciones(), esProduccion: false);
+        using var proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
+        using var alcance = proveedor.CreateScope();
+
+        Assert.IsType<SimuladorPasarelaDePago>(proveedor.GetRequiredService<IPasarelaDePago>());
+        Assert.False(proveedor.GetRequiredService<OpcionesDelCobro>().EnviarElCorreoDelTitular);
+        Assert.NotNull(alcance.ServiceProvider.GetRequiredService<IPagos>());
+        Assert.NotNull(alcance.ServiceProvider.GetRequiredService<IReembolsos>());
+        Assert.NotNull(alcance.ServiceProvider.GetRequiredService<IAvisosDeLaPasarela>());
+        Assert.NotNull(alcance.ServiceProvider.GetRequiredService<ILiberacionDeContactoDePago>());
+        Assert.NotNull(alcance.ServiceProvider.GetRequiredService<ICreadorDeIntencionesDePago>());
+        Assert.IsType<IntencionesDePagoDeLaAplicacion>(alcance.ServiceProvider.GetRequiredService<ICreadorDeIntencionesDePago>());
+        Assert.Contains(alcance.ServiceProvider.GetServices<IPendientesDeCuenta>(), p => p is ContarPendientesDeCuenta);
+        Assert.Contains(alcance.ServiceProvider.GetServices<IAplicadorDeCancelacion>(), p => p is DesvincularPagosDeUnaCuenta);
+        Assert.IsType<RestReservasDelPago>(alcance.ServiceProvider.GetRequiredService<IReservasDelPago>());
+    }
+
+    [Fact]
+    public void Pagos_reemplaza_al_creador_de_intenciones_provisional_que_Carrito_ya_registro()
+    {
+        var servicios = ConExternos();
+        servicios.AddScoped<ICreadorDeIntencionesDePago>(_ => Falso<ICreadorDeIntencionesDePago>());
+        servicios.AgregarPagos(Opciones(), esProduccion: false);
+        using var proveedor = servicios.BuildServiceProvider();
+        using var alcance = proveedor.CreateScope();
+
+        Assert.IsType<IntencionesDePagoDeLaAplicacion>(alcance.ServiceProvider.GetRequiredService<ICreadorDeIntencionesDePago>());
+    }
+
+    [Fact]
     public void Con_un_modo_sin_llamadas_reales_y_el_adaptador_nulo_la_pasarela_es_la_nula()
     {
         var servicios = ConExternos().AgregarPagos(Opciones(sinLlamadasReales: true, nula: true), esProduccion: false);
@@ -191,6 +223,19 @@ public sealed class LectorDeOpcionesDePagosTests
         new ConfigurationBuilder().AddInMemoryCollection(valores.ToDictionary(v => v.Ruta, v => v.Valor)).Build();
 
     [Fact]
+    public void Lee_la_pasarela_la_llave_la_clave_de_intentos_y_su_valor_anterior()
+    {
+        var opciones = LectorDeOpcionesDePagos.Leer(
+            Configuracion(("Pagos:Pasarela", "culqi"), ("Pagos:LlavePrivada", "sk_test_abc"), ("Pagos:ClaveDeIntentos", "clave-actual"), ("Pagos:ClaveDeIntentosAnterior", "clave-anterior")),
+            "Test",
+            sinLlamadasReales: false,
+            pedidosDisponible: true);
+
+        Assert.Equal(("culqi", "Test", false, false, true), (opciones.Pasarela, opciones.Entorno, opciones.SinLlamadasReales, opciones.PasarelaEsNula, opciones.PedidosDisponible));
+        Assert.Equal(("sk_test_abc", "clave-actual", "clave-anterior"), (opciones.LlavePrivada, opciones.ClaveDeIntentos, opciones.ClaveDeIntentosAnterior));
+    }
+
+    [Fact]
     public void Lo_ausente_o_en_blanco_es_nulo_y_el_texto_de_las_opciones_no_repite_los_secretos()
     {
         var opciones = LectorDeOpcionesDePagos.Leer(Configuracion(("Pagos:LlavePrivada", "   "), ("Pagos:ClaveDeIntentos", "clave-secreta-actual")), "Development", false, false);
@@ -199,6 +244,19 @@ public sealed class LectorDeOpcionesDePagosTests
         Assert.Null(opciones.LlavePrivada);
         Assert.Null(opciones.ClaveDeIntentosAnterior);
         Assert.DoesNotContain("clave-secreta-actual", opciones.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Un_modo_sin_llamadas_reales_usa_el_adaptador_nulo_y_no_lee_la_llave_privada()
+    {
+        var opciones = LectorDeOpcionesDePagos.Leer(
+            Configuracion(("Pagos:Pasarela", "simulador"), ("Pagos:LlavePrivada", "sk_live_no_se_lee"), ("Pagos:ClaveDeIntentos", "clave-actual")),
+            "Production",
+            sinLlamadasReales: true,
+            pedidosDisponible: true);
+
+        Assert.True(opciones.PasarelaEsNula);
+        Assert.Null(opciones.LlavePrivada);
     }
 }
 
@@ -222,5 +280,23 @@ public sealed class ArranqueDePagosEncadenadoTests
 
         using var proveedor = servicios.BuildServiceProvider();
         Assert.IsType<NuloPasarelaDePago>(proveedor.GetRequiredService<IPasarelaDePago>());
+    }
+
+    [Fact]
+    public void El_servicio_hospedado_recibe_los_nueve_trabajos_al_registrarlo_como_servicio_alojado()
+    {
+        var servicios = new ServiceCollection();
+        for (var i = 0; i < 9; i++)
+        {
+            var nombre = $"pagos-{i}";
+            servicios.AddSingleton(new TrabajoDeFondoDePagos(nombre, _ => Task.CompletedTask, null!, (c, t) => c(t), null!, null!, new OpcionesDelTrabajoDePagos(TimeSpan.FromMinutes(1))));
+        }
+
+        servicios.AddSingleton<IReadOnlyList<TrabajoDeFondoDePagos>>(sp => [.. sp.GetServices<TrabajoDeFondoDePagos>()]);
+        servicios.AddHostedService<ServicioDeTrabajosDePagos>();
+        using var proveedor = servicios.BuildServiceProvider();
+
+        var servicio = Assert.IsType<ServicioDeTrabajosDePagos>(proveedor.GetRequiredService<IEnumerable<Microsoft.Extensions.Hosting.IHostedService>>().Single());
+        Assert.Equal(9, servicio.Trabajos.Count);
     }
 }

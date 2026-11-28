@@ -75,6 +75,20 @@ public sealed class PasarAlPagoTests
     }
 
     [Fact]
+    public async Task Un_carrito_solo_digital_no_reserva_y_crea_la_intencion()
+    {
+        var s = await Listo(soloDigital: true);
+
+        var resultado = await Pagar(s);
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        Assert.Equal(EstadoDelCheckout.EnPago, s.Checkout.Estado);
+        Assert.Empty(s.Entorno.Inventario.Reservas);
+        Assert.Equal(1, s.Entorno.Pagos.Creaciones);
+        Assert.Equal([(false, false)], s.Entorno.Auditoria.PasosAlPago);
+    }
+
+    [Fact]
     public async Task Las_marcas_se_leen_con_bloqueo_en_cada_paso_corto_y_el_checkout_no_se_retiene_durante_la_llamada_a_Pagos()
     {
         var s = await Listo();
@@ -162,6 +176,21 @@ public sealed class PasarAlPagoTests
     // ---------- Fallas del paso 3 ----------
 
     [Fact]
+    public async Task Crear_con_Cerrada_aborta_y_el_siguiente_intento_usa_otro_pedido()
+    {
+        var s = await Listo();
+        ReservaCorrecta(s);
+        s.Entorno.Pagos.AlCrear = ResultadoDeCrearIntencion.Cerrada;
+
+        var resultado = await Pagar(s);
+
+        Assert.Equal(ClavesDelCarrito.ReservaRechazada, resultado.Error!.Clave);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, s.Checkout.Estado);
+        Assert.NotNull(s.Checkout.PedidoDescartado);
+        Assert.Single(s.Entorno.Inventario.Liberaciones);
+    }
+
+    [Fact]
     public async Task Crear_con_YaEnCurso_redirige_al_estado_del_pago_sin_abortar_ni_liberar()
     {
         var s = await Listo();
@@ -225,6 +254,20 @@ public sealed class PasarAlPagoTests
         Assert.Empty(s.Entorno.Auditoria.PasosAlPago);
     }
 
+    [Fact]
+    public async Task Una_cancelacion_entre_el_paso_1_y_3a_aborta_sin_crear_la_intencion()
+    {
+        var s = await Listo();
+        ReservaCorrecta(s);
+        s.Entorno.Marca.LecturasHastaCambiar = 1;
+
+        var resultado = await Pagar(s);
+
+        Assert.Equal(ClavesDelCarrito.CuentaNoPuedeComprar, resultado.Error!.Clave);
+        Assert.Equal(0, s.Entorno.Pagos.Creaciones);
+        Assert.Single(s.Entorno.Inventario.Liberaciones);
+    }
+
     // ---------- Retiro pendiente en 3b ----------
 
     [Fact]
@@ -285,6 +328,20 @@ public sealed class PasarAlPagoTests
         Assert.Equal(2, s.Entorno.Inventario.Reservas.Count);
         Assert.Equal(s.Entorno.Inventario.Reservas[0].Generacion, s.Entorno.Inventario.Reservas[1].Generacion);
         Assert.Single(s.Entorno.Auditoria.PasosAlPago);
+    }
+
+    [Fact]
+    public async Task Repetir_con_en_pago_y_YaEnCurso_redirige_sin_repetir_Reservar()
+    {
+        var s = await Listo();
+        ReservaCorrecta(s);
+        await Pagar(s);
+        s.Entorno.Pagos.AlCrear = ResultadoDeCrearIntencion.YaEnCurso;
+
+        var otra = await Pagar(s);
+
+        Assert.True(otra.Valor.PagoEnCurso);
+        Assert.Single(s.Entorno.Inventario.Reservas);
     }
 
     [Fact]

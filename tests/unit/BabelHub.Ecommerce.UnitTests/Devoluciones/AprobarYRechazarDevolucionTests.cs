@@ -85,6 +85,21 @@ public sealed class AprobarYRechazarDevolucionTests
         Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, (await entorno.Repositorio.Obtener(id, false))!.Lineas[0].Estado);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-12")]
+    public async Task Una_devolucion_inexistente_responde_lo_mismo_que_una_ajena()
+    {
+        var (entorno, id, _) = await ConSolicitud(ActorDePrueba.DeEncargadoDe(Sucursal), sucursal: "arequipa");
+        entorno.Sucursales.Codigos[Sucursal] = "lima-central";
+
+        var ajena = await entorno.Gestion.Aprobar(id);
+        var inexistente = await entorno.Gestion.Aprobar(Guid.NewGuid());
+
+        Assert.Equal(ajena.Error!.Categoria, inexistente.Error!.Categoria);
+        Assert.Equal(ajena.Error.Clave, inexistente.Error.Clave);
+        Assert.Equal(2, entorno.Denegaciones.Eventos.Count);
+    }
+
     [Theory]
     [Trait("Criterio", "AC-DEV-12")]
     [InlineData("cliente")]
@@ -138,6 +153,19 @@ public sealed class AprobarYRechazarDevolucionTests
         Assert.NotNull(excepcion);
         Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, (await sinAuditoria.Repositorio.Obtener(idA, false))!.Lineas[0].Estado);
         Assert.Equal(CategoriaDeError.NoDisponible, caido.Error!.Categoria);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-12")]
+    public async Task El_limite_de_operaciones_se_aplica_despues_del_rol_y_su_exceso_es_el_429_uniforme()
+    {
+        var (entorno, id, _) = await ConSolicitud(ActorDePrueba.DeAdministradorCentral());
+        entorno.Limites.Maximos["operaciones-de-devoluciones-por-usuario"] = 0;
+
+        var resultado = await entorno.Gestion.Aprobar(id);
+
+        Assert.Equal(CategoriaDeError.Limite, resultado.Error!.Categoria);
+        Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, (await entorno.Repositorio.Obtener(id, false))!.Lineas[0].Estado);
     }
 }
 

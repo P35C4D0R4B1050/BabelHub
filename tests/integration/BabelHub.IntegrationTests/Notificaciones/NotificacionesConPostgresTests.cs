@@ -369,6 +369,7 @@ public sealed class NotificacionesConPostgresTests(PostgresDeNotificacionesFixtu
 
     [Theory]
     [InlineData("987654321")]
+    [InlineData("987 654 321")]
     [InlineData("+51 987-654-321")]
     [InlineData("0051987654321")]
     [InlineData("٩٨٧٦٥٤٣٢١")]
@@ -385,6 +386,19 @@ public sealed class NotificacionesConPostgresTests(PostgresDeNotificacionesFixtu
         Assert.True(await bd.Unidad.Ejecutar(ct => bd.Numeros.ExisteAlguna(despues.Vigentes(escrito), ct)));
         Assert.Equal(2, despues.Vigentes(escrito).Count);
         Assert.NotEqual(antes.Actual(original).Valor, despues.Actual(original).Valor);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-13")]
+    public async Task UnNumeroDistinto_NoQuedaDesactivado()
+    {
+        var calculador = new CalculadorDeHuellaDeNumero(new OpcionesDeHuellaDeNumero(1, Clave('a')), Plataforma);
+        Assert.True(NumeroDeDestino.TryNormalizar("987654321", out var uno));
+        Assert.True(NumeroDeDestino.TryNormalizar("987654322", out var otro));
+        await bd.Unidad.Ejecutar(ct => bd.Numeros.Agregar(new NumeroDesactivado(calculador.Actual(uno), Inicio, "a pedido del titular"), ct));
+
+        Assert.False(await bd.Unidad.Ejecutar(ct => bd.Numeros.ExisteAlguna(calculador.Vigentes(otro), ct)));
+        Assert.DoesNotContain("987654321", await bd.Consultar<string>("SELECT string_agg(huella_numero || motivo, ',') FROM notificaciones.numeros_desactivados") ?? string.Empty, StringComparison.Ordinal);
     }
 
     private static readonly CalculadorDeHuellaHmac Plataforma = new(new OpcionesDeHuella("v1:" + Convert.ToBase64String(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray())));

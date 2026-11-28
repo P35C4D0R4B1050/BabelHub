@@ -265,6 +265,18 @@ public sealed class FusionDelCarritoTests
     }
 
     [Fact]
+    public async Task Con_el_checkout_reservando_la_fusion_se_aplaza()
+    {
+        var (e, _, delaCuenta, visitante) = ConCheckout(AReservando);
+
+        var resultado = await Fusionar(e);
+
+        Assert.True(resultado.Valor.Aplazada);
+        Assert.Equal(EstadoDeCarrito.Abierto, visitante.Estado);
+        Assert.Equal(1, delaCuenta.Lineas.Single().Cantidad.Valor);
+    }
+
+    [Fact]
     public async Task Con_en_pago_y_un_intento_activo_Reabrir_responde_no_cancelable_y_la_fusion_se_aplaza()
     {
         var (e, checkout, _, visitante) = ConCheckout(AEnPago);
@@ -276,6 +288,20 @@ public sealed class FusionDelCarritoTests
         Assert.False(resultado.Valor.BorrarLaCookie);
         Assert.Equal(EstadoDeCarrito.Abierto, visitante.Estado);
         Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
+    }
+
+    [Fact]
+    public async Task Con_en_pago_sin_intento_activo_se_reabre_y_la_fusion_se_aplica_dejando_el_checkout_en_edicion()
+    {
+        var (e, checkout, delaCuenta, visitante) = ConCheckout(AEnPago);
+
+        var resultado = await Fusionar(e);
+
+        Assert.False(resultado.Valor.Aplazada);
+        Assert.Equal(1, e.Pagos.Reaperturas);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+        Assert.Equal(EstadoDeCarrito.Fusionado, visitante.Estado);
+        Assert.Equal(3, delaCuenta.Lineas.Single().Cantidad.Valor);
     }
 
     [Fact]

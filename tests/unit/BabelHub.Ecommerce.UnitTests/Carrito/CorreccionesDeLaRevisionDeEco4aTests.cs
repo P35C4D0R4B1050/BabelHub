@@ -78,6 +78,29 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
         Assert.NotNull(checkout.Contacto);
     }
 
+    [Fact]
+    public void Un_aviso_de_un_pedido_que_no_es_el_del_checkout_ni_su_ultimo_descartado_no_aplica()
+    {
+        var carrito = Carrito();
+        var checkout = EnPago(carrito);
+        var ajeno = Guid.NewGuid();
+
+        Assert.Equal(EfectoDeTransicion.NoAplica, checkout.PagoAprobado(ajeno, carrito, Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.NoAplica, checkout.PagoPendiente(ajeno, Ahora.AddMinutes(30), Ahora.AddMinutes(30), Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.NoAplica, checkout.PagoResuelto(ajeno, MotivoDePagoResuelto.Rechazado, carrito, Ahora).Efecto);
+        Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
+        Assert.NotNull(checkout.Contacto);
+    }
+
+    [Fact]
+    public void Un_aviso_del_pedido_de_un_checkout_sin_pedido_aun_no_aplica()
+    {
+        var checkout = ADomicilio();
+
+        Assert.Equal(EfectoDeTransicion.NoAplica, checkout.PagoAprobado(Guid.NewGuid(), Carrito(), Ahora).Efecto);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+    }
+
     // ---------------------------------------------------------------- abandono a los 30 días
 
     [Theory]

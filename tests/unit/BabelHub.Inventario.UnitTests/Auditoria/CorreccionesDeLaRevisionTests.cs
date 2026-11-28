@@ -186,6 +186,20 @@ public sealed class CorreccionesDeLaRevisionTests
     }
 
     [Fact]
+    public void Una_clave_de_detalle_con_conjunto_cerrado_y_un_tope_de_largo_se_comporta_como_se_declara()
+    {
+        var clave = new ClaveDeDetalle("estado", false) { Valores = ["a", "b"] };
+        var corta = new ClaveDeDetalle("texto", false) { LargoMaximo = 5 };
+
+        var detalle = DetalleSeguro.Construir([clave, corta], new Dictionary<string, string?> { ["estado"] = "a", ["texto"] = "abcdefghij" });
+
+        Assert.Equal("a", detalle.Valores["estado"]);
+        Assert.Equal("abcd…", detalle.Valores["texto"]);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ClaveDeDetalle("x", false) { LargoMaximo = 0 });
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ClaveDeDetalle("x", false) { LargoMaximo = DetalleSeguro.MaximoDeCaracteres + 1 });
+    }
+
+    [Fact]
     public void El_dominio_de_una_accion_rechaza_un_tipo_de_objeto_con_forma_de_texto_libre()
     {
         Assert.Throws<ArgumentException>(() => new AccionDelCatalogo("Prueba", ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Auditoria, false, [], false, false, [], false) { TiposDeObjeto = ["Cuenta de Ana"] });
@@ -203,6 +217,18 @@ public sealed class CorreccionesDeLaRevisionTests
         Assert.Throws<ArgumentException>(() => registro with { Motivo = motivo });
     }
 
+    [Fact]
+    public void El_modelo_del_contrato_valida_la_ruta_el_origen_y_la_accion()
+    {
+        var registro = new RegistroAuditado(Guid.NewGuid(), ServicioAuditado.Ecommerce, TipoDeRegistroAuditado.Seguridad, BabelHub.Inventario.Application.Plataforma.TipoDeActor.Anonimo, null, null, Ahora, "IngresoFallido", ResultadoAuditado.Rechazado);
+
+        Assert.Throws<ArgumentException>(() => registro with { Ruta = "/api/x?token=abc" });
+        Assert.Throws<ArgumentException>(() => registro with { Origen = "198.51.100.7, 10.0.0.1" });
+        Assert.Throws<ArgumentException>(() => registro with { ObjetoId = new string('a', 65) });
+        Assert.Throws<ArgumentException>(() => new RegistroAuditado(Guid.NewGuid(), ServicioAuditado.Ecommerce, TipoDeRegistroAuditado.Seguridad, BabelHub.Inventario.Application.Plataforma.TipoDeActor.Anonimo, null, null, Ahora, "ingreso fallido", ResultadoAuditado.Rechazado));
+        Assert.Equal("sin-coincidencia", (registro with { Ruta = "sin-coincidencia" }).Ruta);
+        Assert.Equal("/api/y/{id}", (registro with { Ruta = "/api/y/{id}" }).Ruta);
+    }
     // ---------- Dobles ----------
 
     private sealed class PlantillasDePrueba(params string[] plantillas) : IPlantillasDeRuta

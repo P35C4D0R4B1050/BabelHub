@@ -43,6 +43,19 @@ public sealed class EditarObraYEdicionTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-08")]
+    public async Task Editar_con_el_mismo_precio_no_audita_un_cambio_de_precio_pero_deja_la_edicion_editada()
+    {
+        var (entorno, obra) = await ConImpresaYDigital();
+        var impresa = obra.Ediciones.Single(e => !e.EsDigital);
+
+        await entorno.EditarEdicion().Ejecutar(new EditarEdicionEntrada(obra.Id, impresa.Id, obra.Version, 129m, null, null));
+
+        Assert.Equal(["EdicionEditada"], entorno.Auditoria.Solicitudes.Select(s => s.Accion.Identificador).ToList());
+        Assert.Equal(string.Empty, entorno.Auditoria.Solicitudes[0].Detalle["camposCambiados"]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-08")]
     public async Task Cambiar_la_licencia_audita_los_valores_anterior_y_nuevo()
     {
         var (entorno, obra) = await ConImpresaYDigital();

@@ -256,4 +256,16 @@ public sealed class DevolucionesDeUnaCuentaTests
         Assert.IsType<PendientesNoDisponiblesException>(sinAlmacen);
         Assert.False(Guardada(cliente, ajena).Motivo.EstaRedactado);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    public void El_aplicador_se_llama_devoluciones_y_el_motivo_sembrado_no_aparece_en_la_vista_redactada()
+    {
+        var cliente = new EntornoDeDevoluciones();
+
+        Assert.Equal("devoluciones", ((IAplicadorDeCancelacion)cliente.Redaccion).Modulo);
+        var redactada = Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", TextoRedactado.Crear(Motivo, 300)!, null, [new NuevaLineaDeDevolucion(Guid.NewGuid(), Guid.NewGuid(), 1, 10m)], Ahora, ResponsableDelCambio.Cliente(Guid.NewGuid()));
+        redactada.Redactar(Ahora, quitarElAcceso: true);
+        Assert.DoesNotContain("SEMBRADO", System.Text.Json.JsonSerializer.Serialize(new { redactada.Motivo, redactada.Lineas }), StringComparison.Ordinal);
+    }
 }

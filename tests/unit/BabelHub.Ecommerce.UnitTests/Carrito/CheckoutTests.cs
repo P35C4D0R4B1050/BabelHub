@@ -235,6 +235,17 @@ public sealed class CheckoutTests
     }
 
     [Fact]
+    public void Con_el_checkout_ya_en_pago_y_la_misma_huella_pasar_al_pago_es_un_exito_idempotente()
+    {
+        var (checkout, carrito) = EnPago();
+
+        var otraVez = Preparar(checkout, carrito);
+
+        Assert.Equal(EfectoDeTransicion.SinCambios, otraVez.Efecto);
+        Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
+    }
+
+    [Fact]
     public void Con_el_pago_pendiente_o_terminado_pasar_al_pago_se_rechaza()
     {
         var (pendiente, carritoP) = PagoPendiente();
@@ -310,6 +321,22 @@ public sealed class CheckoutTests
         Assert.NotEqual(baseA, Huella(50m, 12m, "911222333"));
     }
 
+    [Fact]
+    public void Los_campos_de_texto_de_la_huella_no_se_confunden_aunque_contengan_el_separador()
+    {
+        static string? Huella(string titulo)
+        {
+            string? h = null;
+            var checkout = Determinista(new LineaParaCheckout(Edicion(1), false, titulo, "9780000000019", 1, 50m, Edicion(1), Sucursal.Principal));
+            checkout.ElegirRecojo(Ahora);
+            checkout.PrepararPasoAlPago(Guid.NewGuid(), Envio, Identidad, s => h = s, CarritoCon(Impreso(1)), Ahora);
+            return h;
+        }
+
+        Assert.NotEqual(Huella("a|b"), Huella("a"));
+        Assert.NotEqual(Huella("a|9780000000019"), Huella("a"));
+    }
+
     // ---------------------------------------------------------------- confirmar en pago
 
     [Fact]
@@ -334,6 +361,18 @@ public sealed class CheckoutTests
         Assert.Equal(EfectoDeTransicion.NoAplica, checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva + 1, checkout.HuellaDeInstantanea!, Ahora.AddMinutes(15), carrito).Efecto);
         Assert.Equal(EfectoDeTransicion.NoAplica, checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, "otra", Ahora.AddMinutes(15), carrito).Efecto);
         Assert.Equal(EstadoDelCheckout.Reservando, checkout.Estado);
+    }
+
+    [Fact]
+    public void Confirmar_en_pago_dos_veces_con_lo_mismo_es_un_exito_idempotente()
+    {
+        var (checkout, carrito) = EnPago();
+        var version = checkout.Version;
+
+        var otraVez = ConfirmarEnPago(checkout, carrito);
+
+        Assert.Equal(EfectoDeTransicion.SinCambios, otraVez.Efecto);
+        Assert.Equal(version, checkout.Version);
     }
 
     [Fact]
@@ -420,6 +459,18 @@ public sealed class CheckoutTests
         Assert.Equal(generacion + 1, checkout.GeneracionDeReserva);
         Assert.Equal(Ahora.AddMinutes(1), checkout.ReservaALiberarDesde);
         Assert.Null(checkout.ReservandoDesde);
+    }
+
+    [Fact]
+    public void Abortar_desde_en_pago_hace_lo_mismo_y_limpia_la_expiracion()
+    {
+        var (checkout, carrito) = EnPago();
+        var pedido = checkout.PedidoId!.Value;
+
+        var resultado = checkout.AbortarPasoAlPago(EstadoDelCheckout.EnPago, pedido, checkout.GeneracionDeReserva, carrito, Ahora.AddMinutes(1));
+
+        Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
+        Assert.Equal((EstadoDelCheckout.EnEdicion, (Guid?)null, (Guid?)pedido, (DateTimeOffset?)null), (checkout.Estado, checkout.PedidoId, checkout.PedidoDescartado, checkout.ReservaExpiraEn));
     }
 
     [Fact]
@@ -514,6 +565,18 @@ public sealed class CheckoutTests
     }
 
     [Fact]
+    public void La_cuenta_regresiva_llega_a_cero_y_la_reserva_deja_de_estar_vigente_al_llegar_a_su_expiracion()
+    {
+        var (checkout, _) = EnPago();
+
+        Assert.Equal(TimeSpan.FromMinutes(15), checkout.CuentaRegresiva(Ahora));
+        Assert.Equal(TimeSpan.FromMinutes(5), checkout.CuentaRegresiva(Ahora.AddMinutes(10)));
+        Assert.True(checkout.ReservaVigente(Ahora.AddMinutes(14).AddSeconds(59)));
+        Assert.False(checkout.ReservaVigente(Ahora.AddMinutes(15)));
+        Assert.Equal(TimeSpan.Zero, checkout.CuentaRegresiva(Ahora.AddMinutes(16)));
+    }
+
+    [Fact]
     public void Pago_pendiente_mientras_el_checkout_reserva_responde_aun_no_y_repetido_o_ya_pagado_es_idempotente()
     {
         var (reservando, _) = Reservando();
@@ -596,6 +659,17 @@ public sealed class CheckoutTests
     }
 
     [Fact]
+    public void Resolver_un_pago_mientras_el_checkout_reserva_responde_aun_no_y_si_ya_esta_en_pago_es_idempotente()
+    {
+        var (reservando, carritoR) = Reservando();
+        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoResuelto(reservando.PedidoId!.Value, MotivoDePagoResuelto.Vencido, carritoR, Ahora).Efecto);
+
+        var (enPago, carritoE) = EnPago();
+        Assert.Equal(EfectoDeTransicion.SinCambios, enPago.PagoResuelto(enPago.PedidoId!.Value, MotivoDePagoResuelto.Rechazado, carritoE, Ahora).Efecto);
+        Assert.Equal(EstadoDelCheckout.EnPago, enPago.Estado);
+    }
+
+    [Fact]
     public void Un_pago_rechazado_con_un_retiro_pendiente_no_cambia_el_estado_y_pide_reabrir()
     {
         var (checkout, carrito) = PagoPendiente();
@@ -605,6 +679,23 @@ public sealed class CheckoutTests
 
         Assert.Equal(EfectoDeTransicion.ConRetiroPendiente, resultado.Efecto);
         Assert.Equal(EstadoDelCheckout.PagoPendiente, checkout.Estado);
+    }
+
+    [Fact]
+    public void Despues_de_reabrir_se_vuelve_a_en_edicion_desde_pago_pendiente_o_en_pago_aplicando_el_retiro()
+    {
+        var (checkout, carrito) = PagoPendiente();
+        carrito.RetirarEdicion(Edicion(2), diferir: true, Ahora);
+
+        var resultado = checkout.VolverAEnEdicionTrasReabrir(carrito, Ahora.AddMinutes(10));
+
+        Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
+        Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
+        Assert.Equal([new EdicionRetirada(Edicion(2), true)], resultado.Retiradas);
+        Assert.Null(checkout.LimitePendienteEn);
+        Assert.NotNull(checkout.PedidoId);
+        Assert.Equal(Ahora, checkout.ModificadoPorLaPersonaEn);
+        Assert.Equal(EfectoDeTransicion.SinCambios, checkout.VolverAEnEdicionTrasReabrir(carrito, Ahora).Efecto);
     }
 
     // ---------------------------------------------------------------- retiros pendientes

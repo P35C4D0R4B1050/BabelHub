@@ -108,6 +108,22 @@ public sealed class RevisionDePlazosDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-13")]
+    public async Task Repetir_la_revision_no_cambia_nada_ni_audita_otra_vez()
+    {
+        var (sistema, id, _) = await ConAprobada();
+        sistema.Reloj.Ahora = Ahora.AddDays(11);
+        await sistema.Vencidas.Ejecutar(50);
+        var auditorias = sistema.Auditoria.Solicitudes.Count;
+
+        var repetida = await sistema.Vencidas.Ejecutar(50);
+
+        Assert.Equal(0, repetida.Valor);
+        Assert.Equal(auditorias, sistema.Auditoria.Solicitudes.Count);
+        Assert.Equal(EstadoDeLineaDeDevolucion.Rechazada, Guardada(sistema, id).Lineas[0].Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-13")]
     public async Task Con_la_auditoria_caida_no_se_rechaza_nada_la_revision_no_falla_y_la_siguiente_si_lo_hace()
     {
         var (sistema, id, lineas) = await ConAprobada();
@@ -124,9 +140,53 @@ public sealed class RevisionDePlazosDeDevolucionesTests
         Assert.Equal(1, (await sistema.Vencidas.Ejecutar(50)).Valor);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-DEV-13")]
+    public async Task Una_devolucion_que_falla_al_bloquearse_no_detiene_a_las_demas()
+    {
+        var cliente = new EntornoDeDevoluciones();
+        var ids = new List<Guid>();
+        for (var i = 0; i < 3; i++)
+        {
+            var linea = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2), 3, 50m);
+            var pedido = cliente.SembrarPedido(linea);
+            var solicitada = await cliente.SolicitarImpreso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [new LineaPedidaParaDevolver(linea.LineaId, 1)], new TextoLibre("x"), "lima-central"));
+            ids.Add(solicitada.Valor.DevolucionId);
+        }
+
+        var admin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(cliente);
+        foreach (var id in ids)
+        {
+            await admin.Gestion.Aprobar(id);
+        }
+
+        var sistema = new EntornoDeDevoluciones(ActorDePrueba.DelSistema()).ConLosDatosDe(cliente);
+        sistema.Reloj.Ahora = Ahora.AddDays(11);
+        sistema.Repositorio.FallanAlBloquear.Add(ids.OrderBy(i => i).First());
+
+        var resultado = await sistema.Vencidas.Ejecutar(50);
+
+        Assert.Equal(2, resultado.Valor);
+        Assert.Equal(1, ids.Count(i => Guardada(sistema, i).Lineas[0].Estado == EstadoDeLineaDeDevolucion.Aprobada));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-13")]
+    public async Task Con_el_almacen_caido_responde_servicio_no_disponible()
+    {
+        var (sistema, _, _) = await ConAprobada();
+        sistema.Repositorio.NoDisponible = true;
+
+        var resultado = await sistema.Vencidas.Ejecutar(50);
+
+        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
+    }
+
     [Theory]
     [Trait("Criterio", "AC-DEV-13")]
     [InlineData("cliente")]
+    [InlineData("encargado")]
+    [InlineData("administracion")]
     [InlineData("integracion")]
     [InlineData("anonimo")]
     public async Task Solo_el_sistema_revisa_y_cada_intento_de_otro_actor_deja_un_evento(string quien)
@@ -189,5 +249,24 @@ public sealed class RevisionDePlazosDeDevolucionesTests
         Assert.Equal(0, enElBorde.Valor);
         Assert.Equal(0, recibida.Valor);
         Assert.Empty(sistema.Alertas.Alertas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-15")]
+    public async Task Una_alerta_que_no_sale_no_interrumpe_la_revision_y_solo_el_sistema_revisa()
+    {
+        var (sistema, id, _) = await ConAprobada();
+        var devolucion = Guardada(sistema, id);
+        devolucion.IniciarReingreso(Ahora);
+        await sistema.Repositorio.Guardar(devolucion);
+        sistema.Reloj.Ahora = Ahora.AddDays(2);
+        sistema.Alertas.Falla = new InvalidOperationException("sin canal");
+        var comoAdmin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(sistema);
+
+        var resultado = await sistema.Estancadas.Ejecutar();
+        var prohibido = await comoAdmin.Estancadas.Ejecutar();
+
+        Assert.Equal(1, resultado.Valor);
+        Assert.Equal(CategoriaDeError.Prohibido, prohibido.Error!.Categoria);
     }
 }
